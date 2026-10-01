@@ -1,20 +1,66 @@
-"use client";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
-import { Suspense } from "react";
-function Inner() {
-  const sp = useSearchParams();
-  const id = sp.get("id") ?? "confirmed";
+import { getOrderByReference } from "@/lib/orders";
+
+export const dynamic = "force-dynamic";
+
+export const metadata = {
+  title: "Order received",
+  robots: { index: false, follow: false },
+};
+
+export default async function SuccessPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ ref?: string }>;
+}) {
+  const { ref } = await searchParams;
+  const order = ref ? await getOrderByReference(decodeURIComponent(ref)) : null;
+
   return (
-    <div className="wrap" style={{ paddingTop: 50, paddingBottom: 50, textAlign: "center" }}>
-      <p className="eyebrow">Order confirmed</p>
-      <h1>Thanks — we got it.</h1>
-      <p className="muted">Order <strong>{id}</strong> is in the print queue. A receipt and artwork proof were sent to your email.</p>
-      <div style={{ display: "flex", gap: 10, justifyContent: "center", marginTop: 16 }}>
-        <Link href="/shop" className="btn ghost">Keep shopping</Link>
-        <Link href="/account" className="btn">View orders</Link>
+    <div className="wrap section">
+      <div className="panel panel-pad order-done">
+        <p className="eyebrow">Payment received</p>
+        <h1 className="h2">Thank you — your order is in</h1>
+
+        {order ? (
+          <>
+            <p className="lede">
+              Reference <strong className="tnum">{order.reference}</strong>. Payment is
+              confirmed and your order details are below.
+            </p>
+            <ul className="done-list">
+              {order.items.map((i, idx) => (
+                <li key={idx} className="wrap-anywhere">
+                  {i.quantity} × {i.productName}
+                  {i.colorName ? ` (${i.colorName})` : ""}
+                </li>
+              ))}
+            </ul>
+            <p className="small muted">
+              We proof your artwork before production. Keep your reference to follow
+              progress on the order page.
+            </p>
+            <div className="state-actions">
+              <Link href={`/order/${order.reference}`} className="btn">
+                View order
+              </Link>
+              <Link href="/shop" className="btn btn-ghost">
+                Keep shopping
+              </Link>
+            </div>
+          </>
+        ) : (
+          <>
+            <p className="lede">
+              Your payment went through. We could not load the order details just now —
+              contact us with the reference from your confirmation.
+            </p>
+            <Link href="/shop" className="btn">
+              Keep shopping
+            </Link>
+          </>
+        )}
       </div>
     </div>
   );
 }
-export default function Success() { return <Suspense><Inner /></Suspense>; }
