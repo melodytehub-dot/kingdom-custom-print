@@ -1,0 +1,32 @@
+:root{
+  --ink:#141414; --ink-2:#2b2b2b; --muted:#6b6b6b; --line:#e5e0d8;
+  --paper:#f6f4ef; --card:#ffffff; --red:#c8102e; --red-dark:#9c0b22;
+  --orange:#e8721c; --stone:#efe9df; --ok:#1a7f37;
+  --font-d:"Archivo", "Helvetica Neue", Arial, sans-serif;
+  --font-b:"Inter", -apple-system, "Helvetica Neue", Arial, sans-serif;
+  --max:1200px; --r:6px;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{font-family:var(--font-b);color:var(--ink);background:#fff;-webkit-font-smoothing:antialiased}
+a{color:inherit;text-decoration:none}
+button{font-family:inherit}
+img{max-width:100%}
+.wrap{max-width:var(--max);margin:0 auto;padding:0 20px}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;border:1px solid var(--ink);background:var(--ink);color:#fff;font-weight:700;font-size:13px;letter-spacing:.08em;text-transform:uppercase;padding:13px 22px;border-radius:4px;cursor:pointer}
+.btn:hover{background:var(--ink-2)}
+.btn.ghost{background:#fff;color:var(--ink)}
+.btn.red{background:var(--red);border-color:var(--red)}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.input,select.input,textarea.input{width:100%;border:1px solid var(--line);border-radius:4px;padding:11px 12px;font-size:14px;background:#fff;color:var(--ink)}
+label.lbl{display:block;font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;margin:0 0 6px;color:var(--ink-2)}
+.eyebrow{font-size:11px;letter-spacing:.22em;text-transform:uppercase;color:var(--muted);font-weight:700}
+h1.display{font-family:var(--font-d);font-weight:800;letter-spacing:-.02em;line-height:.95;text-transform:uppercase;margin:0}
+.accent{font-family:Georgia,serif;font-style:italic;text-transform:none;letter-spacing:0;color:var(--orange)}
+.card{border:1px solid var(--line);border-radius:var(--r);background:var(--card);overflow:hidden}
+.muted{color:var(--muted)}
+.small{font-size:13px}
+:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
+.skip{position:absolute;left:-9999px}
+.skip:focus{left:8px;top:8px;background:#fff;padding:8px;z-index:99}
+@media(max-width:760px){ .wrap{padding:0 14px} }
