@@ -67,7 +67,7 @@ export default function TextPanel({ layer, fonts, inks, onChange }: Props) {
       </div>
 
       <div className="field">
-        <span className="label">Ink colour</span>
+        <span className="label">Ink color</span>
         <div className="swatches">
           {inks.map((c) => (
             <button
@@ -87,7 +87,7 @@ export default function TextPanel({ layer, fonts, inks, onChange }: Props) {
 
       <div className="field">
         <label className="label" htmlFor={`custom-${layer.id}`}>
-          Custom colour
+          Custom color
         </label>
         <input
           id={`custom-${layer.id}`}

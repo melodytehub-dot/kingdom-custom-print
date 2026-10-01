@@ -2,10 +2,13 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import Garment from "@/components/Garment";
+import CartIcon from "@/components/icons/CartIcon";
 import DesignCanvas from "./DesignCanvas";
 import TextPanel from "./TextPanel";
 import LayerList from "./LayerList";
+import { ART_LIBRARY, type ArtItem } from "./art";
 import {
   emptyDesign,
   loadDrafts,
@@ -39,8 +42,23 @@ const FONT_OPTIONS = [
 const INK_COLORS = ["#141414", "#FFFFFF", "#C8102E", "#1C6B45", "#E8A317", "#26314C", "#6B6862"];
 
 type Step = "design" | "quantity" | "review";
+type Tool = "products" | "text" | "upload" | "art" | "layers";
 
 const STEP_ORDER: Step[] = ["design", "quantity", "review"];
+
+const STEP_LABEL: Record<Step, string> = {
+  design: "Design",
+  quantity: "Quantity & sizes",
+  review: "Review",
+};
+
+const TOOLS: { id: Tool; label: string; icon: React.ReactNode }[] = [
+  { id: "products", label: "Products", icon: <ProductsGlyph /> },
+  { id: "text", label: "Add Text", icon: <TextGlyph /> },
+  { id: "upload", label: "Upload Art", icon: <UploadGlyph /> },
+  { id: "art", label: "Add Art", icon: <ArtGlyph /> },
+  { id: "layers", label: "Layers", icon: <LayersGlyph /> },
+];
 
 interface DraftState {
   colorSlug: string;
@@ -59,10 +77,12 @@ export default function Customizer({
   initialColor: string;
   initialLines: Record<string, number>;
 }) {
-  const { addItem } = useCart();
+  const { addItem, items } = useCart();
 
   const [step, setStep] = useState<Step>("design");
+  const [tool, setTool] = useState<Tool>("products");
   const [side, setSide] = useState<GarmentSide>("front");
+  const [zoom, setZoom] = useState(1);
   const [colorSlug, setColorSlug] = useState(initialColor || product.colors[0]?.slug || "");
   const [design, setDesign] = useState<Design>(emptyDesign);
   const [lines, setLines] = useState<Record<string, number>>(initialLines);
@@ -71,9 +91,21 @@ export default function Customizer({
   const [notice, setNotice] = useState<{ tone: "ok" | "warn" | "error"; text: string } | null>(null);
   const [busy, setBusy] = useState(false);
   const [addedCount, setAddedCount] = useState(0);
+  const [hist, setHist] = useState({ canUndo: false, canRedo: false });
 
   const fileInput = useRef<HTMLInputElement>(null);
   const draftKey = `kcp.draft.${product.slug}`;
+
+  const historyRef = useRef<Design[]>([]);
+  const futureRef = useRef<Design[]>([]);
+  const applyingHistory = useRef(false);
+
+  const syncHist = useCallback(() => {
+    setHist({
+      canUndo: historyRef.current.length > 1,
+      canRedo: futureRef.current.length > 0,
+    });
+  }, []);
 
   const color = useMemo(
     () => product.colors.find((c) => c.slug === colorSlug) ?? product.colors[0],
@@ -90,12 +122,9 @@ export default function Customizer({
   const quote = quoteProduct(product, { sides, lines: sizeLines });
   const layers = design[side];
   const selected = selectedId ? layers.find((l) => l.id === selectedId) : undefined;
+  const cartCount = items.reduce((n, i) => n + i.quantity, 0);
 
-  /* ---- restore draft on mount ----
-   * localStorage is an external system that is unreadable during SSR, so the
-   * draft can only be adopted on the client after the first paint. This is the
-   * documented exception to the set-state-in-effect rule.
-   */
+  /* ---- restore draft on mount ---- */
   /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     setDrafts(loadDrafts());
@@ -123,6 +152,20 @@ export default function Customizer({
     }
   }, [draftKey, colorSlug, design, lines]);
 
+  /* ---- undo history (debounced so a drag is one step) ---- */
+  useEffect(() => {
+    if (applyingHistory.current) {
+      applyingHistory.current = false;
+      return;
+    }
+    const t = setTimeout(() => {
+      historyRef.current = [...historyRef.current.slice(-29), design];
+      futureRef.current = [];
+      syncHist();
+    }, 450);
+    return () => clearTimeout(t);
+  }, [design, syncHist]);
+
   useEffect(() => {
     if (!notice) return;
     const t = setTimeout(() => setNotice(null), 5200);
@@ -136,7 +179,6 @@ export default function Customizer({
     []
   );
 
-  /** Convenience wrapper that patches the side currently being edited. */
   const patchActive = useCallback(
     (id: string, changes: Partial<DesignLayer>) => {
       setDesign((prev) => updateLayer(prev, side, id, changes));
@@ -148,7 +190,15 @@ export default function Customizer({
     const layer = newTextLayer();
     setDesign((prev) => ({ ...prev, [side]: [...prev[side], layer] }));
     setSelectedId(layer.id);
-    setNotice({ tone: "ok", text: "Text added. Edit it in the panel below the canvas." });
+    setNotice({ tone: "ok", text: "Text added. Edit it in the panel on the left." });
+  };
+
+  const addArt = (item: ArtItem) => {
+    const layer = newImageLayer(item.src, item.name);
+    setDesign((prev) => ({ ...prev, [side]: [...prev[side], layer] }));
+    setSelectedId(layer.id);
+    setTool("layers");
+    setNotice({ tone: "ok", text: `${item.name} added to the ${side}.` });
   };
 
   const onUpload = async (file: File | undefined) => {
@@ -165,6 +215,7 @@ export default function Customizer({
       const layer = newImageLayer(decoded.dataUrl, file.name);
       setDesign((prev) => ({ ...prev, [side]: [...prev[side], layer] }));
       setSelectedId(layer.id);
+      setTool("layers");
       setNotice({
         tone: check.warning ? "warn" : "ok",
         text:
@@ -180,6 +231,40 @@ export default function Customizer({
       setBusy(false);
       if (fileInput.current) fileInput.current.value = "";
     }
+  };
+
+  const undo = () => {
+    const h = historyRef.current;
+    if (h.length < 2) return;
+    const current = h[h.length - 1];
+    const prev = h[h.length - 2];
+    futureRef.current = [current, ...futureRef.current].slice(0, 30);
+    historyRef.current = h.slice(0, -1);
+    applyingHistory.current = true;
+    setDesign(prev);
+    setSelectedId(null);
+    syncHist();
+  };
+
+  const redo = () => {
+    const f = futureRef.current;
+    if (!f.length) return;
+    const next = f[0];
+    futureRef.current = f.slice(1);
+    historyRef.current = [...historyRef.current, next].slice(-30);
+    applyingHistory.current = true;
+    setDesign(next);
+    setSelectedId(null);
+    syncHist();
+  };
+
+  const startOver = () => {
+    applyingHistory.current = true;
+    historyRef.current = [...historyRef.current, emptyDesign()].slice(-30);
+    futureRef.current = [];
+    setDesign(emptyDesign());
+    setSelectedId(null);
+    syncHist();
   };
 
   const saveDraft = () => {
@@ -202,6 +287,7 @@ export default function Customizer({
   const loadDraft = (id: string) => {
     const found = drafts.find((d) => d.id === id);
     if (!found) return;
+    applyingHistory.current = true;
     setDesign(found.design);
     setSelectedId(null);
     setNotice({ tone: "ok", text: `Loaded your saved ${found.productName} design.` });
@@ -211,11 +297,6 @@ export default function Customizer({
     const next = drafts.filter((d) => d.id !== id);
     setDrafts(next);
     persistDrafts(next);
-  };
-
-  const clearSide = () => {
-    setDesign((prev) => ({ ...prev, [side]: [] }));
-    setSelectedId(null);
   };
 
   const setQty = (label: string, value: number) => {
@@ -261,15 +342,14 @@ export default function Customizer({
         previewFront: previews.front,
         previewBack: previews.back,
         lines: sizeLines.filter((l) => l.qty > 0),
-        surcharges: Object.fromEntries(
-          product.sizes.map((sz) => [sz.label, sz.surcharge])
-        ),
+        surcharges: Object.fromEntries(product.sizes.map((sz) => [sz.label, sz.surcharge])),
         unitPrice: quote.unitBase,
         total: quote.total,
         quantity,
       });
       setAddedCount((n) => n + 1);
       setNotice({ tone: "ok", text: "Added to cart." });
+      applyingHistory.current = true;
       setDesign(emptyDesign());
       setLines(Object.fromEntries(product.sizes.map((s) => [s.label, 0])));
       setSelectedId(null);
@@ -285,234 +365,288 @@ export default function Customizer({
 
   const stepIndex = STEP_ORDER.indexOf(step);
 
+  function goNext() {
+    if (step === "design" && quantity <= 0) {
+      setNotice({ tone: "warn", text: "Set a quantity before reviewing." });
+    }
+    if (stepIndex < STEP_ORDER.length - 1) setStep(STEP_ORDER[stepIndex + 1]);
+  }
+
+  function goBack() {
+    if (stepIndex > 0) setStep(STEP_ORDER[stepIndex - 1]);
+  }
+
+  /** Inspector shared by the Text and Layers tools. */
+  function renderInspector() {
+    if (selected?.type === "text") {
+      return (
+        <TextPanel
+          layer={selected}
+          fonts={FONT_OPTIONS}
+          inks={INK_COLORS}
+          onChange={(changes) => patchActive(selected.id, changes)}
+        />
+      );
+    }
+    if (selected?.type === "image") {
+      return (
+        <div className="image-inspector">
+          <p className="small wrap-anywhere">
+            <strong>{selected.name}</strong>
+          </p>
+          <label className="range-row" htmlFor={`op-${selected.id}`}>
+            <span>Opacity</span>
+            <input
+              id={`op-${selected.id}`}
+              type="range"
+              min={0.1}
+              max={1}
+              step={0.05}
+              value={selected.opacity}
+              onChange={(e) => patchActive(selected.id, { opacity: Number(e.target.value) })}
+            />
+            <span className="tnum small">{Math.round(selected.opacity * 100)}%</span>
+          </label>
+        </div>
+      );
+    }
+    return (
+      <p className="empty-note small muted">
+        Select a layer on the garment to edit it.
+      </p>
+    );
+  }
+
   return (
-    <div className="customizer">
-      {/* Step rail */}
-      <nav aria-label="Order steps">
-        <ol className="steps-rail">
-          {(["design", "quantity", "review"] as const).map((key, i) => {
+    <div className="studio">
+      {/* Top bar: steps + cart */}
+      <div className="studio-top">
+        <ol className="studio-steps">
+          {STEP_ORDER.map((key, i) => {
             const active = step === key;
-            const label = key === "quantity" ? "Quantity" : key[0].toUpperCase() + key.slice(1);
+            const done = stepIndex > i;
             return (
-              <li key={key} className="rail-step">
+              <li key={key}>
                 <button
                   type="button"
-                  className={`rail-btn${active ? " is-active" : ""}${stepIndex > i ? " is-done" : ""}`}
+                  className={`studio-step${active ? " is-active" : ""}${done ? " is-done" : ""}`}
                   aria-current={active ? "step" : undefined}
                   onClick={() => setStep(key)}
                 >
-                  <span className="rail-n tnum">{i + 1}</span>
-                  <span className="rail-label">{label}</span>
+                  <span className="studio-step-n tnum">{i + 1}</span>
+                  <span className="studio-step-label">{STEP_LABEL[key]}</span>
                 </button>
-                {i < 2 ? (
-                  <span
-                    className={`rail-line${stepIndex > i ? " is-done" : ""}`}
-                    aria-hidden="true"
-                  />
-                ) : null}
               </li>
             );
           })}
         </ol>
-      </nav>
 
-      <div className="cust-layout">
-        {/* ---------------- Preview stage ---------------- */}
-        <section className="cust-stage" aria-label="Design preview">
-          <div className="stage-head">
-            <div className="side-switch" role="group" aria-label="Garment side">
-              {(["front", "back"] as const).map((s) => (
-                <button
-                  key={s}
-                  type="button"
-                  className={`side-btn${side === s ? " is-active" : ""}`}
-                  aria-pressed={side === s}
-                  onClick={() => {
-                    setSide(s);
-                    setSelectedId(null);
-                  }}
-                >
-                  {s === "front" ? "Front" : "Back"}
-                  <span className="side-count tnum">{design[s].length || ""}</span>
-                </button>
-              ))}
-            </div>
-            {layers.length ? (
-              <button type="button" className="link clear-side" onClick={clearSide}>
-                Clear {side}
+        <div className="studio-top-side">
+          <Link href="/cart" className="studio-top-link">
+            <CartIcon />
+            <span>Cart</span>
+            {cartCount > 0 ? <span className="studio-top-badge tnum">{cartCount}</span> : null}
+          </Link>
+          <Link href="/contact" className="studio-top-link studio-top-help">
+            Need help?
+          </Link>
+        </div>
+      </div>
+
+      <div className="studio-main">
+        {/* Tool rail */}
+        {step === "design" ? (
+          <nav className="studio-rail" aria-label="Design tools">
+            {TOOLS.map((t) => (
+              <button
+                key={t.id}
+                type="button"
+                className={`studio-rail-btn${tool === t.id ? " is-active" : ""}`}
+                onClick={() => setTool(t.id)}
+                aria-pressed={tool === t.id}
+              >
+                <span className="studio-rail-icon" aria-hidden="true">
+                  {t.icon}
+                </span>
+                <span className="studio-rail-label">{t.label}</span>
               </button>
-            ) : null}
-          </div>
+            ))}
+          </nav>
+        ) : null}
 
-          <DesignCanvas
-            product={product}
-            color={color?.hex ?? "#141414"}
-            design={design}
-            side={side}
-            selectedId={selectedId}
-            onSelect={setSelectedId}
-            onChange={patch}
-            onCommit={() => undefined}
-          />
+        {/* Contextual panel */}
+        <aside className="studio-panel" aria-label="Design controls">
+          {notice ? (
+            <p
+              className={`cust-notice is-${notice.tone} studio-notice`}
+              role={notice.tone === "error" ? "alert" : "status"}
+            >
+              {notice.text}
+            </p>
+          ) : null}
 
-          {step === "design" ? (
+          {step === "design" && tool === "products" ? (
             <>
-              <div className="add-bar">
-                <button type="button" className="btn" onClick={addText} disabled={busy}>
-                  Add text
-                </button>
-                <button
-                  type="button"
-                  className="btn btn-light"
-                  onClick={() => fileInput.current?.click()}
-                  disabled={busy}
-                >
-                  {busy ? "Reading…" : "Upload artwork"}
-                </button>
-                <button type="button" className="btn btn-light" onClick={saveDraft}>
-                  Save
-                </button>
-                <input
-                  ref={fileInput}
-                  type="file"
-                  accept="image/png,image/jpeg,image/webp,image/svg+xml"
-                  onChange={(e) => onUpload(e.target.files?.[0])}
-                  className="sr-only"
-                  aria-label="Upload artwork file"
-                />
+              <PanelHead
+                eyebrow="Products"
+                title="Manage your products"
+                hint="Pick a blank, then choose a colour. Everything is printed to order."
+              />
+
+              <div className="studio-product">
+                <div className="studio-product-media">
+                  {product.images[0] ? (
+                    <Image
+                      src={product.images[0].url}
+                      alt=""
+                      width={120}
+                      height={120}
+                      className="studio-product-img"
+                    />
+                  ) : (
+                    <Garment kind={product.kind} color={color?.hex ?? "#141414"} />
+                  )}
+                </div>
+                <div className="studio-product-info">
+                  <p className="studio-product-name wrap-anywhere">{product.name}</p>
+                  {product.styleCode ? (
+                    <p className="small muted">Style {product.styleCode}</p>
+                  ) : null}
+                  <p className="studio-product-color small">
+                    <span
+                      className="studio-dot"
+                      style={{ background: color?.hex }}
+                      aria-hidden="true"
+                    />
+                    {color?.name}
+                  </p>
+                </div>
               </div>
 
-              {notice ? (
-                <p
-                  className={`cust-notice is-${notice.tone}`}
-                  role={notice.tone === "error" ? "alert" : "status"}
-                >
-                  {notice.text}
-                </p>
-              ) : null}
-
-              {drafts.length ? (
-                <div className="drafts">
-                  <p className="eyebrow">Saved designs</p>
-                  <ul>
-                    {drafts.map((d) => (
-                      <li key={d.id}>
-                        <button type="button" className="draft-load" onClick={() => loadDraft(d.id)}>
-                          <Garment kind={product.kind} color={d.colorHex} />
-                          <span className="draft-meta">
-                            <span className="wrap-anywhere">{d.productName}</span>
-                            <span className="small muted">
-                              {new Date(d.savedAt).toLocaleDateString()}
-                            </span>
-                          </span>
-                        </button>
-                        <button
-                          type="button"
-                          className="icon-btn"
-                          onClick={() => deleteDraft(d.id)}
-                          aria-label={`Delete saved ${d.productName} design`}
-                        >
-                          <svg width="15" height="15" viewBox="0 0 18 18" aria-hidden="true">
-                            <path
-                              d="M3 5h12M7.5 5V3.5h3V5M5 5l.8 10.2A1 1 0 0 0 6.8 16h4.4a1 1 0 0 0 1-.8L13 5"
-                              stroke="currentColor"
-                              strokeWidth="1.3"
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              fill="none"
-                            />
-                          </svg>
-                        </button>
-                      </li>
-                    ))}
-                  </ul>
+              <div className="pane">
+                <p className="label">Switch blank</p>
+                <div className="studio-blank-row">
+                  {products.map((p) => (
+                    <Link
+                      key={p.id}
+                      href={`/customize/${p.slug}`}
+                      className={`studio-blank${p.id === product.id ? " is-active" : ""}`}
+                      aria-current={p.id === product.id ? "true" : undefined}
+                    >
+                      {p.images[0] ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={p.images[0].url} alt="" />
+                      ) : (
+                        <Garment kind={p.kind} color={p.colors[0]?.hex ?? "#141414"} />
+                      )}
+                      <span className="wrap-anywhere">{p.name}</span>
+                    </Link>
+                  ))}
                 </div>
-              ) : null}
+              </div>
+
+              <Link href="/customize" className="studio-add">
+                <span aria-hidden="true">+</span> Add another blank
+              </Link>
+
+              <div className="pane">
+                <p className="label">
+                  Color <span className="opt-value">{color?.name}</span>
+                </p>
+                <div className="swatches">
+                  {product.colors.map((c) => (
+                    <button
+                      key={c.slug}
+                      type="button"
+                      className={`swatch${c.slug === color?.slug ? " is-active" : ""}`}
+                      style={{ background: c.hex }}
+                      onClick={() => setColorSlug(c.slug)}
+                      aria-pressed={c.slug === color?.slug}
+                      title={c.name}
+                    >
+                      <span className="sr-only">{c.name}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="pane">
+                <p className="label">Method</p>
+                <div className="studio-method">
+                  <span className="studio-method-opt is-active">
+                    Printing
+                    <span className="small muted">No minimum</span>
+                  </span>
+                  <span className="studio-method-opt is-off">
+                    Embroidery
+                    <span className="small muted">On request</span>
+                  </span>
+                </div>
+              </div>
             </>
           ) : null}
 
-          {step === "review" ? (
-            <div className="review-block">
-              <p className="eyebrow">Design summary</p>
-              <ul className="review-list">
-                <li>
-                  <span>Blank</span>
-                  <strong>{product.name}</strong>
-                </li>
-                <li>
-                  <span>Colour</span>
-                  <strong>{color?.name}</strong>
-                </li>
-                <li>
-                  <span>Printed sides</span>
-                  <strong>
-                    {sides.length ? sides.map((s) => (s === "front" ? "Front" : "Back")).join(" + ") : "Blank garment"}
-                  </strong>
-                </li>
-                <li>
-                  <span>Elements</span>
-                  <strong>
-                    {design.front.length + design.back.length || "None"}
-                  </strong>
-                </li>
-                <li>
-                  <span>Garments</span>
-                  <strong className="tnum">{quantity}</strong>
-                </li>
-              </ul>
-            </div>
+          {step === "design" && tool === "text" ? (
+            <>
+              <PanelHead
+                eyebrow="Add text"
+                title="Type your message"
+                hint={`Adds to the ${side}. Move, scale and restyle it on the garment.`}
+              />
+              <button type="button" className="btn btn-block" onClick={addText}>
+                + Add a text layer
+              </button>
+              <div className="pane">{renderInspector()}</div>
+            </>
           ) : null}
-        </section>
 
-        {/* ---------------- Control panel ---------------- */}
-        <section className="cust-panel" aria-label="Design controls">
-          {products.length > 1 ? (
-            <div className="pane">
-              <p className="label">Blank</p>
-              <div className="blank-row">
-                {products.map((p) => (
-                  <Link
-                    key={p.id}
-                    href={`/customize/${p.slug}`}
-                    className={`blank-chip${p.id === product.id ? " is-active" : ""}`}
-                    aria-current={p.id === product.id ? "true" : undefined}
-                  >
-                    <Garment kind={p.kind} color={p.colors[0]?.hex ?? "#141414"} />
-                    <span className="wrap-anywhere">{p.name}</span>
-                  </Link>
+          {step === "design" && tool === "upload" ? (
+            <>
+              <PanelHead
+                eyebrow="Upload art"
+                title="Add your artwork"
+                hint="PNG, JPG, WEBP or SVG up to 8 MB. Vector prints sharpest — outline fonts first."
+              />
+              <button
+                type="button"
+                className="btn btn-block"
+                onClick={() => fileInput.current?.click()}
+                disabled={busy}
+              >
+                {busy ? "Reading…" : "Choose a file"}
+              </button>
+              <p className="hint">It is placed on the {side} and can be moved and scaled.</p>
+            </>
+          ) : null}
+
+          {step === "design" && tool === "art" ? (
+            <>
+              <PanelHead
+                eyebrow="Add art"
+                title="Ready-made graphics"
+                hint="Drop in a graphic, then scale, rotate and fade it like any layer."
+              />
+              <ul className="studio-art-grid">
+                {ART_LIBRARY.map((item) => (
+                  <li key={item.id}>
+                    <button type="button" onClick={() => addArt(item)} title={item.name}>
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={item.src} alt="" />
+                      <span>{item.name}</span>
+                    </button>
+                  </li>
                 ))}
-              </div>
-            </div>
+              </ul>
+            </>
           ) : null}
 
-          <div className="pane">
-            <p className="label">
-              Colour <span className="opt-value">{color?.name}</span>
-            </p>
-            <div className="swatches">
-              {product.colors.map((c) => (
-                <button
-                  key={c.slug}
-                  type="button"
-                  className={`swatch${c.slug === color?.slug ? " is-active" : ""}`}
-                  style={{ background: c.hex }}
-                  onClick={() => setColorSlug(c.slug)}
-                  aria-pressed={c.slug === color?.slug}
-                  title={c.name}
-                >
-                  <span className="sr-only">{c.name}</span>
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {step === "design" ? (
-            <div className="pane">
-              <p className="label">
-                {side === "front" ? "Front" : "Back"} layers
-                <span className="opt-hint">{layers.length}</span>
-              </p>
-
+          {step === "design" && tool === "layers" ? (
+            <>
+              <PanelHead
+                eyebrow="Layers"
+                title={`${side === "front" ? "Front" : "Back"} elements`}
+                hint="Select a layer to edit or remove it."
+              />
               <LayerList
                 layers={layers}
                 selectedId={selectedId}
@@ -522,53 +656,22 @@ export default function Customizer({
                   if (selectedId === id) setSelectedId(null);
                 }}
               />
-
               {layers.length === 0 ? (
                 <p className="empty-note small muted">
-                  Nothing on this side yet. Add text or upload artwork to begin.
+                  Nothing on this side yet. Use Add Text, Upload Art or Add Art.
                 </p>
               ) : null}
-
-              {selected?.type === "text" ? (
-                <TextPanel
-                  layer={selected}
-                  fonts={FONT_OPTIONS}
-                  inks={INK_COLORS}
-                  onChange={(changes) => patchActive(selected.id, changes)}
-                />
-              ) : null}
-
-              {selected?.type === "image" ? (
-                <div className="image-inspector">
-                  <p className="small wrap-anywhere">
-                    <strong>{selected.name}</strong>
-                  </p>
-                  <label className="range-row" htmlFor={`op-${selected.id}`}>
-                    <span>Opacity</span>
-                    <input
-                      id={`op-${selected.id}`}
-                      type="range"
-                      min={0.1}
-                      max={1}
-                      step={0.05}
-                      value={selected.opacity}
-                      onChange={(e) => patchActive(selected.id, { opacity: Number(e.target.value) })}
-                    />
-                    <span className="tnum small">{Math.round(selected.opacity * 100)}%</span>
-                  </label>
-                </div>
-              ) : null}
-            </div>
+              <div className="pane">{renderInspector()}</div>
+            </>
           ) : null}
 
           {step === "quantity" ? (
-            <div className="pane">
-              <p className="label">
-                Size run{" "}
-                <span className="opt-hint">
-                  {quantity} garment{quantity === 1 ? "" : "s"}
-                </span>
-              </p>
+            <>
+              <PanelHead
+                eyebrow="Step 2"
+                title="Quantity & sizes"
+                hint="Enter quantities per size. The price drops as the run crosses a break."
+              />
               <div className="size-run">
                 {product.sizes.map((s) => (
                   <div
@@ -628,93 +731,350 @@ export default function Customizer({
                   );
                 })}
               </div>
+            </>
+          ) : null}
+
+          {step === "review" ? (
+            <>
+              <PanelHead
+                eyebrow="Step 3"
+                title="Review your order"
+                hint="Check the design and the size run, then add it to the cart."
+              />
+              <ul className="review-list">
+                <li>
+                  <span>Blank</span>
+                  <strong>{product.name}</strong>
+                </li>
+                <li>
+                  <span>Color</span>
+                  <strong>{color?.name}</strong>
+                </li>
+                <li>
+                  <span>Printed sides</span>
+                  <strong>
+                    {sides.length
+                      ? sides.map((s) => (s === "front" ? "Front" : "Back")).join(" + ")
+                      : "Blank garment"}
+                  </strong>
+                </li>
+                <li>
+                  <span>Elements</span>
+                  <strong>{design.front.length + design.back.length || "None"}</strong>
+                </li>
+                <li>
+                  <span>Garments</span>
+                  <strong className="tnum">{quantity}</strong>
+                </li>
+                <li>
+                  <span>Price each</span>
+                  <strong className="tnum">{formatUSD(quote.unitBase)}</strong>
+                </li>
+                <li className="review-total">
+                  <span>Subtotal</span>
+                  <strong className="tnum">{formatUSD(quote.total)}</strong>
+                </li>
+              </ul>
+
+              {drafts.length ? (
+                <div className="drafts">
+                  <p className="eyebrow">Saved designs</p>
+                  <ul>
+                    {drafts.map((d) => (
+                      <li key={d.id}>
+                        <button
+                          type="button"
+                          className="draft-load"
+                          onClick={() => loadDraft(d.id)}
+                        >
+                          <Garment kind={product.kind} color={d.colorHex} />
+                          <span className="draft-meta">
+                            <span className="wrap-anywhere">{d.productName}</span>
+                            <span className="small muted">
+                              {new Date(d.savedAt).toLocaleDateString()}
+                            </span>
+                          </span>
+                        </button>
+                        <button
+                          type="button"
+                          className="icon-btn"
+                          onClick={() => deleteDraft(d.id)}
+                          aria-label={`Delete saved ${d.productName} design`}
+                        >
+                          <svg width="15" height="15" viewBox="0 0 18 18" aria-hidden="true">
+                            <path
+                              d="M3 5h12M7.5 5V3.5h3V5M5 5l.8 10.2A1 1 0 0 0 6.8 16h4.4a1 1 0 0 0 1-.8L13 5"
+                              stroke="currentColor"
+                              strokeWidth="1.3"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              fill="none"
+                            />
+                          </svg>
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ) : null}
+            </>
+          ) : null}
+
+          <input
+            ref={fileInput}
+            type="file"
+            accept="image/png,image/jpeg,image/webp,image/svg+xml"
+            onChange={(e) => onUpload(e.target.files?.[0])}
+            className="sr-only"
+            aria-label="Upload artwork file"
+          />
+        </aside>
+
+        {/* Stage */}
+        <section className="studio-stage" aria-label="Design preview">
+          <div className="stage-top">
+            <div className="stage-side-tabs" role="group" aria-label="Garment side">
+              {(["front", "back"] as const).map((s) => (
+                <button
+                  key={s}
+                  type="button"
+                  className={`stage-side-btn${side === s ? " is-active" : ""}`}
+                  aria-pressed={side === s}
+                  onClick={() => {
+                    setSide(s);
+                    setSelectedId(null);
+                  }}
+                >
+                  {s === "front" ? "Front" : "Back"}
+                  <span className="stage-side-count tnum">{design[s].length || ""}</span>
+                </button>
+              ))}
+            </div>
+
+            <div className="stage-history">
+              <button type="button" onClick={undo} disabled={!hist.canUndo}>
+                Undo
+              </button>
+              <button type="button" onClick={redo} disabled={!hist.canRedo}>
+                Redo
+              </button>
+              <button type="button" onClick={startOver}>
+                Start over
+              </button>
+            </div>
+          </div>
+
+          <div
+            className="stage-canvas"
+            style={{ ["--stage-max" as string]: `${56 * zoom}vh` } as React.CSSProperties}
+          >
+            <DesignCanvas
+              product={product}
+              color={color?.hex ?? "#141414"}
+              design={design}
+              side={side}
+              selectedId={selectedId}
+              onSelect={setSelectedId}
+              onChange={patch}
+              onCommit={() => undefined}
+            />
+          </div>
+
+          {step === "design" ? (
+            <div className="stage-quick">
+              <button
+                type="button"
+                onClick={() => {
+                  setTool("text");
+                  addText();
+                }}
+                disabled={busy}
+              >
+                Add text
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setTool("upload");
+                  fileInput.current?.click();
+                }}
+                disabled={busy}
+              >
+                Upload art
+              </button>
+              <button type="button" onClick={() => setTool("art")}>
+                Add art
+              </button>
             </div>
           ) : null}
 
-          <div className="pane pane-summary">
-            <div className="quote-row">
-              <span>
-                {product.name} · {color?.name}
-              </span>
-              <span className="tnum">
-                {quantity > 0 ? `${quantity} × ${formatUSD(quote.unitBase)}` : "Set quantities"}
-              </span>
-            </div>
+          <div className="stage-status small muted">
+            {design.front.length} front · {design.back.length} back
+          </div>
 
-            <div className="quote-row">
-              <span>
-                {sides.length
-                  ? `Decoration on ${sides.join(" + ")}`
-                  : "No artwork yet"}
-              </span>
-              <span className="tnum">
-                {formatUSD(sides.length * product.printFeePerSide)}
-              </span>
-            </div>
-
-            {quote.appliedBreak ? (
-              <div className="quote-row quote-tier">
-                <span>Quantity break at {quote.appliedBreak}+ applied</span>
-                <span className="tnum">per garment</span>
-              </div>
-            ) : null}
-
-            <div className="quote-row quote-total">
-              <span>Subtotal</span>
-              <strong className="tnum">{quantity > 0 ? formatUSD(quote.total) : "—"}</strong>
-            </div>
-
+          <div className="stage-zoom">
             <button
               type="button"
-              className="btn btn-lg btn-block"
+              onClick={() => setZoom((z) => Math.max(0.75, Math.round((z - 0.25) * 100) / 100))}
+              aria-label="Zoom out"
+            >
+              &minus;
+            </button>
+            <span className="tnum small">{Math.round(zoom * 100)}%</span>
+            <button
+              type="button"
+              onClick={() => setZoom((z) => Math.min(1.5, Math.round((z + 0.25) * 100) / 100))}
+              aria-label="Zoom in"
+            >
+              +
+            </button>
+          </div>
+        </section>
+      </div>
+
+      {/* Bottom action bar */}
+      <div className="studio-footer">
+        <div className="studio-price">
+          <span className="studio-price-unit tnum">
+            {formatUSD(quote.unitBase)}
+            <small> each</small>
+          </span>
+          <span className="studio-price-total small muted">
+            {quantity > 0
+              ? `${quantity} garment${quantity === 1 ? "" : "s"} · ${formatUSD(quote.total)}`
+              : "Set a quantity to see the total"}
+          </span>
+        </div>
+
+        <div className="studio-footer-actions">
+          {stepIndex > 0 ? (
+            <button type="button" className="btn btn-light" onClick={goBack}>
+              Back
+            </button>
+          ) : null}
+          <button type="button" className="btn btn-light" onClick={saveDraft}>
+            Save design
+          </button>
+          {step === "review" ? (
+            <button
+              type="button"
+              className="btn btn-red"
               onClick={handleAddToCart}
               disabled={busy}
             >
               {busy ? "Adding…" : addedCount > 0 ? "Add another" : "Add to cart"}
             </button>
-
-            {addedCount > 0 ? (
-              <Link href="/cart" className="btn btn-light btn-block">
-                Go to cart ({addedCount})
-              </Link>
-            ) : null}
-
-            <p className="hint">
-              Shipping is calculated at checkout. Artwork is proofed before printing.
-            </p>
-          </div>
-
-          {/* Step navigation */}
-          <div className="pane-nav">
-            {stepIndex > 0 ? (
-              <button
-                type="button"
-                className="btn btn-light btn-block"
-                onClick={() => setStep(STEP_ORDER[stepIndex - 1])}
-              >
-                Back
-              </button>
-            ) : null}
-            {stepIndex < STEP_ORDER.length - 1 ? (
-              <button
-                type="button"
-                className="btn btn-block"
-                onClick={() => {
-                  if (step === "design" && quantity <= 0) {
-                    setNotice({
-                      tone: "error",
-                      text: "Set a quantity before reviewing.",
-                    });
-                  }
-                  setStep(STEP_ORDER[stepIndex + 1]);
-                }}
-              >
-                Continue to {STEP_ORDER[stepIndex + 1] === "quantity" ? "quantity" : "review"}
-              </button>
-            ) : null}
-          </div>
-        </section>
+          ) : (
+            <button type="button" className="btn" onClick={goNext}>
+              Next step
+            </button>
+          )}
+          {addedCount > 0 ? (
+            <Link href="/cart" className="btn btn-light">
+              Go to cart ({addedCount})
+            </Link>
+          ) : null}
+        </div>
       </div>
     </div>
+  );
+}
+
+function PanelHead({
+  eyebrow,
+  title,
+  hint,
+}: {
+  eyebrow: string;
+  title: string;
+  hint: string;
+}) {
+  return (
+    <header className="studio-panel-head">
+      <p className="eyebrow">{eyebrow}</p>
+      <h2 className="h3 studio-panel-title">{title}</h2>
+      <p className="small muted">{hint}</p>
+    </header>
+  );
+}
+
+/* -------------------------------------------------------------------------
+   Rail glyphs
+   ------------------------------------------------------------------------- */
+
+function ProductsGlyph() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path
+        d="M9 3 5 5.2 3.4 9.6l2.8 1 .8 9.4h10l.8-9.4 2.8-1L19 5.2 15 3a3 3 0 0 1-6 0Z"
+        stroke="currentColor"
+        strokeWidth="1.6"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+function TextGlyph() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path
+        d="M4 6V4h16v2M12 4v16M8 20h8"
+        stroke="currentColor"
+        strokeWidth="1.6"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+function UploadGlyph() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path
+        d="M12 16V4m0 0L7.5 8.5M12 4l4.5 4.5M4 16v2.5A1.5 1.5 0 0 0 5.5 20h13a1.5 1.5 0 0 0 1.5-1.5V16"
+        stroke="currentColor"
+        strokeWidth="1.6"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+function ArtGlyph() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <rect x="3.5" y="3.5" width="17" height="17" rx="2" stroke="currentColor" strokeWidth="1.6" />
+      <circle cx="8.6" cy="8.6" r="1.6" fill="currentColor" />
+      <path
+        d="m5 17 4.6-4.4L13 15.4l2.4-2.2L19 16"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+function LayersGlyph() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path
+        d="m12 3 9 5-9 5-9-5 9-5Z"
+        stroke="currentColor"
+        strokeWidth="1.6"
+        strokeLinejoin="round"
+      />
+      <path
+        d="m3 13 9 5 9-5"
+        stroke="currentColor"
+        strokeWidth="1.6"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
   );
 }

@@ -13,8 +13,11 @@
 .pdp-media {
   position: sticky;
   top: calc(var(--header-h) + 20px);
-  display: grid;
-  place-items: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
   padding: clamp(24px, 4vw, 48px);
   background: var(--bone);
   border: 1px solid var(--line);
@@ -28,9 +31,37 @@
   height: auto;
 }
 
-.pdp-media img {
+.pdp-media > img {
   max-height: 460px;
   object-fit: contain;
+}
+
+.pdp-thumbs {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.pdp-thumb {
+  width: 56px;
+  height: 56px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-sm);
+  overflow: hidden;
+  background: #fff;
+  transition: border-color var(--dur) var(--ease), box-shadow var(--dur) var(--ease);
+}
+
+.pdp-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.pdp-thumb.is-active {
+  border-color: var(--ink);
+  box-shadow: 0 0 0 2px rgba(17, 17, 16, 0.14);
 }
 
 .pdp-save {
@@ -331,6 +362,49 @@
 }
 
 .pdp-from {
+  margin-top: 10px;
+}
+
+/* Published quantity tiers */
+.pdp-breaks {
+  margin-top: 26px;
+  padding-top: 20px;
+  border-top: 1px solid var(--line);
+}
+
+.breaks-table {
+  margin-top: 8px;
+  font-size: 13.5px;
+}
+
+.breaks-table th {
+  padding: 0 0 6px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  text-align: left;
+  color: var(--muted);
+  border-bottom: 1px solid var(--line);
+}
+
+.breaks-table th:last-child,
+.breaks-table td:last-child {
+  text-align: right;
+}
+
+.breaks-table td {
+  padding: 7px 0;
+  color: var(--ink-2);
+  border-bottom: 1px solid var(--line);
+}
+
+.breaks-table tr.is-active td {
+  color: var(--red);
+  font-weight: 700;
+}
+
+.pdp-breaks .hint {
   margin-top: 10px;
 }
 

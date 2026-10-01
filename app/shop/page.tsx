@@ -78,7 +78,7 @@ export default async function ShopPage({
         </h1>
         <p className="lede">
           Every blank lists its fabric weight and printable area. Pick one to see the size
-          run, then customise it online.
+          run, then customize it online.
         </p>
       </div>
 

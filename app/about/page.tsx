@@ -12,7 +12,7 @@ const STAGES = [
   {
     step: "01",
     title: "Choose the blank",
-    body: "Every garment page lists the fabric weight, available colours and the printable area for each side. Pick what suits the job — a chest mark, a full front, or a large back print.",
+    body: "Every garment page lists the fabric weight, available colors and the printable area for each side. Pick what suits the job — a chest mark, a full front, or a large back print.",
   },
   {
     step: "02",

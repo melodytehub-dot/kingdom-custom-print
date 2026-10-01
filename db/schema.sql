@@ -13,6 +13,8 @@ CREATE TABLE IF NOT EXISTS products (
   id          serial PRIMARY KEY,
   slug        text NOT NULL UNIQUE,
   name        text NOT NULL,
+  -- blank manufacturer style number shown on the product page, e.g. "RT2000"
+  style_code  text NOT NULL DEFAULT '',
   category_id int REFERENCES categories(id) ON DELETE SET NULL,
   -- garment kind drives which customizer template renders
   kind        text NOT NULL CHECK (kind IN ('tee','longsleeve','hoodie','crew','cap','mug','tote')),
@@ -32,6 +34,9 @@ CREATE TABLE IF NOT EXISTS products (
   created_at  timestamptz NOT NULL DEFAULT now(),
   updated_at  timestamptz NOT NULL DEFAULT now()
 );
+
+-- Idempotent add for databases created before the style number existed.
+ALTER TABLE products ADD COLUMN IF NOT EXISTS style_code text NOT NULL DEFAULT '';
 
 CREATE INDEX IF NOT EXISTS products_active_idx ON products (active, sort_order);
 CREATE INDEX IF NOT EXISTS products_featured_idx ON products (featured) WHERE featured;

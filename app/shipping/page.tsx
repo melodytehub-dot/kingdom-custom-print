@@ -67,7 +67,7 @@ export default async function ShippingPage() {
           <p>
             Custom printed items are made to your specification, so they cannot be
             returned for change of mind. That said, if something arrives with a print
-            fault, the wrong colour or a manufacturing error, contact us and we will put
+            fault, the wrong color or a manufacturing error, contact us and we will put
             it right — reprinting or refunding as appropriate.
           </p>
           <p>

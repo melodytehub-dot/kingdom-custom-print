@@ -1,15 +1,16 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
 import type { Category } from "@/lib/types";
+import ArrowRight from "./icons/ArrowRight";
 
 const LINKS = [
-  { href: "/shop", label: "Shop all" },
-  { href: "/customize", label: "Design your own" },
-  { href: "/cart", label: "Cart" },
+  { href: "/shop", label: "Shop" },
+  { href: "/customize", label: "Design" },
   { href: "/about", label: "About" },
   { href: "/contact", label: "Contact" },
 ];
@@ -21,9 +22,6 @@ export default function MobileNav({ categories }: { categories: Category[] }) {
   const toggleRef = useRef<HTMLButtonElement>(null);
   const [shownFor, setShownFor] = useState(pathname);
 
-  // A route change closes the panel. Adjusting state while rendering is the
-  // documented way to react to a changed input without a second render pass;
-  // link clicks also close it directly.
   if (shownFor !== pathname) {
     setShownFor(pathname);
     if (open) setOpen(false);
@@ -41,7 +39,6 @@ export default function MobileNav({ categories }: { categories: Category[] }) {
     };
     document.addEventListener("keydown", onKey);
 
-    // Move focus into the panel so keyboard and screen-reader users land inside it.
     const first = panelRef.current?.querySelector<HTMLElement>("a, button");
     first?.focus();
 
@@ -69,23 +66,24 @@ export default function MobileNav({ categories }: { categories: Category[] }) {
         </span>
       </button>
 
-      {open ? (
-        <>
-          <div className="nav-scrim" onClick={() => setOpen(false)} aria-hidden="true" />
-          <div
-            id="mobile-menu"
-            ref={panelRef}
-            className="mobile-panel"
+      {open
+        ? createPortal(
+            <>
+              <div className="nav-scrim" onClick={() => setOpen(false)} aria-hidden="true" />
+              <div
+                id="mobile-menu"
+                ref={panelRef}
+                className="mobile-panel"
             role="dialog"
             aria-modal="true"
             aria-label="Site menu"
           >
             <div className="mobile-panel-head">
               <Image
-                src="/brand/kingdom-logo.svg"
+                src="/brand/kingdom-logo.png"
                 alt=""
-                width={150}
-                height={40}
+                width={1400}
+                height={843}
                 className="mobile-logo"
               />
               <button
@@ -94,7 +92,7 @@ export default function MobileNav({ categories }: { categories: Category[] }) {
                 onClick={() => setOpen(false)}
                 aria-label="Close menu"
               >
-                <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true">
+                <svg width="20" height="20" viewBox="0 0 18 18" aria-hidden="true">
                   <path
                     d="M3 3l12 12M15 3L3 15"
                     stroke="currentColor"
@@ -109,7 +107,10 @@ export default function MobileNav({ categories }: { categories: Category[] }) {
               <ul className="mobile-links">
                 {LINKS.map((l) => (
                   <li key={l.href}>
-                    <Link href={l.href}>{l.label}</Link>
+                    <Link href={l.href}>
+                      {l.label}
+                      <ArrowRight size={20} />
+                    </Link>
                   </li>
                 ))}
               </ul>
@@ -127,9 +128,17 @@ export default function MobileNav({ categories }: { categories: Category[] }) {
                 </ul>
               </div>
             ) : null}
-          </div>
-        </>
-      ) : null}
+
+            <div className="mobile-panel-foot">
+              <Link href="/customize" className="btn btn-red btn-block">
+                Start designing
+              </Link>
+            </div>
+              </div>
+            </>,
+            document.body
+          )
+        : null}
     </>
   );
 }

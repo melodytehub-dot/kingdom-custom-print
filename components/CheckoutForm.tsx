@@ -167,7 +167,7 @@ export default function CheckoutForm({ settings }: { settings: SiteSettings }) {
       <div className="wrap section">
         <div className="state">
           <h2 className="h3">There is nothing to check out</h2>
-          <p>Add a customised garment to your cart first.</p>
+          <p>Add a customized garment to your cart first.</p>
           <Link href="/customize" className="btn">
             Start designing
           </Link>

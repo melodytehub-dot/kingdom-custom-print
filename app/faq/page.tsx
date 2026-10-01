@@ -46,8 +46,8 @@ const GROUPS: { title: string; items: { q: string; a: string }[] }[] = [
         a: "2XL and above carry a surcharge because the blanks cost more to produce. The exact amount is shown next to each size on the product page and in the designer.",
       },
       {
-        q: "Can I mix colours in one order?",
-        a: "Each design is a separate cart item, so you can order several colourways or designs in one order. Size runs are set per design.",
+        q: "Can I mix colors in one order?",
+        a: "Each design is a separate cart item, so you can order several colorways or designs in one order. Size runs are set per design.",
       },
     ],
   },

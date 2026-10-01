@@ -46,7 +46,7 @@ export default function CartView({
           </svg>
           <h2 className="h3">Your cart is empty</h2>
           <p>
-            Browse the blanks, then customise one and it will appear here with your
+            Browse the blanks, then customize one and it will appear here with your
             artwork attached.
           </p>
           <div className="state-actions">

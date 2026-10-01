@@ -14,6 +14,7 @@ interface ProductRow {
   id: number;
   slug: string;
   name: string;
+  style_code: string;
   kind: ProductKind;
   category_id: number | null;
   category_slug: string | null;
@@ -31,7 +32,7 @@ interface ProductRow {
 }
 
 const PRODUCT_COLUMNS = sql`
-  p.id, p.slug, p.name, p.kind, p.category_id,
+  p.id, p.slug, p.name, p.style_code, p.kind, p.category_id,
   c.slug AS category_slug, c.name AS category_name,
   p.blurb, p.description, p.material,
   p.base_price, p.compare_at, p.print_fee_per_side, p.print_area,
@@ -94,6 +95,7 @@ function hydrate(row: ProductRow, variants: Awaited<ReturnType<typeof loadVarian
     id: row.id,
     slug: row.slug,
     name: row.name,
+    styleCode: row.style_code,
     kind: row.kind,
     categoryId: row.category_id,
     categorySlug: row.category_slug,
@@ -215,6 +217,7 @@ export async function getCategoryBySlug(slug: string): Promise<Category | null> 
 export interface ProductInput {
   name: string;
   slug: string;
+  styleCode: string;
   kind: ProductKind;
   categoryId: number | null;
   blurb: string;
@@ -265,9 +268,9 @@ function asJson(value: unknown) {
 export async function createProduct(input: ProductInput): Promise<number> {
   return sql.begin(async (tx) => {
     const [row] = await tx<{ id: number }[]>`
-      INSERT INTO products (slug, name, category_id, kind, blurb, description, material,
+      INSERT INTO products (slug, name, style_code, category_id, kind, blurb, description, material,
         base_price, compare_at, print_fee_per_side, print_area, featured, active)
-      VALUES (${input.slug}, ${input.name}, ${input.categoryId}, ${input.kind},
+      VALUES (${input.slug}, ${input.name}, ${input.styleCode}, ${input.categoryId}, ${input.kind},
         ${input.blurb}, ${input.description}, ${input.material}, ${input.basePrice},
         ${input.compareAt}, ${input.printFeePerSide}, ${tx.json(asJson(input.printArea))},
         ${input.featured}, ${input.active})
@@ -284,7 +287,8 @@ export async function updateProduct(
   return sql.begin(async (tx) => {
     const result = await tx`
       UPDATE products SET
-        slug = ${input.slug}, name = ${input.name}, category_id = ${input.categoryId},
+        slug = ${input.slug}, name = ${input.name}, style_code = ${input.styleCode},
+        category_id = ${input.categoryId},
         kind = ${input.kind}, blurb = ${input.blurb}, description = ${input.description},
         material = ${input.material}, base_price = ${input.basePrice},
         compare_at = ${input.compareAt}, print_fee_per_side = ${input.printFeePerSide},

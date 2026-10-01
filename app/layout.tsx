@@ -6,6 +6,7 @@ import "./home.css";
 import "./shop/shop.css";
 import "./product/product.css";
 import "./customize/customizer.css";
+import "./customize/studio.css";
 import "./cart/cart.css";
 import "./admin/admin.css";
 import "./content.css";
@@ -13,6 +14,7 @@ import { CartProvider } from "@/lib/cart-context";
 import { getCategories } from "@/lib/catalog";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
+import MobileTabBar from "@/components/MobileTabBar";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -74,6 +76,7 @@ export default async function RootLayout({
           <Header categories={categories} />
           <main id="main">{children}</main>
           <Footer />
+          <MobileTabBar />
         </CartProvider>
       </body>
     </html>

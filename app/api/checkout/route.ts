@@ -27,8 +27,8 @@ interface Body {
  * Narrow a client-supplied cart item down to the fields we persist, then
  * re-derive every money field from the database.
  *
- * Prices, names, colours and size labels all come from the product record so a
- * tampered request cannot set its own price or print an unavailable colour or
+ * Prices, names, colors and size labels all come from the product record so a
+ * tampered request cannot set its own price or print an unavailable color or
  * size. Anything the cart asks for that the product no longer offers is dropped.
  */
 async function sanitise(items: CartItem[]): Promise<CartItem[]> {
@@ -59,10 +59,10 @@ async function sanitise(items: CartItem[]): Promise<CartItem[]> {
     const quantity = lines.reduce((n, l) => n + l.qty, 0);
     if (!quantity) continue;
 
-    const colour =
+    const color =
       product.colors.find((c) => c.name.toLowerCase() === String(item.colorName ?? "").toLowerCase()) ??
       product.colors[0];
-    if (!colour) continue;
+    if (!color) continue;
 
     const quote = quoteProduct(product, {
       sides: designSides(item.design),
@@ -73,8 +73,8 @@ async function sanitise(items: CartItem[]): Promise<CartItem[]> {
       ...item,
       productName: product.name,
       productKind: product.kind,
-      colorName: colour.name,
-      colorHex: /^#[0-9A-Fa-f]{6}$/.test(colour.hex) ? colour.hex : "#141414",
+      colorName: color.name,
+      colorHex: /^#[0-9A-Fa-f]{6}$/.test(color.hex) ? color.hex : "#141414",
       unitPrice: quote.unitBase,
       total: quote.total,
       quantity: lines.reduce((n, l) => n + l.qty, 0),
@@ -204,7 +204,7 @@ export async function POST(req: Request) {
     items = await sanitise(Array.isArray(body.items) ? body.items : []);
   } catch {
     return NextResponse.json(
-      { error: "We could not load the catalogue to price your cart. Please try again." },
+      { error: "We could not load the catalog to price your cart. Please try again." },
       { status: 503 }
     );
   }

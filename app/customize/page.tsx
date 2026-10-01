@@ -15,12 +15,21 @@ export default async function CustomizeStartPage() {
 
   return (
     <>
-      <div className="wrap cust-head">
+      <div className="wrap page-head">
+        <nav aria-label="Breadcrumb">
+          <ol className="breadcrumb">
+            <li>
+              <Link href="/">Home</Link>
+            </li>
+            <li aria-current="page">Design studio</li>
+          </ol>
+        </nav>
         <p className="eyebrow">Online designer</p>
         <h1 className="h2">Choose a blank to start designing</h1>
         <p className="lede">
-          Pick the garment you want printed. The designer lets you add text, upload
-          artwork, position both on the front or back, and set quantities per size.
+          Pick the garment you want printed. The studio lets you add text, upload artwork,
+          drop in ready-made graphics, place them on the front or back, and set quantities
+          per size.
         </p>
       </div>
 

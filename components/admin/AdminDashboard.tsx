@@ -507,6 +507,7 @@ interface DraftProduct {
   id?: number;
   name: string;
   slug: string;
+  styleCode: string;
   kind: ProductKind;
   categoryId: string;
   blurb: string;
@@ -530,6 +531,7 @@ function emptyProduct(): DraftProduct {
   return {
     name: "",
     slug: "",
+    styleCode: "",
     kind: "tee",
     categoryId: "",
     blurb: "",
@@ -560,6 +562,7 @@ function toDraft(p: Product): DraftProduct {
     id: p.id,
     name: p.name,
     slug: p.slug,
+    styleCode: p.styleCode,
     kind: p.kind,
     categoryId: p.categoryId ? String(p.categoryId) : "",
     blurb: p.blurb,
@@ -601,6 +604,7 @@ function ProductsPanel({ data }: { data: AdminData }) {
       id: draft.id,
       name: draft.name,
       slug: draft.slug,
+      styleCode: draft.styleCode,
       kind: draft.kind,
       categoryId: draft.categoryId ? Number(draft.categoryId) : null,
       blurb: draft.blurb,
@@ -741,7 +745,7 @@ function ProductsPanel({ data }: { data: AdminData }) {
                 </p>
                 <p className="small muted wrap-anywhere">
                   {KIND_OPTIONS.find((k) => k.value === p.kind)?.label ?? p.kind} ·{" "}
-                  {p.colors.length} colours · {p.sizes.length} sizes ·{" "}
+                  {p.colors.length} colors · {p.sizes.length} sizes ·{" "}
                   <span className="mono">/{p.slug}</span>
                 </p>
               </div>
@@ -838,6 +842,18 @@ function ProductForm({
             value={draft.slug}
             placeholder="generated from the name"
             onChange={(e) => onChange({ slug: e.target.value })}
+          />
+        </div>
+        <div className="field">
+          <label className="label" htmlFor="p-style">
+            Style code
+          </label>
+          <input
+            id="p-style"
+            className="input"
+            value={draft.styleCode}
+            placeholder="e.g. RT2000"
+            onChange={(e) => onChange({ styleCode: e.target.value })}
           />
         </div>
         <div className="field">
@@ -991,7 +1007,7 @@ function ProductForm({
       </fieldset>
 
       <fieldset className="fieldset">
-        <legend className="label">Colours</legend>
+        <legend className="label">Colors</legend>
         <div className="repeat-list">
           {draft.colors.map((c, i) => (
             <div className="repeat-row" key={i}>
@@ -1063,7 +1079,7 @@ function ProductForm({
             })
           }
         >
-          Add colour
+          Add color
         </button>
       </fieldset>
 

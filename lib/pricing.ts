@@ -80,6 +80,24 @@ export function lowestUnitPrice(product: Product): number | null {
   return round2(Math.max(0, product.basePrice + best.amountOff));
 }
 
+/** The largest published quantity tier, or null when none are set. */
+export function largestBreakQty(product: Pick<Product, "priceBreaks">): number | null {
+  if (!product.priceBreaks.length) return null;
+  return product.priceBreaks.reduce((max, b) => (b.minQty > max ? b.minQty : max), 0);
+}
+
+/**
+ * Lowest all-in price for one garment with a single printed side, at the
+ * best published tier — the "from $X each" figure shown on product cards.
+ */
+export function lowestPrintedUnit(product: Product): number | null {
+  if (!product.priceBreaks.length) return null;
+  const best = product.priceBreaks.reduce((a, b) => (b.amountOff < a.amountOff ? b : a));
+  return round2(
+    Math.max(0, product.basePrice + product.printFeePerSide + best.amountOff)
+  );
+}
+
 export function formatUSD(n: number): string {
   return new Intl.NumberFormat("en-US", {
     style: "currency",

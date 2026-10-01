@@ -5,14 +5,15 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Garment from "@/components/Garment";
 import ArrowRight from "@/components/icons/ArrowRight";
-import { formatUSD, lowestUnitPrice, quoteProduct, resolveBreak } from "@/lib/pricing";
-import type { Product } from "@/lib/types";
+import { formatUSD, lowestPrintedUnit, quoteProduct, resolveBreak } from "@/lib/pricing";
+import type { Product, ProductColor } from "@/lib/types";
 
 export default function ProductDetail({ product }: { product: Product }) {
   const router = useRouter();
   const firstColor = product.colors[0];
 
   const [colorSlug, setColorSlug] = useState(firstColor?.slug ?? "");
+  const [imageIdx, setImageIdx] = useState(0);
   const [lines, setLines] = useState<Record<string, number>>(() => {
     const seed: Record<string, number> = {};
     for (const s of product.sizes) seed[s.label] = 0;
@@ -26,6 +27,14 @@ export default function ProductDetail({ product }: { product: Product }) {
     [colorSlug, product.colors, firstColor]
   );
 
+  function pickColor(c: ProductColor) {
+    setColorSlug(c.slug);
+    const i = product.images.findIndex((img) =>
+      img.alt.toLowerCase().includes(c.name.toLowerCase())
+    );
+    if (i >= 0) setImageIdx(i);
+  }
+
   const sizeLines = useMemo(
     () => product.sizes.map((s) => ({ label: s.label, qty: lines[s.label] ?? 0 })),
     [product.sizes, lines]
@@ -33,17 +42,32 @@ export default function ProductDetail({ product }: { product: Product }) {
 
   const totalQty = sizeLines.reduce((n, l) => n + l.qty, 0);
 
-  // Quote both sides so the price shown covers a front-and-back print.
-  const quoteBoth = quoteProduct(product, { sides: ["front", "back"], lines: sizeLines });
-  const quoteOne = quoteProduct(product, { sides: ["front"], lines: sizeLines });
+  // Default configuration is a single front print; the back is an add-on.
+  const quote = quoteProduct(product, { sides: ["front"], lines: sizeLines });
   const tier = resolveBreak(product.priceBreaks, totalQty);
 
-  const floor = lowestUnitPrice(product);
-  const surcharge = quoteBoth.surchargeTotal;
-  // Both-side quote is what the customer actually pays per garment; the
-  // surcharge is added on top for extended sizes.
-  const perUnit = quoteBoth.unitBase;
+  const floor = lowestPrintedUnit(product);
+  const surcharge = quote.surchargeTotal;
+  const perUnit = quote.unitBase;
+  const secondSide = product.printFeePerSide;
 
+  // Published quantity tiers, priced for a single printed side.
+  const tiers = useMemo(
+    () =>
+      product.priceBreaks
+        .slice()
+        .sort((a, b) => a.minQty - b.minQty)
+        .map((b) => ({
+          minQty: b.minQty,
+          unit: quoteProduct(product, {
+            sides: ["front"],
+            lines: [{ label: "__tier__", qty: b.minQty }],
+          }).unitBase,
+        })),
+    [product]
+  );
+
+  const activeImage = product.images[imageIdx] ?? product.images[0];
   const canCustomize = totalQty > 0;
 
   function setQty(label: string, value: number) {
@@ -54,9 +78,9 @@ export default function ProductDetail({ product }: { product: Product }) {
   return (
     <div className="pdp">
       <div className="pdp-media">
-        {product.images.length ? (
+        {activeImage ? (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={product.images[0].url} alt={product.images[0].alt || product.name} />
+          <img src={activeImage.url} alt={activeImage.alt || product.name} />
         ) : (
           <Garment
             kind={product.kind}
@@ -70,29 +94,50 @@ export default function ProductDetail({ product }: { product: Product }) {
             Save {formatUSD(product.compareAt - product.basePrice)} per garment
           </p>
         ) : null}
+
+        {product.images.length > 1 ? (
+          <ul className="pdp-thumbs">
+            {product.images.map((img, i) => (
+              <li key={img.id}>
+                <button
+                  type="button"
+                  className={`pdp-thumb${i === imageIdx ? " is-active" : ""}`}
+                  onClick={() => setImageIdx(i)}
+                  aria-label={img.alt || `View ${i + 1}`}
+                  aria-pressed={i === imageIdx}
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={img.url} alt="" />
+                </button>
+              </li>
+            ))}
+          </ul>
+        ) : null}
       </div>
 
       <div className="pdp-panel">
-        <p className="eyebrow">{product.categoryName ?? "Blank"}</p>
+        <p className="eyebrow">
+          {product.categoryName ?? "Blank"}
+          {product.styleCode ? ` · Style ${product.styleCode}` : ""}
+        </p>
         <h1 className="h2 pdp-title wrap-anywhere">{product.name}</h1>
         <p className="lede pdp-blurb">{product.blurb}</p>
 
         <div className="pdp-price-row">
           <p className="pdp-price tnum">
-            <strong>{formatUSD(quoteBoth.unitBase)}</strong> per garment
+            <strong>{formatUSD(quote.unitBase)}</strong> each, one side
           </p>
-          {floor !== null && floor < quoteBoth.unitBase ? (
+          {floor !== null && floor < quote.unitBase ? (
             <p className="small muted">
-              Drops to {formatUSD(floor)} per garment at bulk quantities
+              From {formatUSD(floor)} each at {tiers[tiers.length - 1]?.minQty}+
             </p>
           ) : null}
         </div>
 
-        {/* Colour */}
+        {/* Color */}
         <fieldset className="opt-group">
           <legend className="label">
-            Colour:{" "}
-            <span className="opt-value">{color?.name}</span>
+            Color: <span className="opt-value">{color?.name}</span>
           </legend>
           <ul className="swatches">
             {product.colors.map((c) => (
@@ -101,7 +146,7 @@ export default function ProductDetail({ product }: { product: Product }) {
                   type="button"
                   className={`swatch${c.slug === color?.slug ? " is-active" : ""}`}
                   style={{ background: c.hex }}
-                  onClick={() => setColorSlug(c.slug)}
+                  onClick={() => pickColor(c)}
                   aria-pressed={c.slug === color?.slug}
                   title={c.name}
                 >
@@ -192,27 +237,21 @@ export default function ProductDetail({ product }: { product: Product }) {
         {/* Quote summary */}
         <div className="pdp-quote" aria-live="polite">
           <div className="quote-row">
-            <span>
-              {product.printFeePerSide > 0
-                ? `Blank ${formatUSD(product.basePrice)} + print from ${formatUSD(product.printFeePerSide)}/side`
-                : "Blank price"}
-            </span>
-            {quoteOne.printCharge > 0 ? (
-              <span className="tnum muted">
-                +{formatUSD(quoteOne.printCharge)} for 2 sides
-              </span>
-            ) : null}
+            <span>Front print</span>
+            <span className="tnum">{formatUSD(quote.unitBase)} each</span>
           </div>
+
+          {secondSide > 0 ? (
+            <div className="quote-row">
+              <span>Add a back print</span>
+              <span className="tnum muted">+{formatUSD(secondSide)} each</span>
+            </div>
+          ) : null}
 
           {tier ? (
             <div className="quote-row quote-tier">
-              <span>
-                Quantity break at {tier.minQty}+
-                {tier.amountOff < 0 ? " per garment" : ""}
-              </span>
-              <span className="tnum">
-                {tier.amountOff < 0 ? formatUSD(tier.amountOff) : formatUSD(tier.amountOff)}
-              </span>
+              <span>Quantity break at {tier.minQty}+</span>
+              <span className="tnum">{formatUSD(tier.amountOff)}</span>
             </div>
           ) : null}
 
@@ -221,7 +260,7 @@ export default function ProductDetail({ product }: { product: Product }) {
               {totalQty > 0 ? `${totalQty} × ${formatUSD(perUnit)}` : "Estimated total"}
             </span>
             <strong className="tnum">
-              {totalQty > 0 ? formatUSD(quoteBoth.total) : "—"}
+              {totalQty > 0 ? formatUSD(quote.total) : "—"}
             </strong>
           </div>
 
@@ -246,7 +285,7 @@ export default function ProductDetail({ product }: { product: Product }) {
               )
             }
           >
-            Customise this
+            Customize this
             <ArrowRight />
           </button>
           <Link href="/contact" className="btn btn-lg btn-ghost">
@@ -255,6 +294,12 @@ export default function ProductDetail({ product }: { product: Product }) {
         </div>
 
         <ul className="pdp-specs">
+          {product.styleCode ? (
+            <li>
+              <span className="spec-k">Style</span>
+              <span>{product.styleCode}</span>
+            </li>
+          ) : null}
           {product.material ? (
             <li>
               <span className="spec-k">Material</span>
@@ -274,6 +319,35 @@ export default function ProductDetail({ product }: { product: Product }) {
             <span>Screen print and DTF available on request</span>
           </li>
         </ul>
+
+        {tiers.length > 1 ? (
+          <div className="pdp-breaks">
+            <p className="label">Price by quantity</p>
+            <table className="breaks-table">
+              <thead>
+                <tr>
+                  <th scope="col">Quantity</th>
+                  <th scope="col">Price each</th>
+                </tr>
+              </thead>
+              <tbody>
+                {tiers.map((t, i) => {
+                  const next = tiers[i + 1];
+                  const label = next ? `${t.minQty}–${next.minQty - 1}` : `${t.minQty}+`;
+                  const isActive =
+                    totalQty >= t.minQty && (!next || totalQty < next.minQty);
+                  return (
+                    <tr key={t.minQty} className={isActive ? "is-active" : undefined}>
+                      <td className="tnum">{label}</td>
+                      <td className="tnum">{formatUSD(t.unit)}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+            <p className="hint">One printed side. Free US shipping over $75.</p>
+          </div>
+        ) : null}
       </div>
     </div>
   );

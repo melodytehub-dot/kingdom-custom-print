@@ -11,7 +11,7 @@ interface GarmentProps {
 }
 
 /**
- * Shade helpers. Derived from the garment colour so every colourway gets
+ * Shade helpers. Derived from the garment color so every colorway gets
  * consistent depth without a hand-authored gradient per product.
  */
 function shades(hex: string) {

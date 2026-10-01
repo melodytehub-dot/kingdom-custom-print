@@ -56,9 +56,9 @@ export default async function TermsPage() {
         </section>
 
         <section>
-          <h2 className="h3">Colour and material</h2>
+          <h2 className="h3">Color and material</h2>
           <p>
-            Colours shown on screen are a representation. Garment dye lots and screen
+            Colors shown on screen are a representation. Garment dye lots and screen
             settings vary, so a printed garment may differ slightly from the on-screen
             preview. Fabric weight and composition are as stated on each product page.
           </p>
@@ -77,7 +77,7 @@ export default async function TermsPage() {
           <h2 className="h3">Custom goods</h2>
           <p>
             Custom printed items cannot be returned for change of mind. Faults,
-            manufacturing errors or incorrect colours are covered — see the shipping and
+            manufacturing errors or incorrect colors are covered — see the shipping and
             returns page.
           </p>
         </section>

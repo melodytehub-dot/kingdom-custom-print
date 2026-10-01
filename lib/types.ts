@@ -42,6 +42,7 @@ export interface Product {
   id: number;
   slug: string;
   name: string;
+  styleCode: string;
   kind: ProductKind;
   categoryId: number | null;
   categorySlug: string | null;

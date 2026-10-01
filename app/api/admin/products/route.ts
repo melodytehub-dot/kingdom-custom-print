@@ -20,6 +20,7 @@ interface RawProduct {
   id?: number;
   name?: string;
   slug?: string;
+  styleCode?: string;
   kind?: string;
   categoryId?: number | null;
   blurb?: string;
@@ -66,7 +67,7 @@ function validate(raw: RawProduct): { value?: ProductInput; error?: string } {
       name: String(c.name).slice(0, 40),
       hex: String(c.hex).toLowerCase(),
     }));
-  if (!colors.length) return { error: "Add at least one colour with a valid hex value." };
+  if (!colors.length) return { error: "Add at least one color with a valid hex value." };
 
   const sizes = (raw.sizes ?? [])
     .filter((s) => s && s.label)
@@ -116,6 +117,7 @@ function validate(raw: RawProduct): { value?: ProductInput; error?: string } {
     value: {
       name,
       slug,
+      styleCode: String(raw.styleCode ?? "").trim().slice(0, 40),
       kind: raw.kind as ProductKind,
       categoryId: raw.categoryId ? Number(raw.categoryId) : null,
       blurb: String(raw.blurb ?? "").trim().slice(0, 400),

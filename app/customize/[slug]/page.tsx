@@ -1,6 +1,5 @@
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
-import Link from "next/link";
 import Customizer from "@/components/customizer/Customizer";
 import { getProductBySlug, getProducts } from "@/lib/catalog";
 import type { Product } from "@/lib/types";
@@ -48,34 +47,14 @@ export default async function CustomizePage({ params, searchParams }: Params) {
   const products = await getProducts({});
 
   return (
-    <>
-      <div className="wrap cust-head">
-        <nav aria-label="Breadcrumb">
-          <ol className="breadcrumb">
-            <li>
-              <Link href="/">Home</Link>
-            </li>
-            <li>
-              <Link href="/shop">Shop</Link>
-            </li>
-            <li aria-current="page">Design</li>
-          </ol>
-        </nav>
-        <h1 className="h2">Design your {product.name}</h1>
-        <p className="lede">
-          Add text or upload artwork, place it on the front or back, then set your size
-          run. Nothing is printed until you place the order.
-        </p>
-      </div>
-
-      <div className="wrap">
-        <Customizer
-          product={product}
-          products={products}
-          initialColor={color ?? ""}
-          initialLines={parseSizes(sizes, product)}
-        />
-      </div>
-    </>
+    <div className="studio-page">
+      <h1 className="sr-only">Design your {product.name}</h1>
+      <Customizer
+        product={product}
+        products={products}
+        initialColor={color ?? ""}
+        initialLines={parseSizes(sizes, product)}
+      />
+    </div>
   );
 }

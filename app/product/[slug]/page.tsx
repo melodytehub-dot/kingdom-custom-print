@@ -4,7 +4,7 @@ import type { Metadata } from "next";
 import ProductDetail from "@/components/ProductDetail";
 import ProductCard from "@/components/ProductCard";
 import { getProductBySlug, getProducts } from "@/lib/catalog";
-import { quoteProduct } from "@/lib/pricing";
+import { formatUSD } from "@/lib/pricing";
 
 export const revalidate = 60;
 
@@ -37,11 +37,6 @@ export default async function ProductPage({ params }: Params) {
     .filter((p) => p.categorySlug === product.categorySlug || p.kind === product.kind)
     .slice(0, 4);
 
-  const singleUnit = quoteProduct(product, {
-    sides: ["front"],
-    lines: [{ label: product.sizes[0]?.label ?? "One Size", qty: 1 }],
-  });
-
   return (
     <>
       <div className="wrap page-head">
@@ -68,7 +63,7 @@ export default async function ProductPage({ params }: Params) {
       <div className="wrap">
         <ProductDetail product={product} />
         <p className="pdp-from small muted">
-          Blank priced from {formatFrom(singleUnit.unitBase)} before printing.
+          Blank priced from {formatUSD(product.basePrice)} before printing.
         </p>
       </div>
 
@@ -110,11 +105,4 @@ export default async function ProductPage({ params }: Params) {
       ) : null}
     </>
   );
-}
-
-function formatFrom(n: number) {
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "USD",
-  }).format(n);
 }
