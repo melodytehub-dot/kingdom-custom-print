@@ -3,7 +3,8 @@ import { createOrder, attachStripeSession } from "@/lib/orders";
 import { siteUrl, stripeClient } from "@/lib/stripe";
 import { getProductById } from "@/lib/catalog";
 import { quoteProduct } from "@/lib/pricing";
-import type { CartItem, Design, DesignLayer, GarmentSide } from "@/lib/types";
+import { FONTS } from "@/lib/fonts";
+import type { CartItem, Design, DesignLayer, GarmentSide, RosterEntry } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
@@ -59,22 +60,27 @@ async function sanitise(items: CartItem[]): Promise<CartItem[]> {
     const quantity = lines.reduce((n, l) => n + l.qty, 0);
     if (!quantity) continue;
 
-    const color =
+    const matched =
       product.colors.find((c) => c.name.toLowerCase() === String(item.colorName ?? "").toLowerCase()) ??
       product.colors[0];
-    if (!color) continue;
+    if (!matched) continue;
 
     const quote = quoteProduct(product, {
       sides: designSides(item.design),
       lines,
     });
 
+    // Prefer the exact colour the shopper picked (the studio offers the full
+    // real garment palette); fall back to the matched catalogue colour.
+    const colorName = String(item.colorName ?? "").trim().slice(0, 40) || matched.name;
+    const colorHex = hexOr(item.colorHex, matched.hex);
+
     priced.push({
       ...item,
       productName: product.name,
       productKind: product.kind,
-      colorName: color.name,
-      colorHex: /^#[0-9A-Fa-f]{6}$/.test(color.hex) ? color.hex : "#141414",
+      colorName,
+      colorHex,
       unitPrice: quote.unitBase,
       total: quote.total,
       quantity: lines.reduce((n, l) => n + l.qty, 0),
@@ -84,6 +90,7 @@ async function sanitise(items: CartItem[]): Promise<CartItem[]> {
       previewFront: truncateDataUrl(item.previewFront),
       previewBack: truncateDataUrl(item.previewBack),
       design: sanitiseDesign(item.design),
+      roster: sanitiseRoster(item.roster),
     });
   }
   return priced;
@@ -104,6 +111,10 @@ function truncateDataUrl(value: string | null | undefined): string | null {
   return value.length > 400_000 ? null : value;
 }
 
+const FONT_VALUES = new Set(FONTS.map((f) => f.value));
+const hexOr = (v: unknown, fallback: string) =>
+  /^#[0-9A-Fa-f]{6}$/.test(String(v)) ? String(v) : fallback;
+
 function sanitiseDesign(design: unknown): Design {
   const empty: Design = { front: [], back: [] };
   if (!design || typeof design !== "object") return empty;
@@ -117,22 +128,28 @@ function sanitiseDesign(design: unknown): Design {
       if (!raw || typeof raw !== "object") continue;
       const l = raw as Record<string, unknown>;
 
+      const base = {
+        id: String(l.id ?? "l").slice(0, 40),
+        x: clampNum(l.x, -20, 120, 50),
+        y: clampNum(l.y, -20, 120, 50),
+        scaleX: clampNum(l.scaleX, 0.05, 8, 1),
+        scaleY: clampNum(l.scaleY, 0.05, 8, 1),
+        rotation: clampNum(l.rotation, -360, 360, 0),
+        opacity: clampNum(l.opacity, 0.1, 1, 1),
+        flipH: Boolean(l.flipH),
+        flipV: Boolean(l.flipV),
+      };
+
       if (l.type === "text") {
         const text = String(l.text ?? "").slice(0, 400);
         if (!text.trim()) continue;
         out.push({
-          id: String(l.id ?? "t"),
+          ...base,
           type: "text",
           text,
-          x: clampNum(l.x, 0, 100, 50),
-          y: clampNum(l.y, 0, 100, 50),
-          scale: clampNum(l.scale, 0.12, 3, 1),
-          rotation: clampNum(l.rotation, -360, 360, 0),
-          font: ["anton", "inter", "serif"].includes(String(l.font))
-            ? String(l.font)
-            : "anton",
+          font: FONT_VALUES.has(String(l.font)) ? String(l.font) : "anton",
           fontSize: clampNum(l.fontSize, 2, 40, 7),
-          color: /^#[0-9A-Fa-f]{6}$/.test(String(l.color)) ? String(l.color) : "#141414",
+          color: hexOr(l.color, "#141414"),
           weight: [400, 700, 900].includes(Number(l.weight))
             ? (Number(l.weight) as 400 | 700 | 900)
             : 700,
@@ -141,8 +158,11 @@ function sanitiseDesign(design: unknown): Design {
           align: ["left", "center", "right"].includes(String(l.align))
             ? (l.align as "left" | "center" | "right")
             : "center",
-          letterSpacing: clampNum(l.letterSpacing, -4, 30, 0),
+          letterSpacing: clampNum(l.letterSpacing, -10, 50, 0),
           lineHeight: clampNum(l.lineHeight, 0.7, 3, 1.05),
+          strokeColor: hexOr(l.strokeColor, "#FFFFFF"),
+          strokeWidth: clampNum(l.strokeWidth, 0, 30, 0),
+          role: l.role === "name" || l.role === "number" ? l.role : undefined,
         });
         continue;
       }
@@ -151,15 +171,10 @@ function sanitiseDesign(design: unknown): Design {
         const src = String(l.src ?? "");
         if (!src.startsWith("data:image/") || src.length > 400_000) continue;
         out.push({
-          id: String(l.id ?? "i"),
+          ...base,
           type: "image",
           src,
           name: String(l.name ?? "artwork").slice(0, 120),
-          x: clampNum(l.x, 0, 100, 50),
-          y: clampNum(l.y, 0, 100, 50),
-          scale: clampNum(l.scale, 0.12, 3, 0.6),
-          rotation: clampNum(l.rotation, -360, 360, 0),
-          opacity: clampNum(l.opacity, 0.1, 1, 1),
         });
       }
     }
@@ -168,6 +183,18 @@ function sanitiseDesign(design: unknown): Design {
   };
 
   return { front: cleanSide(d.front), back: cleanSide(d.back) };
+}
+
+function sanitiseRoster(roster: unknown): RosterEntry[] | undefined {
+  if (!Array.isArray(roster) || !roster.length) return undefined;
+  return roster.slice(0, 300).map((raw, i) => {
+    const r = (raw ?? {}) as Record<string, unknown>;
+    return {
+      id: String(r.id ?? `r-${i}`).slice(0, 40),
+      name: String(r.name ?? "").slice(0, 40),
+      number: String(r.number ?? "").slice(0, 12),
+    };
+  });
 }
 
 function clampNum(v: unknown, min: number, max: number, fallback: number): number {

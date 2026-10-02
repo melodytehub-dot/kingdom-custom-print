@@ -8,93 +8,111 @@ import {
   useState,
   type PointerEvent as ReactPointerEvent,
 } from "react";
-import Garment from "@/components/Garment";
 import type {
   Design,
   DesignLayer,
   GarmentSide,
   ImageLayer,
-  PrintArea,
-  ProductKind,
   TextLayer,
 } from "@/lib/types";
-import { areaFor } from "@/lib/design";
+import { layerBox, teeArea } from "@/lib/design";
+import { svgFontStack } from "@/lib/fonts";
 
 type Tool = "move" | "scale" | "rotate";
+type Edge = "n" | "s" | "e" | "w" | "ne" | "nw" | "se" | "sw";
 
 interface CanvasProps {
-  product: { kind: ProductKind; name: string; printArea: PrintArea };
-  color: string;
-  design: Design;
+  frontSrc: string;
+  backSrc: string;
   side: GarmentSide;
+  design: Design;
   selectedId: string | null;
   onSelect: (id: string | null) => void;
   onChange: (side: GarmentSide, id: string, patch: Partial<DesignLayer>) => void;
   onCommit: () => void;
+  onDuplicate: (id: string) => void;
+  onDelete: (id: string) => void;
+  onReorder: (id: string, dir: "front" | "back" | "forward" | "backward") => void;
 }
 
-const VIEW_W = 320;
-const VIEW_H = 340;
+const VIEW = 900;
 
-/** Matches the garment artwork box so the print area overlays the fabric. */
-const GARMENT_FRAME = { x: 40, y: 42, w: 240, h: 268 } as const;
+interface Box {
+  w: number;
+  h: number;
+}
 
 interface DragState {
   id: string;
   tool: Tool;
+  edge: Edge | null;
   originX: number;
   originY: number;
-  originScale: number;
+  originSX: number;
+  originSY: number;
   originRotation: number;
   startPx: number;
   startPy: number;
+  startDist: number;
   pivot: { x: number; y: number };
+  base: Box;
 }
 
+const clamp = (n: number, min: number, max: number) => Math.min(max, Math.max(min, n));
+const round2 = (n: number) => Math.round(n * 100) / 100;
+
+const effBox = (base: Box, layer: DesignLayer): Box => ({
+  w: base.w * layer.scaleX,
+  h: base.h * layer.scaleY,
+});
+
 export default function DesignCanvas({
-  product,
-  color,
-  design,
+  frontSrc,
+  backSrc,
   side,
+  design,
   selectedId,
   onSelect,
   onChange,
   onCommit,
+  onDuplicate,
+  onDelete,
+  onReorder,
 }: CanvasProps) {
   const svgRef = useRef<SVGSVGElement>(null);
-  const [tool, setTool] = useState<Tool>("move");
   const dragRef = useRef<DragState | null>(null);
-  const [isDragging, setIsDragging] = useState(false);
+  const [dragging, setDragging] = useState(false);
 
-  const frac = areaFor(product.printArea, side);
+  const frac = teeArea(side);
   const area = useMemo(
-    () => ({
-      x: GARMENT_FRAME.x + (GARMENT_FRAME.w * (1 - frac.w)) / 2,
-      y: GARMENT_FRAME.y + (GARMENT_FRAME.h * (1 - frac.h)) / 2,
-      w: GARMENT_FRAME.w * frac.w,
-      h: GARMENT_FRAME.h * frac.h,
-    }),
+    () => ({ w: VIEW * frac.w, h: VIEW * frac.h }),
     [frac.w, frac.h]
+  );
+  const areaOrigin = useMemo(
+    () => ({ x: VIEW * frac.cx - area.w / 2, y: VIEW * frac.cy - area.h / 2 }),
+    [frac.cx, frac.cy, area.w, area.h]
   );
 
   const layers = design[side];
+  const selected = selectedId ? layers.find((l) => l.id === selectedId) : undefined;
+  const photo = side === "front" ? frontSrc : backSrc;
 
-  /** Maps a pointer event into SVG viewBox coordinates. */
   const toView = useCallback((clientX: number, clientY: number) => {
     const svg = svgRef.current;
     if (!svg) return null;
     const rect = svg.getBoundingClientRect();
     if (!rect.width || !rect.height) return null;
     return {
-      x: ((clientX - rect.left) / rect.width) * VIEW_W,
-      y: ((clientY - rect.top) / rect.height) * VIEW_H,
+      x: ((clientX - rect.left) / rect.width) * VIEW,
+      y: ((clientY - rect.top) / rect.height) * VIEW,
     };
   }, []);
 
   const startDrag = (
     event: ReactPointerEvent,
     layer: DesignLayer,
-    nextTool: Tool
+    nextTool: Tool,
+    edge: Edge | null = null
   ) => {
     if (event.button !== 0 && event.pointerType === "mouse") return;
     event.preventDefault();
@@ -103,72 +121,94 @@ export default function DesignCanvas({
     const pt = toView(event.clientX, event.clientY);
     if (!pt) return;
 
+    const pivot = {
+      x: areaOrigin.x + (layer.x / 100) * area.w,
+      y: areaOrigin.y + (layer.y / 100) * area.h,
+    };
+    const base = layerBox(layer, area);
+
     onSelect(layer.id);
-    setTool(nextTool);
     dragRef.current = {
       id: layer.id,
       tool: nextTool,
+      edge,
       originX: layer.x,
       originY: layer.y,
-      originScale: layer.scale,
+      originSX: layer.scaleX,
+      originSY: layer.scaleY,
       originRotation: layer.rotation,
       startPx: pt.x,
       startPy: pt.y,
-      pivot: { x: area.x + area.w / 2, y: area.y + area.h / 2 },
+      startDist: Math.hypot(pt.x - pivot.x, pt.y - pivot.y) || 1,
+      pivot,
+      base,
     };
-    setIsDragging(true);
+    setDragging(true);
   };
 
-  // Pointermove/Up live on window so a fast drag that leaves the SVG still tracks.
   useEffect(() => {
-    if (!isDragging) return;
+    if (!dragging) return;
 
     const onMove = (e: PointerEvent) => {
-      const state = dragRef.current;
-      if (!state) return;
+      const s = dragRef.current;
+      if (!s) return;
       const pt = toView(e.clientX, e.clientY);
       if (!pt) return;
 
-      if (state.tool === "move") {
-        const dx = ((pt.x - state.startPx) / area.w) * 100;
-        const dy = ((pt.y - state.startPy) / area.h) * 100;
-        onChange(side, state.id, {
-          x: clamp(state.originX + dx, 0, 100),
-          y: clamp(state.originY + dy, 0, 100),
+      if (s.tool === "move") {
+        const dx = ((pt.x - s.startPx) / area.w) * 100;
+        const dy = ((pt.y - s.startPy) / area.h) * 100;
+        onChange(side, s.id, {
+          x: round2(clamp(s.originX + dx, -10, 110)),
+          y: round2(clamp(s.originY + dy, -10, 110)),
         });
         return;
       }
 
-      if (state.tool === "scale") {
-        const dy = (pt.y - state.startPy) / area.h;
-        const next = clamp(state.originScale + dy * 1.6, 0.12, 3);
-        onChange(side, state.id, { scale: Math.round(next * 100) / 100 });
+      if (s.tool === "scale") {
+        if (s.edge && s.edge.length === 1) {
+          // Edge handles stretch a single axis.
+          const dx = pt.x - s.pivot.x;
+          const dy = pt.y - s.pivot.y;
+          if (s.edge === "e" || s.edge === "w") {
+            onChange(side, s.id, { scaleX: round2(clamp(Math.abs(dx) / (s.base.w / 2), 0.05, 8)) });
+          } else {
+            onChange(side, s.id, { scaleY: round2(clamp(Math.abs(dy) / (s.base.h / 2), 0.05, 8)) });
+          }
+          return;
+        }
+        // Corner handles scale proportionally.
+        const dist = Math.hypot(pt.x - s.pivot.x, pt.y - s.pivot.y);
+        const k = dist / s.startDist;
+        onChange(side, s.id, {
+          scaleX: round2(clamp(s.originSX * k, 0.05, 8)),
+          scaleY: round2(clamp(s.originSY * k, 0.05, 8)),
+        });
         return;
       }
 
-      const a0 = Math.atan2(state.startPy - state.pivot.y, state.startPx - state.pivot.x);
-      const a1 = Math.atan2(pt.y - state.pivot.y, pt.x - state.pivot.x);
-      let deg = state.originRotation + ((a1 - a0) * 180) / Math.PI;
+      const a0 = Math.atan2(s.startPy - s.pivot.y, s.startPx - s.pivot.x);
+      const a1 = Math.atan2(pt.y - s.pivot.y, pt.x - s.pivot.x);
+      let deg = s.originRotation + ((a1 - a0) * 180) / Math.PI;
       if (e.shiftKey) deg = Math.round(deg / 15) * 15;
-      onChange(side, state.id, { rotation: Math.round(deg) });
+      onChange(side, s.id, { rotation: Math.round(deg) });
     };
 
     const onUp = () => {
       dragRef.current = null;
-      setIsDragging(false);
+      setDragging(false);
       onCommit();
     };
 
     window.addEventListener("pointermove", onMove);
     window.addEventListener("pointerup", onUp);
     window.addEventListener("pointercancel", onUp);
-
     return () => {
       window.removeEventListener("pointermove", onMove);
       window.removeEventListener("pointerup", onUp);
       window.removeEventListener("pointercancel", onUp);
     };
-  }, [isDragging, side, area.w, area.h, toView, onChange, onCommit]);
+  }, [dragging, side, area.w, area.h, toView, onChange, onCommit]);
 
   // Keyboard nudging for the selected layer.
   useEffect(() => {
@@ -179,28 +219,30 @@ export default function DesignCanvas({
     const onKey = (e: KeyboardEvent) => {
       const target = e.target as HTMLElement | null;
       if (target && /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName)) return;
-
       const step = e.shiftKey ? 5 : 1;
       let handled = true;
-
       switch (e.key) {
         case "ArrowLeft":
-          onChange(side, selectedId, { x: clamp(layer.x - step, 0, 100) });
+          onChange(side, selectedId, { x: clamp(layer.x - step, -10, 110) });
           break;
         case "ArrowRight":
-          onChange(side, selectedId, { x: clamp(layer.x + step, 0, 100) });
+          onChange(side, selectedId, { x: clamp(layer.x + step, -10, 110) });
           break;
         case "ArrowUp":
-          onChange(side, selectedId, { y: clamp(layer.y - step, 0, 100) });
+          onChange(side, selectedId, { y: clamp(layer.y - step, -10, 110) });
           break;
         case "ArrowDown":
-          onChange(side, selectedId, { y: clamp(layer.y + step, 0, 100) });
+          onChange(side, selectedId, { y: clamp(layer.y + step, -10, 110) });
           break;
         case "[":
-          onChange(side, selectedId, { scale: clamp(layer.scale - 0.05, 0.12, 3) });
+          onChange(side, selectedId, { scaleX: clamp(layer.scaleX - 0.05, 0.05, 8), scaleY: clamp(layer.scaleY - 0.05, 0.05, 8) });
           break;
         case "]":
-          onChange(side, selectedId, { scale: clamp(layer.scale + 0.05, 0.12, 3) });
+          onChange(side, selectedId, { scaleX: clamp(layer.scaleX + 0.05, 0.05, 8), scaleY: clamp(layer.scaleY + 0.05, 0.05, 8) });
+          break;
+        case "Delete":
+        case "Backspace":
+          onDelete(selectedId);
           break;
         case "Escape":
           onSelect(null);
@@ -208,55 +250,59 @@ export default function DesignCanvas({
         default:
           handled = false;
       }
-
       if (handled) {
         e.preventDefault();
         onCommit();
       }
     };
-
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [selectedId, layers, side, onChange, onSelect, onCommit]);
+  }, [selectedId, layers, side, onChange, onSelect, onCommit, onDelete]);
 
   return (
     <div className="canvas-wrap">
       <svg
         ref={svgRef}
-        viewBox={`0 0 ${VIEW_W} ${VIEW_H}`}
+        viewBox={`0 0 ${VIEW} ${VIEW}`}
         className="canvas-svg"
         role="img"
-        aria-label={`${product.name} ${side} preview with ${layers.length} design element${
-          layers.length === 1 ? "" : "s"
-        }`}
+        aria-label={`${side} preview with ${layers.length} design element${layers.length === 1 ? "" : "s"}`}
         onPointerDown={() => onSelect(null)}
       >
-        <defs>
-          <clipPath id="print-clip">
-            <rect x={area.x} y={area.y} width={area.w} height={area.h} />
-          </clipPath>
-        </defs>
-
-        <Garment kind={product.kind} color={color} back={side === "back"} />
+        <image
+          href={photo}
+          x={0}
+          y={0}
+          width={VIEW}
+          height={VIEW}
+          preserveAspectRatio="xMidYMid meet"
+          pointerEvents="none"
+        />
 
         <rect
-          x={area.x}
-          y={area.y}
+          x={areaOrigin.x}
+          y={areaOrigin.y}
           width={area.w}
           height={area.h}
           fill="none"
-          stroke="rgba(200,16,46,0.5)"
-          strokeWidth="1.4"
-          strokeDasharray="5 4"
+          stroke="rgba(200,16,46,0.55)"
+          strokeWidth="1.6"
+          strokeDasharray="7 6"
           pointerEvents="none"
         />
 
         <g clipPath="url(#print-clip)">
+          <defs>
+            <clipPath id="print-clip">
+              <rect x={areaOrigin.x} y={areaOrigin.y} width={area.w} height={area.h} />
+            </clipPath>
+          </defs>
           {layers.map((layer) => (
             <LayerNode
               key={layer.id}
               layer={layer}
               area={area}
+              areaOrigin={areaOrigin}
               selected={layer.id === selectedId}
               onPointerDown={startDrag}
             />
@@ -264,160 +310,157 @@ export default function DesignCanvas({
         </g>
       </svg>
 
-      <div className="canvas-bar">
-        {selectedId ? (
-          <>
-            <div className="tool-group" role="group" aria-label="Active tool">
-              <ToolButton active={tool === "move"} onClick={() => setTool("move")}>
-                Move
-              </ToolButton>
-              <ToolButton active={tool === "scale"} onClick={() => setTool("scale")}>
-                Resize
-              </ToolButton>
-              <ToolButton active={tool === "rotate"} onClick={() => setTool("rotate")}>
-                Rotate
-              </ToolButton>
-            </div>
-            <p className="canvas-hint small muted">
-              Drag to place. Arrow keys nudge, [ and ] resize.
-            </p>
-          </>
-        ) : (
-          <p className="canvas-hint small muted">
-            Select text or artwork on the garment to position it.
-          </p>
-        )}
-      </div>
+      {selected ? (
+        <div className="canvas-float" role="toolbar" aria-label="Selected element">
+          <span className="canvas-float-name">
+            {selected.type === "text" ? selected.text.split("\n")[0] || "Text" : selected.name}
+          </span>
+          <button type="button" onClick={() => onChange(side, selected.id, { flipH: !selected.flipH })} title="Flip horizontal">
+            <FlipIcon axis="h" />
+          </button>
+          <button type="button" onClick={() => onChange(side, selected.id, { flipV: !selected.flipV })} title="Flip vertical">
+            <FlipIcon axis="v" />
+          </button>
+          <button type="button" onClick={() => onReorder(selected.id, "forward")} title="Bring forward">
+            <OrderIcon dir="up" />
+          </button>
+          <button type="button" onClick={() => onReorder(selected.id, "backward")} title="Send backward">
+            <OrderIcon dir="down" />
+          </button>
+          <button type="button" onClick={() => onDuplicate(selected.id)} title="Duplicate">
+            <DupIcon />
+          </button>
+          <button type="button" className="is-danger" onClick={() => onDelete(selected.id)} title="Delete">
+            <TrashIcon />
+          </button>
+        </div>
+      ) : null}
     </div>
   );
-}
-
-function ToolButton({
-  active,
-  onClick,
-  children,
-}: {
-  active: boolean;
-  onClick: () => void;
-  children: React.ReactNode;
-}) {
-  return (
-    <button
-      type="button"
-      className={`tool-btn${active ? " is-active" : ""}`}
-      onClick={onClick}
-      aria-pressed={active}
-    >
-      {children}
-    </button>
-  );
-}
-
-function clamp(n: number, min: number, max: number) {
-  return Math.min(max, Math.max(min, n));
-}
-
-/** Approximate rendered size of a layer in SVG units, used for handles and hit areas. */
-function layerBox(
-  layer: DesignLayer,
-  area: { w: number; h: number }
-): { w: number; h: number } {
-  if (layer.type === "image") {
-    return {
-      w: Math.max(8, (area.w * layer.scale) / 100),
-      h: Math.max(8, (area.h * layer.scale * 0.86) / 100),
-    };
-  }
-  const lines = layer.text.split("\n").length || 1;
-  const longest = Math.max(...layer.text.split("\n").map((l) => l.length), 1);
-  const charW = (layer.fontSize / 100) * area.h * 0.52;
-  const w = Math.min(area.w * 0.98, Math.max(12, longest * charW)) * layer.scale;
-  const h = Math.min(
-    area.h * 0.98,
-    lines * ((layer.fontSize / 100) * area.h * 1.02) * layer.lineHeight
-  ) * layer.scale;
-  return { w, h };
 }
 
 function LayerNode({
   layer,
   area,
+  areaOrigin,
   selected,
   onPointerDown,
 }: {
   layer: DesignLayer;
-  area: { x: number; y: number; w: number; h: number };
+  area: { w: number; h: number };
+  areaOrigin: { x: number; y: number };
   selected: boolean;
-  onPointerDown: (e: ReactPointerEvent, layer: DesignLayer, tool: Tool) => void;
+  onPointerDown: (e: ReactPointerEvent, layer: DesignLayer, tool: Tool, edge?: Edge | null) => void;
 }) {
-  const cx = area.x + (layer.x / 100) * area.w;
-  const cy = area.y + (layer.y / 100) * area.h;
-  const box = layerBox(layer, area);
+  const cx = areaOrigin.x + (layer.x / 100) * area.w;
+  const cy = areaOrigin.y + (layer.y / 100) * area.h;
+  const base = layerBox(layer, area);
+  const box = effBox(base, layer);
+  const fh = layer.flipH ? -1 : 1;
+  const fv = layer.flipV ? -1 : 1;
+
+  const handles: { edge: Edge; x: number; y: number }[] = [
+    { edge: "nw", x: -box.w / 2, y: -box.h / 2 },
+    { edge: "n", x: 0, y: -box.h / 2 },
+    { edge: "ne", x: box.w / 2, y: -box.h / 2 },
+    { edge: "e", x: box.w / 2, y: 0 },
+    { edge: "se", x: box.w / 2, y: box.h / 2 },
+    { edge: "s", x: 0, y: box.h / 2 },
+    { edge: "sw", x: -box.w / 2, y: box.h / 2 },
+    { edge: "w", x: -box.w / 2, y: 0 },
+  ];
+
+  const cursor: Record<Edge, string> = {
+    nw: "nwse-resize",
+    n: "ns-resize",
+    ne: "nesw-resize",
+    e: "ew-resize",
+    se: "nwse-resize",
+    s: "ns-resize",
+    sw: "nesw-resize",
+    w: "ew-resize",
+  };
 
   return (
-    <g transform={`translate(${cx} ${cy}) rotate(${layer.rotation})`}>
-      {/* Generous invisible hit area so small elements stay selectable on touch. */}
-      <rect
-        x={-box.w / 2 - 8}
-        y={-box.h / 2 - 8}
-        width={box.w + 16}
-        height={box.h + 16}
-        fill="transparent"
-        style={{ cursor: "move" }}
-        onPointerDown={(e) => onPointerDown(e, layer, "move")}
-      />
-
-{layer.type === "image" ? (
-        <image
-          href={(layer as ImageLayer).src}
-          x={-box.w / 2}
-          y={-box.h / 2}
-          width={box.w}
-          height={box.h}
-          opacity={(layer as ImageLayer).opacity}
-          preserveAspectRatio="xMidYMid meet"
-          pointerEvents="none"
-        />
-      ) : (
-        <TextNode layer={layer as TextLayer} area={area} pointerEvents="none" />
-      )}
-
-      {selected ? (
-        <>
-          <rect
-            x={-box.w / 2 - 4}
-            y={-box.h / 2 - 4}
-            width={box.w + 8}
-            height={box.h + 8}
-            fill="none"
-            stroke="#c8102e"
-            strokeWidth="1.3"
-            strokeDasharray="4 3"
+    <g>
+      {/* Content, scaled */}
+      <g transform={`translate(${cx} ${cy}) rotate(${layer.rotation}) scale(${layer.scaleX * fh} ${layer.scaleY * fv})`} opacity={layer.opacity}>
+        {layer.type === "image" ? (
+          <image
+            href={(layer as ImageLayer).src}
+            x={-area.w / 2}
+            y={-area.h / 2}
+            width={area.w}
+            height={area.h}
+            preserveAspectRatio="xMidYMid meet"
             pointerEvents="none"
           />
-          {/* Handles stay interactive so the tool can be switched by dragging them. */}
-          <circle
-            cx={0}
-            cy={-box.h / 2 - 5}
-            r="6"
-            fill="#fff"
-            stroke="#c8102e"
-            strokeWidth="1.4"
-            style={{ cursor: "ns-resize" }}
-            onPointerDown={(e) => onPointerDown(e, layer, "scale")}
-          />
-          <circle
-            cx={box.w / 2 + 5}
-            cy={-box.h / 2 - 5}
-            r="6"
-            fill="#fff"
-            stroke="#c8102e"
-            strokeWidth="1.4"
-            style={{ cursor: "grab" }}
-            onPointerDown={(e) => onPointerDown(e, layer, "rotate")}
-          />
-        </>
-      ) : null}
+        ) : (
+          <TextNode layer={layer as TextLayer} area={area} />
+        )}
+      </g>
+
+      {/* Hit area + selection UI, rotation only (handles stay constant size) */}
+      <g transform={`translate(${cx} ${cy}) rotate(${layer.rotation})`}>
+        <rect
+          x={-box.w / 2 - 6}
+          y={-box.h / 2 - 6}
+          width={box.w + 12}
+          height={box.h + 12}
+          fill="transparent"
+          style={{ cursor: "move" }}
+          onPointerDown={(e) => onPointerDown(e, layer, "move")}
+        />
+
+        {selected ? (
+          <>
+            <rect
+              x={-box.w / 2}
+              y={-box.h / 2}
+              width={box.w}
+              height={box.h}
+              fill="none"
+              stroke="#c8102e"
+              strokeWidth="2"
+              pointerEvents="none"
+            />
+            <line
+              x1={0}
+              y1={-box.h / 2}
+              x2={0}
+              y2={-box.h / 2 - 34}
+              stroke="#c8102e"
+              strokeWidth="2"
+              pointerEvents="none"
+            />
+            <circle
+              cx={0}
+              cy={-box.h / 2 - 40}
+              r={11}
+              fill="#fff"
+              stroke="#c8102e"
+              strokeWidth="2"
+              style={{ cursor: "grab" }}
+              onPointerDown={(e) => onPointerDown(e, layer, "rotate")}
+            />
+            {handles.map((h) => (
+              <rect
+                key={h.edge}
+                x={h.x - 8}
+                y={h.y - 8}
+                width={16}
+                height={16}
+                rx={3}
+                fill="#fff"
+                stroke="#c8102e"
+                strokeWidth="2"
+                style={{ cursor: cursor[h.edge] }}
+                onPointerDown={(e) => onPointerDown(e, layer, "scale", h.edge)}
+              />
+            ))}
+          </>
+        ) : null}
+      </g>
     </g>
   );
 }
@@ -425,25 +468,17 @@ function LayerNode({
 function TextNode({
   layer,
   area,
-  pointerEvents,
 }: {
   layer: TextLayer;
   area: { w: number; h: number };
-  pointerEvents?: string;
 }) {
   const lines = layer.text.split("\n");
   const size = (layer.fontSize / 100) * area.h;
   const anchor = layer.align === "left" ? "start" : layer.align === "right" ? "end" : "middle";
-  const offset = layer.align === "left" ? -area.w * 0.42 : layer.align === "right" ? area.w * 0.42 : 0;
-
-  const family =
-    layer.font === "anton"
-      ? "var(--font-anton), 'Arial Narrow', sans-serif"
-      : layer.font === "inter"
-        ? "var(--font-inter), system-ui, sans-serif"
-        : "Georgia, 'Times New Roman', serif";
-
+  const offset =
+    layer.align === "left" ? -area.w * 0.45 : layer.align === "right" ? area.w * 0.45 : 0;
   const firstDy = -((lines.length - 1) * size * layer.lineHeight) / 2;
+  const stroke = layer.strokeWidth > 0 ? layer.strokeColor : "none";
 
   return (
     <text
@@ -452,12 +487,16 @@ function TextNode({
       textAnchor={anchor}
       dominantBaseline="middle"
       fill={layer.color}
+      stroke={stroke}
+      strokeWidth={(layer.strokeWidth / 100) * size}
+      strokeLinejoin="round"
+      paintOrder="stroke"
       fontSize={size}
-      fontFamily={family}
+      fontFamily={svgFontStack(layer.font)}
       fontWeight={layer.weight}
       fontStyle={layer.italic ? "italic" : "normal"}
       letterSpacing={(layer.letterSpacing / 100) * size}
-      pointerEvents={pointerEvents}
+      pointerEvents="none"
     >
       {lines.map((line, i) => (
         <tspan key={i} x={offset} dy={i === 0 ? firstDy : size * layer.lineHeight}>
@@ -465,5 +504,58 @@ function TextNode({
         </tspan>
       ))}
     </text>
+  );
+}
+
+/* --------------------------------- icons --------------------------------- */
+
+function FlipIcon({ axis }: { axis: "h" | "v" }) {
+  return (
+    <svg viewBox="0 0 18 18" width="16" height="16" fill="none" aria-hidden="true">
+      <path
+        d={axis === "h" ? "M9 2v14M6 5 2.5 9 6 13M12 5l3.5 4L12 13" : "M2 9h14M5 6 9 2.5 13 6M5 12l4 3.5L13 12"}
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+function OrderIcon({ dir }: { dir: "up" | "down" }) {
+  return (
+    <svg viewBox="0 0 18 18" width="16" height="16" fill="none" aria-hidden="true">
+      <path
+        d={dir === "up" ? "M9 14V4m0 0L5 8m4-4 4 4" : "M9 4v10m0 0 4-4m-4 4-4-4"}
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+function DupIcon() {
+  return (
+    <svg viewBox="0 0 18 18" width="16" height="16" fill="none" aria-hidden="true">
+      <rect x="6" y="6" width="9" height="9" rx="1.5" stroke="currentColor" strokeWidth="1.5" />
+      <path d="M12 6V4.5A1.5 1.5 0 0 0 10.5 3h-6A1.5 1.5 0 0 0 3 4.5v6A1.5 1.5 0 0 0 4.5 12H6" stroke="currentColor" strokeWidth="1.5" />
+    </svg>
+  );
+}
+
+function TrashIcon() {
+  return (
+    <svg viewBox="0 0 18 18" width="16" height="16" fill="none" aria-hidden="true">
+      <path
+        d="M3 5h12M7.5 5V3.5h3V5M5 5l.8 10.2A1 1 0 0 0 6.8 16h4.4a1 1 0 0 0 1-.8L13 5"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
   );
 }

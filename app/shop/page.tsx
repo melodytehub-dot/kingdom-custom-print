@@ -5,19 +5,15 @@ import { getProducts, getCategories } from "@/lib/catalog";
 export const revalidate = 60;
 
 export const metadata = {
-  title: "Shop custom printed apparel",
+  title: "Shop custom printed t-shirts",
   description:
-    "Blank t-shirts, hoodies, crewnecks, caps and mugs, printed to order. Filter by product type, then design yours online.",
+    "Blank t-shirts printed to order. Filter by fit, then design yours online with text, artwork and names & numbers.",
 };
 
 const KINDS = [
   { value: "", label: "All" },
   { value: "tee", label: "T-Shirts" },
   { value: "longsleeve", label: "Long Sleeve" },
-  { value: "hoodie", label: "Hoodies" },
-  { value: "crew", label: "Crewnecks" },
-  { value: "cap", label: "Caps" },
-  { value: "mug", label: "Mugs" },
 ];
 
 export default async function ShopPage({

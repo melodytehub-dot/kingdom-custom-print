@@ -1,5 +1,14 @@
 import type { Metadata, Viewport } from "next";
-import { Anton, Inter } from "next/font/google";
+import {
+  Anton,
+  Inter,
+  Oswald,
+  Bebas_Neue,
+  Archivo_Black,
+  Playfair_Display,
+  Pacifico,
+  Lobster,
+} from "next/font/google";
 import "./globals.css";
 import "./site.css";
 import "./home.css";
@@ -29,6 +38,57 @@ const anton = Anton({
   variable: "--font-anton",
 });
 
+const oswald = Oswald({
+  subsets: ["latin"],
+  display: "swap",
+  variable: "--font-oswald",
+});
+
+const bebas = Bebas_Neue({
+  subsets: ["latin"],
+  weight: "400",
+  display: "swap",
+  variable: "--font-bebas",
+});
+
+const archivo = Archivo_Black({
+  subsets: ["latin"],
+  weight: "400",
+  display: "swap",
+  variable: "--font-archivo",
+});
+
+const playfair = Playfair_Display({
+  subsets: ["latin"],
+  display: "swap",
+  variable: "--font-playfair",
+});
+
+const pacifico = Pacifico({
+  subsets: ["latin"],
+  weight: "400",
+  display: "swap",
+  variable: "--font-pacifico",
+});
+
+const lobster = Lobster({
+  subsets: ["latin"],
+  weight: "400",
+  display: "swap",
+  variable: "--font-lobster",
+});
+
+const FONT_VARS = [
+  inter.variable,
+  anton.variable,
+  oswald.variable,
+  bebas.variable,
+  archivo.variable,
+  playfair.variable,
+  pacifico.variable,
+  lobster.variable,
+].join(" ");
+
 const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
 
 export const metadata: Metadata = {
@@ -38,14 +98,14 @@ export const metadata: Metadata = {
     template: "%s | Kingdom Custom Print",
   },
   description:
-    "Design custom printed t-shirts, hoodies, caps and mugs. Upload your artwork or build a design online, then we print it to order.",
+    "Design custom printed t-shirts. Upload your artwork or build a design online — add text, graphics and names & numbers — then we print it to order.",
   openGraph: {
     type: "website",
     siteName: "Kingdom Custom Print",
     url: siteUrl,
     title: "Kingdom Custom Print — Custom Printed Apparel",
     description:
-      "Upload your artwork or design online. Custom printed tees, hoodies, caps and mugs.",
+      "Upload your artwork or design online. Custom printed t-shirts, made to order.",
   },
   twitter: {
     card: "summary_large_image",
@@ -67,7 +127,7 @@ export default async function RootLayout({
   const categories = await getCategories().catch(() => []);
 
   return (
-    <html lang="en" className={`${inter.variable} ${anton.variable}`}>
+    <html lang="en" className={FONT_VARS}>
       <body>
         <a className="skip-link" href="#main">
           Skip to content

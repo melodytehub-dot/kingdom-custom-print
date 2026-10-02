@@ -44,6 +44,45 @@ export function areaFor(printArea: PrintArea, side: GarmentSide) {
 }
 
 /**
+ * Printable area of the real tee mockup photo, as a fraction of the image.
+ * Shared by the editor canvas and the cart preview so they always agree.
+ */
+export interface TeeArea {
+  w: number;
+  h: number;
+  cx: number;
+  cy: number;
+}
+
+export const TEE_PRINT_AREA: Record<GarmentSide, TeeArea> = {
+  front: { w: 0.32, h: 0.42, cx: 0.5, cy: 0.4 },
+  back: { w: 0.36, h: 0.46, cx: 0.5, cy: 0.4 },
+};
+
+export function teeArea(side: GarmentSide): TeeArea {
+  return TEE_PRINT_AREA[side];
+}
+
+/**
+ * Unscaled box of a layer in view units. Text is measured with a simple
+ * estimate — good enough for handles and for the cart preview.
+ */
+export function layerBox(
+  layer: DesignLayer,
+  area: { w: number; h: number }
+): { w: number; h: number } {
+  if (layer.type === "image") {
+    return { w: area.w, h: area.h };
+  }
+  const lines = layer.text.split("\n");
+  const size = (layer.fontSize / 100) * area.h;
+  const longest = Math.max(...lines.map((l) => l.length), 1);
+  const w = Math.min(area.w * 1.4, Math.max(size * 0.8, longest * size * 0.6));
+  const h = Math.max(size, lines.length * size * layer.lineHeight);
+  return { w, h };
+}
+
+/**
  * Clamp a layer so its rendered box stays inside the printable area.
  * `extent` is the layer's half-width/half-height in normalized units, which
  * depends on the measured content, so the caller supplies it.
@@ -61,17 +100,27 @@ export function clampToArea(
 
 const round2 = (n: number) => Math.round(n * 100) / 100;
 
+let seq = 0;
+function nextId(prefix: string): string {
+  seq += 1;
+  return `${prefix}-${Date.now().toString(36)}${seq.toString(36)}`;
+}
+
 export function newTextLayer(overrides: Partial<TextLayer> = {}): TextLayer {
   return {
-    id: `t-${Math.random().toString(36).slice(2, 10)}`,
+    id: nextId("t"),
     type: "text",
     text: "Your text",
     x: 50,
     y: 50,
-    scale: 1,
+    scaleX: 1,
+    scaleY: 1,
     rotation: 0,
+    opacity: 1,
+    flipH: false,
+    flipV: false,
     font: "anton",
-    fontSize: 7,
+    fontSize: 10,
     color: "#141414",
     weight: 700,
     italic: false,
@@ -79,22 +128,103 @@ export function newTextLayer(overrides: Partial<TextLayer> = {}): TextLayer {
     align: "center",
     letterSpacing: 0,
     lineHeight: 1.05,
+    strokeColor: "#FFFFFF",
+    strokeWidth: 0,
     ...overrides,
   };
 }
 
-export function newImageLayer(src: string, name: string): ImageLayer {
+export function newImageLayer(
+  src: string,
+  name: string,
+  overrides: Partial<ImageLayer> = {}
+): ImageLayer {
   return {
-    id: `i-${Math.random().toString(36).slice(2, 10)}`,
+    id: nextId("i"),
     type: "image",
     src,
     name,
     x: 50,
     y: 50,
-    scale: 0.6,
+    scaleX: 0.6,
+    scaleY: 0.6,
     rotation: 0,
     opacity: 1,
+    flipH: false,
+    flipV: false,
+    ...overrides,
   };
+}
+
+/** Fills in fields added after a design was saved, so old drafts still load. */
+export function normalizeLayer(layer: DesignLayer): DesignLayer {
+  const isImage = layer.type === "image";
+  const patched = {
+    ...layer,
+    scaleX: Number.isFinite(layer.scaleX) ? layer.scaleX : isImage ? 0.6 : 1,
+    scaleY: Number.isFinite(layer.scaleY) ? layer.scaleY : isImage ? 0.6 : 1,
+    opacity: Number.isFinite(layer.opacity) ? layer.opacity : 1,
+    flipH: layer.flipH ?? false,
+    flipV: layer.flipV ?? false,
+  };
+  if (patched.type === "text") {
+    return {
+      ...patched,
+      strokeColor: patched.strokeColor ?? "#FFFFFF",
+      strokeWidth: Number.isFinite(patched.strokeWidth) ? patched.strokeWidth : 0,
+    };
+  }
+  return patched;
+}
+
+export function normalizeDesign(design: Design): Design {
+  return {
+    front: (design.front ?? []).map(normalizeLayer),
+    back: (design.back ?? []).map(normalizeLayer),
+  };
+}
+
+/** Clones a layer, offsets it slightly and drops it on top of the original. */
+export function duplicateLayer(
+  design: Design,
+  side: GarmentSide,
+  id: string
+): { design: Design; id: string } | null {
+  const index = design[side].findIndex((l) => l.id === id);
+  if (index < 0) return null;
+  const src = design[side][index];
+  const copy = normalizeLayer({
+    ...src,
+    id: nextId(src.type === "text" ? "t" : "i"),
+    x: Math.min(100, src.x + 5),
+    y: Math.min(100, src.y + 5),
+  });
+  const layers = [...design[side]];
+  layers.splice(index + 1, 0, copy);
+  return { design: { ...design, [side]: layers }, id: copy.id };
+}
+
+/** Reorders a layer within its side. */
+export function reorderLayer(
+  design: Design,
+  side: GarmentSide,
+  id: string,
+  dir: "front" | "back" | "forward" | "backward"
+): Design {
+  const layers = [...design[side]];
+  const i = layers.findIndex((l) => l.id === id);
+  if (i < 0) return design;
+  const [layer] = layers.splice(i, 1);
+  const target =
+    dir === "front"
+      ? layers.length
+      : dir === "back"
+        ? 0
+        : dir === "forward"
+          ? Math.min(layers.length, i + 1)
+          : Math.max(0, i - 1);
+  layers.splice(target, 0, layer);
+  return { ...design, [side]: layers };
 }
 
 export function removeLayer(

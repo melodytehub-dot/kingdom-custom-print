@@ -3,46 +3,56 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import Garment from "@/components/Garment";
 import CartIcon from "@/components/icons/CartIcon";
 import DesignCanvas from "./DesignCanvas";
 import TextPanel from "./TextPanel";
 import LayerList from "./LayerList";
 import { ART_LIBRARY, type ArtItem } from "./art";
 import {
+  duplicateLayer,
   emptyDesign,
   loadDrafts,
   newImageLayer,
   newTextLayer,
+  normalizeDesign,
   persistDrafts,
   readImageFile,
   removeLayer,
+  reorderLayer,
   updateLayer,
   usedSides,
   validateUpload,
   type SavedDraft,
 } from "@/lib/design";
 import { drawPreview } from "./preview";
+import { TEE_MOCKUPS, mockupForColor, type TeeMockup } from "@/lib/mockups";
+import { FONTS } from "@/lib/fonts";
 import { useCart } from "@/lib/cart-context";
 import { formatUSD, quoteProduct } from "@/lib/pricing";
 import type {
   Design,
   DesignLayer,
   GarmentSide,
+  NameNumberStyle,
   Product,
+  RosterEntry,
   SizeLine,
 } from "@/lib/types";
 
-const FONT_OPTIONS = [
-  { value: "anton", label: "Impact" },
-  { value: "inter", label: "Grotesk" },
-  { value: "serif", label: "Serif" },
+const INK_COLORS = [
+  "#141414",
+  "#FFFFFF",
+  "#C8102E",
+  "#1C6B45",
+  "#E8A317",
+  "#26314C",
+  "#6B6862",
+  "#7A2E8E",
+  "#0F7B8C",
 ];
 
-const INK_COLORS = ["#141414", "#FFFFFF", "#C8102E", "#1C6B45", "#E8A317", "#26314C", "#6B6862"];
-
 type Step = "design" | "quantity" | "review";
-type Tool = "products" | "text" | "upload" | "art" | "layers";
+type Tool = "products" | "text" | "art" | "upload" | "names" | "layers";
 
 const STEP_ORDER: Step[] = ["design", "quantity", "review"];
 
@@ -54,17 +64,20 @@ const STEP_LABEL: Record<Step, string> = {
 
 const TOOLS: { id: Tool; label: string; icon: React.ReactNode }[] = [
   { id: "products", label: "Products", icon: <ProductsGlyph /> },
-  { id: "text", label: "Add Text", icon: <TextGlyph /> },
-  { id: "upload", label: "Upload Art", icon: <UploadGlyph /> },
-  { id: "art", label: "Add Art", icon: <ArtGlyph /> },
+  { id: "text", label: "Text", icon: <TextGlyph /> },
+  { id: "upload", label: "Upload", icon: <UploadGlyph /> },
+  { id: "art", label: "Clipart", icon: <ArtGlyph /> },
+  { id: "names", label: "Names", icon: <NamesGlyph /> },
   { id: "layers", label: "Layers", icon: <LayersGlyph /> },
 ];
 
 interface DraftState {
-  colorSlug: string;
+  colorCode: string;
   design: Design;
   lines: Record<string, number>;
 }
+
+const uid = () => `r-${Math.random().toString(36).slice(2, 9)}`;
 
 export default function Customizer({
   product,
@@ -83,7 +96,12 @@ export default function Customizer({
   const [tool, setTool] = useState<Tool>("products");
   const [side, setSide] = useState<GarmentSide>("front");
   const [zoom, setZoom] = useState(1);
-  const [colorSlug, setColorSlug] = useState(initialColor || product.colors[0]?.slug || "");
+  const [colorCode, setColorCode] = useState(() => {
+    const match =
+      TEE_MOCKUPS.find((m) => m.slug === initialColor || m.code === initialColor) ??
+      mockupForColor(product.colors[0]?.name ?? "White", product.colors[0]?.hex ?? "#FFFFFF");
+    return match?.code ?? "WHT";
+  });
   const [design, setDesign] = useState<Design>(emptyDesign);
   const [lines, setLines] = useState<Record<string, number>>(initialLines);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -92,9 +110,16 @@ export default function Customizer({
   const [busy, setBusy] = useState(false);
   const [addedCount, setAddedCount] = useState(0);
   const [hist, setHist] = useState({ canUndo: false, canRedo: false });
+  const [roster, setRoster] = useState<RosterEntry[]>([]);
+  const [nnStyle, setNnStyle] = useState<NameNumberStyle>({
+    font: "bebas",
+    color: "#141414",
+    strokeColor: "#FFFFFF",
+    strokeWidth: 0,
+  });
 
   const fileInput = useRef<HTMLInputElement>(null);
-  const draftKey = `kcp.draft.${product.slug}`;
+  const draftKey = `kcp.draft.v2.${product.slug}`;
 
   const historyRef = useRef<Design[]>([]);
   const futureRef = useRef<Design[]>([]);
@@ -107,9 +132,9 @@ export default function Customizer({
     });
   }, []);
 
-  const color = useMemo(
-    () => product.colors.find((c) => c.slug === colorSlug) ?? product.colors[0],
-    [colorSlug, product.colors]
+  const mockup: TeeMockup = useMemo(
+    () => TEE_MOCKUPS.find((m) => m.code === colorCode) ?? TEE_MOCKUPS[0],
+    [colorCode]
   );
 
   const sizeLines = useMemo<SizeLine[]>(
@@ -132,8 +157,12 @@ export default function Customizer({
       const raw = window.localStorage.getItem(draftKey);
       if (!raw) return;
       const parsed = JSON.parse(raw) as DraftState;
-      if (parsed?.design?.front && parsed?.design?.back) setDesign(parsed.design);
-      if (parsed?.colorSlug) setColorSlug(parsed.colorSlug);
+      if (parsed?.design?.front && parsed?.design?.back) {
+        setDesign(normalizeDesign(parsed.design));
+      }
+      if (parsed?.colorCode && TEE_MOCKUPS.some((m) => m.code === parsed.colorCode)) {
+        setColorCode(parsed.colorCode);
+      }
     } catch {
       // A corrupt draft should not block the editor; start clean.
     }
@@ -145,12 +174,12 @@ export default function Customizer({
     try {
       window.localStorage.setItem(
         draftKey,
-        JSON.stringify({ colorSlug, design, lines } satisfies DraftState)
+        JSON.stringify({ colorCode, design, lines } satisfies DraftState)
       );
     } catch {
       // Storage unavailable or full; the in-progress design still works.
     }
-  }, [draftKey, colorSlug, design, lines]);
+  }, [draftKey, colorCode, design, lines]);
 
   /* ---- undo history (debounced so a drag is one step) ---- */
   useEffect(() => {
@@ -190,14 +219,13 @@ export default function Customizer({
     const layer = newTextLayer();
     setDesign((prev) => ({ ...prev, [side]: [...prev[side], layer] }));
     setSelectedId(layer.id);
-    setNotice({ tone: "ok", text: "Text added. Edit it in the panel on the left." });
+    setNotice({ tone: "ok", text: "Text added. Edit it in the panel." });
   };
 
   const addArt = (item: ArtItem) => {
     const layer = newImageLayer(item.src, item.name);
     setDesign((prev) => ({ ...prev, [side]: [...prev[side], layer] }));
     setSelectedId(layer.id);
-    setTool("layers");
     setNotice({ tone: "ok", text: `${item.name} added to the ${side}.` });
   };
 
@@ -215,12 +243,9 @@ export default function Customizer({
       const layer = newImageLayer(decoded.dataUrl, file.name);
       setDesign((prev) => ({ ...prev, [side]: [...prev[side], layer] }));
       setSelectedId(layer.id);
-      setTool("layers");
       setNotice({
         tone: check.warning ? "warn" : "ok",
-        text:
-          check.warning ??
-          `Added at ${decoded.width} × ${decoded.height}px. Drag the handles to fit.`,
+        text: check.warning ?? `Added at ${decoded.width} × ${decoded.height}px. Drag the handles to fit.`,
       });
     } catch (err) {
       setNotice({
@@ -231,6 +256,66 @@ export default function Customizer({
       setBusy(false);
       if (fileInput.current) fileInput.current.value = "";
     }
+  };
+
+  /** Updates the roster and mirrors the first entry onto any name/number layers. */
+  const commitRoster = (next: RosterEntry[]) => {
+    setRoster(next);
+    const first = next[0];
+    setDesign((prev) => {
+      const back = prev.back.map((l) => {
+        if (l.type !== "text") return l;
+        if (l.role === "name") return { ...l, text: first?.name || "NAME" };
+        if (l.role === "number") return { ...l, text: first?.number || "00" };
+        return l;
+      });
+      return { ...prev, back };
+    });
+  };
+
+  const addRosterRow = () => commitRoster([...roster, { id: uid(), name: "", number: "" }]);
+  const updateRoster = (id: string, patchRow: Partial<RosterEntry>) =>
+    commitRoster(roster.map((e) => (e.id === id ? { ...e, ...patchRow } : e)));
+  const removeRoster = (id: string) => commitRoster(roster.filter((e) => e.id !== id));
+
+  const addNamesNumbers = () => {
+    const first = roster[0] ?? { name: "NAME", number: "00" };
+    const nameLayer = newTextLayer({
+      role: "name",
+      text: first.name || "NAME",
+      x: 50,
+      y: 30,
+      fontSize: 7,
+      font: nnStyle.font,
+      color: nnStyle.color,
+      strokeColor: nnStyle.strokeColor,
+      strokeWidth: nnStyle.strokeWidth,
+      uppercase: true,
+      weight: 700,
+    });
+    const numLayer = newTextLayer({
+      role: "number",
+      text: first.number || "00",
+      x: 50,
+      y: 62,
+      fontSize: 22,
+      font: nnStyle.font,
+      color: nnStyle.color,
+      strokeColor: nnStyle.strokeColor,
+      strokeWidth: nnStyle.strokeWidth,
+      weight: 900,
+    });
+    setDesign((prev) => ({
+      ...prev,
+      back: [
+        ...prev.back.filter((l) => l.type !== "text" || !l.role),
+        nameLayer,
+        numLayer,
+      ],
+    }));
+    setSide("back");
+    setSelectedId(numLayer.id);
+    setNotice({ tone: "ok", text: "Names & numbers added to the back." });
   };
 
   const undo = () => {
@@ -272,9 +357,9 @@ export default function Customizer({
       id: `d-${Date.now().toString(36)}`,
       productSlug: product.slug,
       productName: product.name,
-      colorSlug,
-      colorName: color?.name ?? "",
-      colorHex: color?.hex ?? "#141414",
+      colorSlug: mockup.slug,
+      colorName: mockup.name,
+      colorHex: mockup.hex,
       design,
       savedAt: Date.now(),
     };
@@ -288,8 +373,10 @@ export default function Customizer({
     const found = drafts.find((d) => d.id === id);
     if (!found) return;
     applyingHistory.current = true;
-    setDesign(found.design);
+    setDesign(normalizeDesign(found.design));
     setSelectedId(null);
+    const m = mockupForColor(found.colorName, found.colorHex);
+    if (m) setColorCode(m.code);
     setNotice({ tone: "ok", text: `Loaded your saved ${found.productName} design.` });
   };
 
@@ -320,25 +407,23 @@ export default function Customizer({
       return;
     }
     if (sides.length === 0) {
-      setNotice({
-        tone: "warn",
-        text: "No artwork added — this garment will be added blank.",
-      });
+      setNotice({ tone: "warn", text: "No artwork added — this shirt will be added blank." });
     }
 
     setBusy(true);
     try {
-      const previews = await drawPreview(product, color?.hex ?? "#141414", design);
+      const previews = await drawPreview(mockup.front, mockup.back, design);
       addItem({
         productId: product.id,
         productSlug: product.slug,
         productName: product.name,
         productKind: product.kind,
-        colorSlug: color?.slug ?? "",
-        colorName: color?.name ?? "",
-        colorHex: color?.hex ?? "#141414",
+        colorSlug: mockup.slug,
+        colorName: mockup.name,
+        colorHex: mockup.hex,
         sidesUsed: sides,
         design,
+        roster: roster.length ? roster : undefined,
         previewFront: previews.front,
         previewBack: previews.back,
         lines: sizeLines.filter((l) => l.qty > 0),
@@ -382,7 +467,6 @@ export default function Customizer({
       return (
         <TextPanel
           layer={selected}
-          fonts={FONT_OPTIONS}
           inks={INK_COLORS}
           onChange={(changes) => patchActive(selected.id, changes)}
         />
@@ -407,14 +491,28 @@ export default function Customizer({
             />
             <span className="tnum small">{Math.round(selected.opacity * 100)}%</span>
           </label>
+          <div className="toggle-row" role="group" aria-label="Flip image">
+            <button
+              type="button"
+              className={`toggle${selected.flipH ? " is-on" : ""}`}
+              aria-pressed={selected.flipH}
+              onClick={() => patchActive(selected.id, { flipH: !selected.flipH })}
+            >
+              Flip H
+            </button>
+            <button
+              type="button"
+              className={`toggle${selected.flipV ? " is-on" : ""}`}
+              aria-pressed={selected.flipV}
+              onClick={() => patchActive(selected.id, { flipV: !selected.flipV })}
+            >
+              Flip V
+            </button>
+          </div>
         </div>
       );
     }
-    return (
-      <p className="empty-note small muted">
-        Select a layer on the garment to edit it.
-      </p>
-    );
+    return <p className="empty-note small muted">Select a layer on the shirt to edit it.</p>;
   }
 
   return (
@@ -489,23 +587,14 @@ export default function Customizer({
             <>
               <PanelHead
                 eyebrow="Products"
-                title="Manage your products"
-                hint="Pick a blank, then choose a colour. Everything is printed to order."
+                title="Pick a blank & colour"
+                hint="Choose the shirt, then a colour. The preview swaps to that exact garment."
               />
 
               <div className="studio-product">
                 <div className="studio-product-media">
-                  {product.images[0] ? (
-                    <Image
-                      src={product.images[0].url}
-                      alt=""
-                      width={120}
-                      height={120}
-                      className="studio-product-img"
-                    />
-                  ) : (
-                    <Garment kind={product.kind} color={color?.hex ?? "#141414"} />
-                  )}
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={mockup.front} alt="" className="studio-product-img" />
                 </div>
                 <div className="studio-product-info">
                   <p className="studio-product-name wrap-anywhere">{product.name}</p>
@@ -513,13 +602,30 @@ export default function Customizer({
                     <p className="small muted">Style {product.styleCode}</p>
                   ) : null}
                   <p className="studio-product-color small">
-                    <span
-                      className="studio-dot"
-                      style={{ background: color?.hex }}
-                      aria-hidden="true"
-                    />
-                    {color?.name}
+                    <span className="studio-dot" style={{ background: mockup.hex }} aria-hidden="true" />
+                    {mockup.name}
                   </p>
+                </div>
+              </div>
+
+              <div className="pane">
+                <p className="label">
+                  Colour <span className="opt-value">{mockup.name}</span>
+                </p>
+                <div className="swatches swatches-lg">
+                  {TEE_MOCKUPS.map((m) => (
+                    <button
+                      key={m.code}
+                      type="button"
+                      className={`swatch${m.code === mockup.code ? " is-active" : ""}`}
+                      style={{ background: m.hex }}
+                      onClick={() => setColorCode(m.code)}
+                      aria-pressed={m.code === mockup.code}
+                      title={m.name}
+                    >
+                      <span className="sr-only">{m.name}</span>
+                    </button>
+                  ))}
                 </div>
               </div>
 
@@ -537,50 +643,11 @@ export default function Customizer({
                         // eslint-disable-next-line @next/next/no-img-element
                         <img src={p.images[0].url} alt="" />
                       ) : (
-                        <Garment kind={p.kind} color={p.colors[0]?.hex ?? "#141414"} />
+                        <Image src="/brand/kingdom-logo.png" alt="" width={40} height={24} />
                       )}
                       <span className="wrap-anywhere">{p.name}</span>
                     </Link>
                   ))}
-                </div>
-              </div>
-
-              <Link href="/customize" className="studio-add">
-                <span aria-hidden="true">+</span> Add another blank
-              </Link>
-
-              <div className="pane">
-                <p className="label">
-                  Color <span className="opt-value">{color?.name}</span>
-                </p>
-                <div className="swatches">
-                  {product.colors.map((c) => (
-                    <button
-                      key={c.slug}
-                      type="button"
-                      className={`swatch${c.slug === color?.slug ? " is-active" : ""}`}
-                      style={{ background: c.hex }}
-                      onClick={() => setColorSlug(c.slug)}
-                      aria-pressed={c.slug === color?.slug}
-                      title={c.name}
-                    >
-                      <span className="sr-only">{c.name}</span>
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <div className="pane">
-                <p className="label">Method</p>
-                <div className="studio-method">
-                  <span className="studio-method-opt is-active">
-                    Printing
-                    <span className="small muted">No minimum</span>
-                  </span>
-                  <span className="studio-method-opt is-off">
-                    Embroidery
-                    <span className="small muted">On request</span>
-                  </span>
                 </div>
               </div>
             </>
@@ -591,7 +658,7 @@ export default function Customizer({
               <PanelHead
                 eyebrow="Add text"
                 title="Type your message"
-                hint={`Adds to the ${side}. Move, scale and restyle it on the garment.`}
+                hint={`Adds to the ${side}. Drag to move, pull the corners to resize, use the top handle to rotate.`}
               />
               <button type="button" className="btn btn-block" onClick={addText}>
                 + Add a text layer
@@ -615,16 +682,16 @@ export default function Customizer({
               >
                 {busy ? "Reading…" : "Choose a file"}
               </button>
-              <p className="hint">It is placed on the {side} and can be moved and scaled.</p>
+              <p className="hint">It is placed on the {side} and can be moved, resized and flipped.</p>
             </>
           ) : null}
 
           {step === "design" && tool === "art" ? (
             <>
               <PanelHead
-                eyebrow="Add art"
+                eyebrow="Clipart"
                 title="Ready-made graphics"
-                hint="Drop in a graphic, then scale, rotate and fade it like any layer."
+                hint="Drop in a graphic, then resize, rotate, flip and fade it like any layer."
               />
               <ul className="studio-art-grid">
                 {ART_LIBRARY.map((item) => (
@@ -640,12 +707,147 @@ export default function Customizer({
             </>
           ) : null}
 
+          {step === "design" && tool === "names" ? (
+            <>
+              <PanelHead
+                eyebrow="Names & numbers"
+                title="Add team names & numbers"
+                hint="Set the style, then build a roster. Each shirt can print its own name and number."
+              />
+
+              <div className="field">
+                <label className="label" htmlFor="nn-font">
+                  Font
+                </label>
+                <select
+                  id="nn-font"
+                  className="select"
+                  value={nnStyle.font}
+                  onChange={(e) => setNnStyle((s) => ({ ...s, font: e.target.value }))}
+                >
+                  {FONTS.map((f) => (
+                    <option key={f.value} value={f.value}>
+                      {f.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="field">
+                <span className="label">Ink colour</span>
+                <div className="swatches">
+                  {INK_COLORS.map((c) => (
+                    <button
+                      key={c}
+                      type="button"
+                      className={`swatch${c.toLowerCase() === nnStyle.color.toLowerCase() ? " is-active" : ""}`}
+                      style={{ background: c }}
+                      onClick={() => setNnStyle((s) => ({ ...s, color: c }))}
+                      aria-pressed={c.toLowerCase() === nnStyle.color.toLowerCase()}
+                      title={c}
+                    >
+                      <span className="sr-only">{c}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="field">
+                <span className="label">
+                  Outline <span className="opt-value">{nnStyle.strokeWidth > 0 ? `${nnStyle.strokeWidth}%` : "Off"}</span>
+                </span>
+                <div className="swatches">
+                  {["#FFFFFF", "#141414", "#C8102E", "#E8A317", "#1C6B45", "#26314C"].map((c) => (
+                    <button
+                      key={c}
+                      type="button"
+                      className={`swatch${c.toLowerCase() === nnStyle.strokeColor.toLowerCase() ? " is-active" : ""}`}
+                      style={{ background: c }}
+                      onClick={() => setNnStyle((s) => ({ ...s, strokeColor: c }))}
+                      aria-pressed={c.toLowerCase() === nnStyle.strokeColor.toLowerCase()}
+                      title={c}
+                    >
+                      <span className="sr-only">{c}</span>
+                    </button>
+                  ))}
+                </div>
+                <label className="range-row" htmlFor="nn-stroke">
+                  <span>Width</span>
+                  <input
+                    id="nn-stroke"
+                    type="range"
+                    min={0}
+                    max={20}
+                    step={1}
+                    value={nnStyle.strokeWidth}
+                    onChange={(e) => setNnStyle((s) => ({ ...s, strokeWidth: Number(e.target.value) }))}
+                  />
+                  <span className="tnum small">{nnStyle.strokeWidth}</span>
+                </label>
+              </div>
+
+              <div className="field">
+                <span className="label">
+                  Roster <span className="opt-value">{roster.length || "none"}</span>
+                </span>
+                {roster.length ? (
+                  <ul className="roster-list">
+                    {roster.map((entry) => (
+                      <li key={entry.id}>
+                        <input
+                          className="input"
+                          value={entry.name}
+                          placeholder="Name"
+                          onChange={(e) => updateRoster(entry.id, { name: e.target.value })}
+                          aria-label="Player name"
+                        />
+                        <input
+                          className="input roster-num"
+                          value={entry.number}
+                          placeholder="00"
+                          inputMode="numeric"
+                          onChange={(e) => updateRoster(entry.id, { number: e.target.value })}
+                          aria-label="Player number"
+                        />
+                        <button
+                          type="button"
+                          className="icon-btn"
+                          onClick={() => removeRoster(entry.id)}
+                          aria-label="Remove row"
+                        >
+                          <svg width="14" height="14" viewBox="0 0 18 18" fill="none" aria-hidden="true">
+                            <path
+                              d="M3 5h12M7.5 5V3.5h3V5M5 5l.8 10.2A1 1 0 0 0 6.8 16h4.4a1 1 0 0 0 1-.8L13 5"
+                              stroke="currentColor"
+                              strokeWidth="1.3"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                            />
+                          </svg>
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="empty-note small muted">No players yet. Add a row to start a roster.</p>
+                )}
+                <button type="button" className="btn btn-light btn-block" onClick={addRosterRow}>
+                  + Add player
+                </button>
+              </div>
+
+              <button type="button" className="btn btn-block" onClick={addNamesNumbers}>
+                Add names & numbers to the back
+              </button>
+            </>
+          ) : null}
+
           {step === "design" && tool === "layers" ? (
             <>
               <PanelHead
                 eyebrow="Layers"
                 title={`${side === "front" ? "Front" : "Back"} elements`}
-                hint="Select a layer to edit or remove it."
+                hint="Select a layer to edit it. Use the floating toolbar to reorder, flip, duplicate or delete."
               />
               <LayerList
                 layers={layers}
@@ -658,7 +860,7 @@ export default function Customizer({
               />
               {layers.length === 0 ? (
                 <p className="empty-note small muted">
-                  Nothing on this side yet. Use Add Text, Upload Art or Add Art.
+                  Nothing on this side yet. Use Text, Upload, Clipart or Names.
                 </p>
               ) : null}
               <div className="pane">{renderInspector()}</div>
@@ -680,9 +882,7 @@ export default function Customizer({
                   >
                     <label htmlFor={`c-qty-${s.label}`} className="size-label">
                       {s.label}
-                      {s.surcharge > 0 ? (
-                        <span className="size-add">+{formatUSD(s.surcharge)}</span>
-                      ) : null}
+                      {s.surcharge > 0 ? <span className="size-add">+{formatUSD(s.surcharge)}</span> : null}
                     </label>
                     <div className="size-stepper">
                       <button
@@ -747,23 +947,29 @@ export default function Customizer({
                   <strong>{product.name}</strong>
                 </li>
                 <li>
-                  <span>Color</span>
-                  <strong>{color?.name}</strong>
+                  <span>Colour</span>
+                  <strong>{mockup.name}</strong>
                 </li>
                 <li>
                   <span>Printed sides</span>
                   <strong>
                     {sides.length
                       ? sides.map((s) => (s === "front" ? "Front" : "Back")).join(" + ")
-                      : "Blank garment"}
+                      : "Blank shirt"}
                   </strong>
                 </li>
                 <li>
                   <span>Elements</span>
                   <strong>{design.front.length + design.back.length || "None"}</strong>
                 </li>
+                {roster.length ? (
+                  <li>
+                    <span>Roster</span>
+                    <strong className="tnum">{roster.length} names</strong>
+                  </li>
+                ) : null}
                 <li>
-                  <span>Garments</span>
+                  <span>Shirts</span>
                   <strong className="tnum">{quantity}</strong>
                 </li>
                 <li>
@@ -782,12 +988,8 @@ export default function Customizer({
                   <ul>
                     {drafts.map((d) => (
                       <li key={d.id}>
-                        <button
-                          type="button"
-                          className="draft-load"
-                          onClick={() => loadDraft(d.id)}
-                        >
-                          <Garment kind={product.kind} color={d.colorHex} />
+                        <button type="button" className="draft-load" onClick={() => loadDraft(d.id)}>
+                          <span className="draft-dot" style={{ background: d.colorHex }} aria-hidden="true" />
                           <span className="draft-meta">
                             <span className="wrap-anywhere">{d.productName}</span>
                             <span className="small muted">
@@ -833,7 +1035,7 @@ export default function Customizer({
         {/* Stage */}
         <section className="studio-stage" aria-label="Design preview">
           <div className="stage-top">
-            <div className="stage-side-tabs" role="group" aria-label="Garment side">
+            <div className="stage-side-tabs" role="group" aria-label="Shirt side">
               {(["front", "back"] as const).map((s) => (
                 <button
                   key={s}
@@ -864,58 +1066,35 @@ export default function Customizer({
             </div>
           </div>
 
-          <div
-            className="stage-canvas"
-            style={{ ["--stage-max" as string]: `${56 * zoom}vh` } as React.CSSProperties}
-          >
+          <div className="stage-canvas" style={{ ["--stage-zoom" as string]: `${zoom}` }}>
             <DesignCanvas
-              product={product}
-              color={color?.hex ?? "#141414"}
-              design={design}
+              frontSrc={mockup.front}
+              backSrc={mockup.back}
               side={side}
+              design={design}
               selectedId={selectedId}
               onSelect={setSelectedId}
               onChange={patch}
               onCommit={() => undefined}
+              onDuplicate={(id) => {
+                const res = duplicateLayer(design, side, id);
+                if (res) {
+                  setDesign(res.design);
+                  setSelectedId(res.id);
+                }
+              }}
+              onDelete={(id) => {
+                setDesign((prev) => removeLayer(prev, side, id));
+                if (selectedId === id) setSelectedId(null);
+              }}
+              onReorder={(id, dir) => setDesign((prev) => reorderLayer(prev, side, id, dir))}
             />
-          </div>
-
-          {step === "design" ? (
-            <div className="stage-quick">
-              <button
-                type="button"
-                onClick={() => {
-                  setTool("text");
-                  addText();
-                }}
-                disabled={busy}
-              >
-                Add text
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setTool("upload");
-                  fileInput.current?.click();
-                }}
-                disabled={busy}
-              >
-                Upload art
-              </button>
-              <button type="button" onClick={() => setTool("art")}>
-                Add art
-              </button>
-            </div>
-          ) : null}
-
-          <div className="stage-status small muted">
-            {design.front.length} front · {design.back.length} back
           </div>
 
           <div className="stage-zoom">
             <button
               type="button"
-              onClick={() => setZoom((z) => Math.max(0.75, Math.round((z - 0.25) * 100) / 100))}
+              onClick={() => setZoom((z) => Math.max(0.75, Math.round((z - 0.15) * 100) / 100))}
               aria-label="Zoom out"
             >
               &minus;
@@ -923,7 +1102,7 @@ export default function Customizer({
             <span className="tnum small">{Math.round(zoom * 100)}%</span>
             <button
               type="button"
-              onClick={() => setZoom((z) => Math.min(1.5, Math.round((z + 0.25) * 100) / 100))}
+              onClick={() => setZoom((z) => Math.min(1.6, Math.round((z + 0.15) * 100) / 100))}
               aria-label="Zoom in"
             >
               +
@@ -941,7 +1120,7 @@ export default function Customizer({
           </span>
           <span className="studio-price-total small muted">
             {quantity > 0
-              ? `${quantity} garment${quantity === 1 ? "" : "s"} · ${formatUSD(quote.total)}`
+              ? `${quantity} shirt${quantity === 1 ? "" : "s"} · ${formatUSD(quote.total)}`
               : "Set a quantity to see the total"}
           </span>
         </div>
@@ -956,12 +1135,7 @@ export default function Customizer({
             Save design
           </button>
           {step === "review" ? (
-            <button
-              type="button"
-              className="btn btn-red"
-              onClick={handleAddToCart}
-              disabled={busy}
-            >
+            <button type="button" className="btn btn-red" onClick={handleAddToCart} disabled={busy}>
               {busy ? "Adding…" : addedCount > 0 ? "Add another" : "Add to cart"}
             </button>
           ) : (
@@ -980,15 +1154,7 @@ export default function Customizer({
   );
 }
 
-function PanelHead({
-  eyebrow,
-  title,
-  hint,
-}: {
-  eyebrow: string;
-  title: string;
-  hint: string;
-}) {
+function PanelHead({ eyebrow, title, hint }: { eyebrow: string; title: string; hint: string }) {
   return (
     <header className="studio-panel-head">
       <p className="eyebrow">{eyebrow}</p>
@@ -1059,15 +1225,25 @@ function ArtGlyph() {
   );
 }
 
+function NamesGlyph() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path d="M4 6h10M4 11h7M4 16h6" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+      <path
+        d="M16 20c0-2.2 1.6-3.6 3.5-3.6S23 17.8 23 20M19.5 13.4a2.2 2.2 0 1 0 0-4.4 2.2 2.2 0 0 0 0 4.4Z"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
 function LayersGlyph() {
   return (
     <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
-      <path
-        d="m12 3 9 5-9 5-9-5 9-5Z"
-        stroke="currentColor"
-        strokeWidth="1.6"
-        strokeLinejoin="round"
-      />
+      <path d="m12 3 9 5-9 5-9-5 9-5Z" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" />
       <path
         d="m3 13 9 5 9-5"
         stroke="currentColor"

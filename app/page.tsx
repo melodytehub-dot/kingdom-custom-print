@@ -11,9 +11,6 @@ export const revalidate = 60;
 
 const CATEGORY_IMAGE: Record<string, string> = {
   "t-shirts": "/img/cat-tees.jpg",
-  sweatshirts: "/img/cat-sweatshirts.jpg",
-  headwear: "/img/cat-headwear.jpg",
-  drinkware: "/img/cat-drinkware.jpg",
 };
 
 const STEPS = [
@@ -146,7 +143,7 @@ export default async function HomePage() {
           <div className="hero-media">
             <Image
               src="/img/hero.jpg"
-              alt="A person wearing a plain black hooded sweatshirt"
+              alt="A runner wearing a custom-printed t-shirt"
               fill
               preload
               sizes="(max-width: 900px) 100vw, 50vw"

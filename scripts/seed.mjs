@@ -16,9 +16,6 @@ const sql = postgres(process.env.DATABASE_URL, { max: 1, ssl: "require" });
 
 const categories = [
   { slug: "t-shirts", name: "T-Shirts", description: "Short and long sleeve blanks for everyday custom prints.", sort: 1 },
-  { slug: "sweatshirts", name: "Sweatshirts", description: "Hoodies and crewnecks with a large printable surface.", sort: 2 },
-  { slug: "headwear", name: "Caps & Beanies", description: "Structured caps with a flat front panel for embroidery or print.", sort: 3 },
-  { slug: "drinkware", name: "Drinkware", description: "Ceramic mugs for logos and artwork.", sort: 4 },
 ];
 
 /* Reusable colour palettes ------------------------------------------------ */
@@ -133,21 +130,6 @@ const PREMIUM_BREAKS = [
   { min_qty: 24, off: -2.5 },
   { min_qty: 50, off: -3.5 },
   { min_qty: 100, off: -4.25 },
-];
-
-const FLEECE_BREAKS = [
-  { min_qty: 1, off: 0 },
-  { min_qty: 6, off: -2 },
-  { min_qty: 12, off: -3 },
-  { min_qty: 24, off: -4.5 },
-  { min_qty: 50, off: -6 },
-];
-
-const ACCESSORY_BREAKS = [
-  { min_qty: 1, off: 0 },
-  { min_qty: 12, off: -1.5 },
-  { min_qty: 24, off: -2.5 },
-  { min_qty: 50, off: -3.5 },
 ];
 
 const products = [
@@ -477,118 +459,6 @@ const products = [
   },
 
   /* ------------------------------ Sweatshirts ---------------------------- */
-  {
-    slug: "minimalist-hoodie",
-    name: "Minimalist Hoodie",
-    style: "996",
-    category: "sweatshirts",
-    kind: "hoodie",
-    material: "Brushed-back fleece, 8.0 oz / 271 gsm",
-    blurb: "Brushed-back fleece with a double-lined hood and a wide back panel for artwork.",
-    description:
-      "The heaviest blank in the range. A brushed-back fleece gives a large front or back print a flat surface to sit on. The double-lined hood holds its shape, and ribbed cuffs and hem keep the sleeves in place during wear.",
-    base_price: 32.0,
-    compare_at: 38.0,
-    print_fee: 7,
-    print_area: { frontW: 0.46, frontH: 0.44, backW: 0.6, backH: 0.6 },
-    featured: true,
-    sort: 20,
-    colors: [
-      { slug: "black", name: "Black", hex: "#141414" },
-      { slug: "charcoal", name: "Charcoal", hex: "#3A3A3C" },
-      { slug: "forest", name: "Forest", hex: "#1F3D2B" },
-      { slug: "oat", name: "Oat", hex: "#DCD2C0" },
-      { slug: "navy", name: "Navy", hex: "#1F2A44" },
-      { slug: "maroon", name: "Maroon", hex: "#5A1A22" },
-    ],
-    sizes: ADULT_SIZES,
-    breaks: FLEECE_BREAKS,
-    images: [{ url: "/img/products/minimalist-hoodie.jpg", alt: "Minimalist Hoodie" }],
-  },
-  {
-    slug: "essential-crew",
-    name: "Essential Crewneck",
-    style: "562",
-    category: "sweatshirts",
-    kind: "crew",
-    material: "Midweight fleece, 7.8 oz / 265 gsm",
-    blurb: "A clean crewneck surface for left chest marks and mid-weight front prints.",
-    description:
-      "Midweight fleece sits between a tee and a hoodie. The flat front panel takes a left chest mark or a medium front print without the bulk of a full hoodie.",
-    base_price: 28.0,
-    compare_at: null,
-    print_fee: 6.5,
-    print_area: { frontW: 0.44, frontH: 0.44, backW: 0.6, backH: 0.6 },
-    featured: true,
-    sort: 21,
-    colors: [
-      { slug: "black", name: "Black", hex: "#141414" },
-      { slug: "oat", name: "Oat", hex: "#DCD2C0" },
-      { slug: "navy", name: "Navy", hex: "#1F2A44" },
-      { slug: "wine", name: "Wine", hex: "#5C1F2C" },
-      { slug: "sport-grey", name: "Sport Grey", hex: "#B4B4B6" },
-      { slug: "forest", name: "Forest", hex: "#1F3D2B" },
-    ],
-    sizes: ADULT_SIZES,
-    breaks: FLEECE_BREAKS,
-    images: [{ url: "/img/products/essential-crew.jpg", alt: "Essential Crewneck" }],
-  },
-
-  /* ------------------------------- Headwear ------------------------------ */
-  {
-    slug: "urban-snapback",
-    name: "Urban Snapback",
-    style: "112",
-    category: "headwear",
-    kind: "cap",
-    material: "Cotton twill front, mesh back, structured six-panel",
-    blurb: "Structured six-panel trucker with a flat printable front panel.",
-    description:
-      "A structured six-panel with a flat cotton-twill front panel that takes a logo cleanly at small sizes, plus a breathable mesh back and an adjustable snap closure.",
-    base_price: 14.0,
-    compare_at: null,
-    print_fee: 5,
-    print_area: { frontW: 0.52, frontH: 0.42, backW: 0.52, backH: 0.42 },
-    featured: true,
-    sort: 30,
-    colors: [
-      { slug: "black", name: "Black", hex: "#141414" },
-      { slug: "olive", name: "Olive", hex: "#4A4A33" },
-      { slug: "stone", name: "Stone", hex: "#C8C2B4" },
-      { slug: "navy", name: "Navy", hex: "#1F2A44" },
-      { slug: "tan", name: "Tan", hex: "#B8A277" },
-      { slug: "charcoal", name: "Charcoal", hex: "#3A3A3C" },
-    ],
-    sizes: [{ label: "One Size", surcharge: 0 }],
-    breaks: ACCESSORY_BREAKS,
-    images: [{ url: "/img/products/urban-snapback.jpg", alt: "Urban Snapback" }],
-  },
-
-  /* ------------------------------ Drinkware ------------------------------ */
-  {
-    slug: "kingdom-mug",
-    name: "Kingdom Mug 11oz",
-    style: "MUG11",
-    category: "drinkware",
-    kind: "mug",
-    material: "Ceramic, 11oz",
-    blurb: "Ceramic mug with a printable face for logos and artwork.",
-    description:
-      "Standard 11oz ceramic mug. Full wrap available on request for logos that run edge to edge.",
-    base_price: 11.0,
-    compare_at: null,
-    print_fee: 4,
-    print_area: { frontW: 0.66, frontH: 0.56, backW: 0.66, backH: 0.56 },
-    featured: false,
-    sort: 40,
-    colors: [
-      { slug: "white", name: "White", hex: "#FFFFFF" },
-      { slug: "black", name: "Black", hex: "#141414" },
-    ],
-    sizes: [{ label: "11oz", surcharge: 0 }],
-    breaks: ACCESSORY_BREAKS,
-    images: [{ url: "/img/products/kingdom-mug.jpg", alt: "Kingdom Mug 11oz" }],
-  },
 ];
 
 const settings = {

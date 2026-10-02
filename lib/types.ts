@@ -75,14 +75,23 @@ export interface Category {
    Customizer design payload
    ------------------------------------------------------------------------- */
 
-export interface TextLayer {
+/** Fields every layer shares, so the canvas can move/scale/rotate any of them. */
+export interface BaseLayer {
   id: string;
-  type: "text";
-  text: string;
   x: number;
   y: number;
-  scale: number;
+  /** Horizontal/vertical stretch, multiplied on top of the layer's base size. */
+  scaleX: number;
+  scaleY: number;
   rotation: number;
+  opacity: number;
+  flipH: boolean;
+  flipV: boolean;
+}
+
+export interface TextLayer extends BaseLayer {
+  type: "text";
+  text: string;
   font: string;
   fontSize: number;
   color: string;
@@ -92,23 +101,37 @@ export interface TextLayer {
   align: "left" | "center" | "right";
   letterSpacing: number;
   lineHeight: number;
+  /** Outline / stroke drawn behind the fill. */
+  strokeColor: string;
+  /** Stroke width as a percentage of the font size (0 = no outline). */
+  strokeWidth: number;
+  /** Marks a layer as a team name or number so the roster drives its text. */
+  role?: "name" | "number";
 }
 
-export interface ImageLayer {
-  id: string;
+export interface ImageLayer extends BaseLayer {
   type: "image";
   src: string;
   name: string;
-  x: number;
-  y: number;
-  scale: number;
-  rotation: number;
-  opacity: number;
 }
 
 export type DesignLayer = TextLayer | ImageLayer;
 
 export type Design = Record<GarmentSide, DesignLayer[]>;
+
+/** A single row of a team roster, used by the names & numbers tool. */
+export interface RosterEntry {
+  id: string;
+  name: string;
+  number: string;
+}
+
+export interface NameNumberStyle {
+  font: string;
+  color: string;
+  strokeColor: string;
+  strokeWidth: number;
+}
 
 /* -------------------------------------------------------------------------
    Cart + order
@@ -131,6 +154,8 @@ export interface CartItem {
   colorHex: string;
   sidesUsed: GarmentSide[];
   design: Design;
+  /** Per-shirt names/numbers captured by the names & numbers tool. */
+  roster?: RosterEntry[];
   previewFront: string | null;
   previewBack: string | null;
   lines: SizeLine[];
