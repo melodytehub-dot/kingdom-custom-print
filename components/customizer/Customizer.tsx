@@ -202,6 +202,9 @@ export default function Customizer({
     () => TEE_MOCKUPS.find((m) => m.code === colorCode) ?? TEE_MOCKUPS[0],
     [colorCode]
   );
+  const changeColor = useCallback((code: string) => {
+    setColorCode(code);
+  }, []);
   const darkShirt = luminance(mockup.hex) < 0.42;
 
   const sizeLines = useMemo<SizeLine[]>(
@@ -895,7 +898,7 @@ export default function Customizer({
             product={product}
             products={products}
             mockup={mockup}
-            onColor={setColorCode}
+            onColor={changeColor}
             onClose={closePanel}
           />
         );
@@ -1195,6 +1198,7 @@ export default function Customizer({
                 }}
               >
                 <DesignCanvas
+                  key={`${mockup.code}-${side}`}
                   frontSrc={mockup.front}
                   backSrc={mockup.back}
                   side={side}
