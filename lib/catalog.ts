@@ -187,9 +187,9 @@ export async function getProductById(id: number): Promise<Product | null> {
 
 export async function getCategories(): Promise<Category[]> {
   const rows = await sql<
-    { id: number; slug: string; name: string; description: string; product_count: number }[]
+    { id: number; slug: string; name: string; description: string; sort_order: number; product_count: number }[]
   >`
-    SELECT c.id, c.slug, c.name, c.description,
+    SELECT c.id, c.slug, c.name, c.description, c.sort_order,
       (SELECT count(*)::int FROM products p WHERE p.category_id = c.id AND p.active) AS product_count
     FROM categories c
     ORDER BY c.sort_order, c.id
@@ -200,6 +200,7 @@ export async function getCategories(): Promise<Category[]> {
     name: r.name,
     description: r.description,
     productCount: r.product_count,
+    sortOrder: r.sort_order,
   }));
 }
 
@@ -208,6 +209,35 @@ export async function getCategoryBySlug(slug: string): Promise<Category | null> 
     { id: number; slug: string; name: string; description: string }[]
   >`SELECT id, slug, name, description FROM categories WHERE slug = ${slug} LIMIT 1`;
   return rows[0] ?? null;
+}
+
+export interface CategoryInput {
+  name: string;
+  slug: string;
+  description: string;
+  sortOrder: number;
+}
+
+export async function createCategory(input: CategoryInput): Promise<number> {
+  const [row] = await sql<{ id: number }[]>`
+    INSERT INTO categories (name, slug, description, sort_order)
+    VALUES (${input.name}, ${input.slug}, ${input.description}, ${input.sortOrder})
+    RETURNING id`;
+  return row.id;
+}
+
+export async function updateCategory(id: number, input: CategoryInput): Promise<boolean> {
+  const result = await sql`
+    UPDATE categories
+    SET name = ${input.name}, slug = ${input.slug}, description = ${input.description},
+        sort_order = ${input.sortOrder}
+    WHERE id = ${id}`;
+  return result.count > 0;
+}
+
+export async function deleteCategory(id: number): Promise<boolean> {
+  const result = await sql`DELETE FROM categories WHERE id = ${id}`;
+  return result.count > 0;
 }
 
 /* -------------------------------------------------------------------------

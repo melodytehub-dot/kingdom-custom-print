@@ -39,7 +39,7 @@ interface AdminData {
   stats: DashboardStats;
   orders: AdminOrder[];
   products: Product[];
-  categories: { id: number; name: string; slug: string }[];
+  categories: { id: number; name: string; slug: string; description: string; sortOrder: number }[];
   customers: CustomerRow[];
   settings: SiteSettings;
   paymentsLive: boolean;
@@ -113,7 +113,7 @@ export default function AdminDashboard({
       ) : null}
       {tab === "products" ? <ProductsPanel data={data} /> : null}
       {tab === "customers" ? <Customers data={data} /> : null}
-      {tab === "settings" ? <SettingsPanel settings={data.settings} /> : null}
+      {tab === "settings" ? <SettingsPanel settings={data.settings} categories={data.categories} /> : null}
     </div>
   );
 }
@@ -1320,8 +1320,16 @@ function Customers({ data }: { data: AdminData }) {
    Settings
    ------------------------------------------------------------------------- */
 
-function SettingsPanel({ settings }: { settings: SiteSettings }) {
+function SettingsPanel({
+  settings,
+  categories: initialCategories,
+}: {
+  settings: SiteSettings;
+  categories: AdminData["categories"];
+}) {
   const [form, setForm] = useState(settings);
+  const [categories, setCategories] = useState(initialCategories);
+  const [categoryDraft, setCategoryDraft] = useState<{ id?: number; name: string; slug: string; description: string; sortOrder: string } | null>(null);
   const [saving, setSaving] = useState(false);
   const [state, setState] = useState<{ tone: "ok" | "error"; text: string } | null>(null);
 
@@ -1482,6 +1490,54 @@ function SettingsPanel({ settings }: { settings: SiteSettings }) {
           {saving ? "Saving…" : "Save settings"}
         </button>
       </form>
+
+      <div className="admin-subsection">
+        <div className="admin-block-head">
+          <div>
+            <h3 className="h3">Catalog categories</h3>
+            <p className="small muted">Control the categories shown in the shop and product editor.</p>
+          </div>
+          <button type="button" className="btn btn-sm" onClick={() => setCategoryDraft({ name: "", slug: "", description: "", sortOrder: String(categories.length) })}>
+            New category
+          </button>
+        </div>
+        {categoryDraft ? (
+          <form
+            className="category-form"
+            onSubmit={async (e) => {
+              e.preventDefault();
+              const res = await fetch("/api/admin/categories", {
+                method: categoryDraft.id ? "PUT" : "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(categoryDraft),
+              });
+              const json = (await res.json()) as { error?: string };
+              if (!res.ok) {
+                setState({ tone: "error", text: json.error ?? "Category could not be saved." });
+                return;
+              }
+              window.location.reload();
+            }}
+          >
+            <div className="field-grid">
+              <div className="field"><label className="label" htmlFor="cat-name">Name</label><input id="cat-name" className="input" required value={categoryDraft.name} onChange={(e) => setCategoryDraft({ ...categoryDraft, name: e.target.value })} /></div>
+              <div className="field"><label className="label" htmlFor="cat-slug">URL slug</label><input id="cat-slug" className="input" value={categoryDraft.slug} placeholder="generated from name" onChange={(e) => setCategoryDraft({ ...categoryDraft, slug: e.target.value })} /></div>
+              <div className="field"><label className="label" htmlFor="cat-order">Order</label><input id="cat-order" className="input" type="number" min="0" value={categoryDraft.sortOrder} onChange={(e) => setCategoryDraft({ ...categoryDraft, sortOrder: e.target.value })} /></div>
+            </div>
+            <div className="field"><label className="label" htmlFor="cat-description">Description</label><textarea id="cat-description" className="textarea" rows={2} value={categoryDraft.description} onChange={(e) => setCategoryDraft({ ...categoryDraft, description: e.target.value })} /></div>
+            <div className="form-actions"><button type="submit" className="btn btn-sm">Save category</button><button type="button" className="btn btn-light btn-sm" onClick={() => setCategoryDraft(null)}>Cancel</button></div>
+          </form>
+        ) : null}
+        <ul className="category-admin-list">
+          {categories.map((category) => (
+            <li key={category.id} className="category-admin-row">
+              <div className="grow"><strong>{category.name}</strong><span className="small muted">/{category.slug}{category.description ? ` · ${category.description}` : ""}</span></div>
+              <button type="button" className="link" onClick={() => setCategoryDraft({ id: category.id, name: category.name, slug: category.slug, description: category.description, sortOrder: String(category.sortOrder) })}>Edit</button>
+              <button type="button" className="cart-remove" onClick={async () => { if (!window.confirm(`Delete “${category.name}”? Products will become uncategorised.`)) return; const res = await fetch(`/api/admin/categories?id=${category.id}`, { method: "DELETE" }); if (res.ok) setCategories((prev) => prev.filter((item) => item.id !== category.id)); else setState({ tone: "error", text: "Category could not be deleted." }); }}>Delete</button>
+            </li>
+          ))}
+        </ul>
+      </div>
     </section>
   );
 }
