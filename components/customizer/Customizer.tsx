@@ -90,7 +90,7 @@ type Panel =
 const STEP_ORDER: Step[] = ["design", "quantity", "review"];
 const STEP_LABEL: Record<Step, string> = {
   design: "Design",
-  quantity: "Quantity",
+  quantity: "Quantity & sizes",
   review: "Review",
 };
 
@@ -169,6 +169,7 @@ export default function Customizer({
   const [nn, setNn] = useState<NNSettings>(NN_DEFAULTS);
   const [focusToken, setFocusToken] = useState(0);
   const [flipping, setFlipping] = useState(false);
+  const [zoom, setZoom] = useState(1);
   const [previews, setPreviews] = useState<{ front: string | null; back: string | null }>({
     front: null,
     back: null,
@@ -633,6 +634,15 @@ export default function Customizer({
     setNotice({ tone: "ok", text: "Names & numbers removed." });
   };
 
+  const startOver = () => {
+    setDesign(emptyDesign());
+    setRoster([]);
+    setSelectedId(null);
+    setPanel("none");
+    setZoom(1);
+    setNotice({ tone: "ok", text: "Started a fresh design." });
+  };
+
   /* ---- history ---- */
   const undo = () => {
     const h = historyRef.current;
@@ -790,7 +800,7 @@ export default function Customizer({
     if (!w || !h) return { size: 0, left: 0, ty: 0 };
     // RushOrderTees keeps the garment large in the square workspace. The
     // previous fit left too much empty space above and below the shirt.
-    const size = compact ? w * 1.14 : Math.min(w * 1.1, h * 1.1);
+    const size = (compact ? w * 1.14 : Math.min(w * 1.1, h * 1.1)) * zoom;
     const top = 0.054 * size;
     const silhouetteH = 0.892 * size;
     let ty = (h - silhouetteH) / 2 - top;
@@ -806,7 +816,7 @@ export default function Customizer({
     }
     return { size, left: (w - size) / 2, ty };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [stageBox, compact, split, selectedId, selected?.y, side]);
+  }, [stageBox, compact, split, selectedId, selected?.y, side, zoom]);
 
   /* ---- what the rail highlights ---- */
   const railActive =
@@ -1131,17 +1141,44 @@ export default function Customizer({
                   <RedoIcon size={22} />
                 </button>
               </div>
-              <button
-                type="button"
-                className="rot-rotate"
-                onClick={rotateSide}
-                aria-label={`Rotate to the ${side === "front" ? "back" : "front"}`}
-              >
-                <span className="rot-rotate-icon">
-                  <RotateShirtIcon />
-                </span>
-                <span className="rot-rotate-label">Rotate</span>
-              </button>
+              <div className="rot-stage-actions">
+                <div className="rot-side-switcher" aria-label="Garment side">
+                  {(["front", "back"] as const).map((view) => (
+                    <button
+                      key={view}
+                      type="button"
+                      className={`rot-side-thumb${side === view ? " is-active" : ""}`}
+                      onClick={() => {
+                        setSide(view);
+                        setSelectedId(null);
+                        setPanel((p) => (SPLIT_PANELS.includes(p) ? "none" : p));
+                      }}
+                      aria-pressed={side === view}
+                    >
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={view === "front" ? mockup.front : mockup.back} alt="" />
+                      <span>{view}</span>
+                    </button>
+                  ))}
+                </div>
+                <button type="button" className="rot-stage-chip" onClick={() => setZoom((z) => (z > 1 ? 1 : 1.12))}>
+                  {zoom > 1 ? "Fit" : "Zoom"}
+                </button>
+                <button type="button" className="rot-stage-chip rot-start-over" onClick={startOver}>
+                  Start over
+                </button>
+                <button
+                  type="button"
+                  className="rot-rotate rot-rotate-compact"
+                  onClick={rotateSide}
+                  aria-label={`Rotate to the ${side === "front" ? "back" : "front"}`}
+                >
+                  <span className="rot-rotate-icon">
+                    <RotateShirtIcon />
+                  </span>
+                  <span className="rot-rotate-label">Rotate</span>
+                </button>
+              </div>
             </div>
 
             {fit.size > 0 ? (

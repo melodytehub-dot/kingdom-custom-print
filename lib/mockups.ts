@@ -11,7 +11,10 @@ export interface TeeMockup {
   back: string;
 }
 
-const B = "/img/mockups/flat";
+// High-contrast transparent ghost-mannequin renders used by the studio.
+// The garment is isolated from its background so artwork stays crisp and
+// the stage can inherit the site's bone background.
+const B = "/img/mockups/garment";
 
 export const TEE_MOCKUPS: TeeMockup[] = [
   { code: "WHT", slug: "white", name: "White", hex: "#FFFFFF", front: `${B}/WHT_fr.webp`, back: `${B}/WHT_bk.webp` },

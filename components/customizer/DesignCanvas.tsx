@@ -316,6 +316,7 @@ export default function DesignCanvas({
 
         <image
           href={photo}
+          className="rot-shirt-photo"
           x={0}
           y={0}
           width={VIEW}
