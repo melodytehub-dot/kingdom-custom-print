@@ -4,6 +4,8 @@
  * viewport. Run with the dev server listening on localhost:3000.
  */
 import { chromium } from "playwright";
+import fs from "node:fs";
+import path from "node:path";
 
 const BASE = process.env.QA_BASE ?? "http://localhost:3000";
 const CHROME = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
@@ -23,6 +25,17 @@ const products = [
   ["v-neck-tee", "vneck", 6],
   ["long-sleeve-tee", "longsleeve", 6],
 ];
+
+const generatedFamilies = ["hoodie", "crew", "cap", "mug", "tote"];
+for (const family of generatedFamilies) {
+  for (const side of ["fr", "bk"]) {
+    const asset = path.resolve(`public/img/mockups/families/${family}/WHT_${side}.webp`);
+    if (!fs.existsSync(asset)) {
+      throw new Error(`Missing generated ${family} ${side} mockup: ${asset}`);
+    }
+  }
+}
+console.log(`PASS generated non-tee families — ${generatedFamilies.length} families with front/back assets`);
 
 const browser = await chromium.launch({ executablePath: CHROME, headless: true });
 const context = await browser.newContext({ viewport: { width: 390, height: 844 } });

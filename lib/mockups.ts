@@ -1,3 +1,5 @@
+import type { ProductKind } from "./types";
+
 // RushOrderTees "Classic Tee" (RT2000) colourways as flat, body-free garment
 // mockups (ghost-mannequin shading composited from ROT's texture + mask, tinted
 // per colour). Front = "_fr", back = "_bk".
@@ -13,6 +15,7 @@ export interface TeeMockup {
 
 type ProductLike = {
   slug: string;
+  kind: ProductKind;
   colors: { slug: string; name: string; hex: string }[];
 };
 
@@ -99,7 +102,19 @@ export function mockupsForProduct(product: ProductLike): TeeMockup[] {
           ? "pocket"
           : product.slug === "youth-classic-tee"
             ? "youth"
-            : null;
+            : product.kind === "hoodie"
+              ? "hoodie"
+              : product.kind === "crew"
+                ? "crew"
+                : product.kind === "cap"
+                  ? "cap"
+                  : product.kind === "mug"
+                    ? "mug"
+                    : product.kind === "tote"
+                      ? "tote"
+                      : product.kind === "longsleeve"
+                        ? "longsleeve"
+                        : null;
   return product.colors.map((color) => {
     const base = mockupForColor(color.name, color.hex) ?? TEE_MOCKUPS[0];
     const productColor = {
