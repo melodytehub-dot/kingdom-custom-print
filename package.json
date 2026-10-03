@@ -14,6 +14,7 @@
     "db:reset": "node --env-file=.env.local scripts/migrate.mjs --force && node --env-file=.env.local scripts/seed.mjs",
     "qa-audit": "node scripts/qa-audit.mjs",
     "qa-cart-flow": "node scripts/qa-cart-flow.mjs",
+    "qa-cart-flow:hoodie": "QA_PRODUCT_SLUG=premium-pullover-hoodie QA_PRODUCT_NAME='Premium Pullover Hoodie' node scripts/qa-cart-flow.mjs",
     "qa-admin-flow": "node scripts/qa-admin-flow.mjs",
     "qa-customizer-controls": "node scripts/qa-customizer-controls.mjs",
     "qa-price-tamper": "node scripts/qa-price-tamper.mjs",

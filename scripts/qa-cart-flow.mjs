@@ -8,6 +8,8 @@
 import { chromium } from "playwright";
 
 const BASE = process.env.QA_BASE ?? "http://localhost:3000";
+const PRODUCT_SLUG = process.env.QA_PRODUCT_SLUG ?? "crown-classic-tee";
+const PRODUCT_NAME = (process.env.QA_PRODUCT_NAME ?? "Crown Classic").toLowerCase();
 const CHROME = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
 
 let failures = 0;
@@ -36,7 +38,7 @@ page.on("console", (m) => {
 
 /* ---- 1. Add a designed garment to the cart ---- */
 console.log("\n1. customizer add-to-cart");
-await page.goto(`${BASE}/customize/crown-classic-tee`, { waitUntil: "networkidle" });
+await page.goto(`${BASE}/customize/${PRODUCT_SLUG}`, { waitUntil: "networkidle" });
 
 const addText = page.getByRole("button", { name: /^add text$/i }).first();
 await addText.click();
@@ -72,7 +74,7 @@ console.log("\n2. cart contents");
 await page.goto(`${BASE}/cart`, { waitUntil: "networkidle" });
 const cartText = await page.locator("main, body").first().innerText();
 
-check("cart shows the product", /crown classic/i.test(cartText));
+check("cart shows the product", cartText.toLowerCase().includes(PRODUCT_NAME));
 const designSummary = cartText.match(/front:\s*\d+\s*\w+/i) ?? cartText.match(/blank/i);
 check("cart records the design", !!designSummary, designSummary?.[0] ?? "no design summary");
 const cartTotal = money((cartText.match(/subtotal[\s\S]{0,60}?(\d+\.\d{2})/i) ?? [])[1]);
@@ -82,7 +84,7 @@ check("subtotal is a positive amount", cartTotal > 0, `$${cartTotal}`);
 console.log("\n3. persistence across reload");
 await page.reload({ waitUntil: "networkidle" });
 const afterReload = await page.locator("main, body").first().innerText();
-check("cart still populated after reload", /crown classic/i.test(afterReload));
+check("cart still populated after reload", afterReload.toLowerCase().includes(PRODUCT_NAME));
 
 /* ---- 4. Size quantity change reprices correctly ---- */
 console.log("\n4. repricing on size change");
