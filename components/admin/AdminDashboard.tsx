@@ -1330,6 +1330,7 @@ function SettingsPanel({
   const [form, setForm] = useState(settings);
   const [categories, setCategories] = useState(initialCategories);
   const [categoryDraft, setCategoryDraft] = useState<{ id?: number; name: string; slug: string; description: string; sortOrder: string } | null>(null);
+  const [categorySaving, setCategorySaving] = useState(false);
   const [saving, setSaving] = useState(false);
   const [state, setState] = useState<{ tone: "ok" | "error"; text: string } | null>(null);
 
@@ -1506,17 +1507,25 @@ function SettingsPanel({
             className="category-form"
             onSubmit={async (e) => {
               e.preventDefault();
-              const res = await fetch("/api/admin/categories", {
-                method: categoryDraft.id ? "PUT" : "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(categoryDraft),
-              });
-              const json = (await res.json()) as { error?: string };
-              if (!res.ok) {
-                setState({ tone: "error", text: json.error ?? "Category could not be saved." });
-                return;
+              setCategorySaving(true);
+              setState(null);
+              try {
+                const res = await fetch("/api/admin/categories", {
+                  method: categoryDraft.id ? "PUT" : "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify(categoryDraft),
+                });
+                const json = (await res.json()) as { error?: string };
+                if (!res.ok) {
+                  setState({ tone: "error", text: json.error ?? "Category could not be saved." });
+                  return;
+                }
+                window.location.reload();
+              } catch {
+                setState({ tone: "error", text: "Network error. Try again." });
+              } finally {
+                setCategorySaving(false);
               }
-              window.location.reload();
             }}
           >
             <div className="field-grid">
@@ -1525,7 +1534,7 @@ function SettingsPanel({
               <div className="field"><label className="label" htmlFor="cat-order">Order</label><input id="cat-order" className="input" type="number" min="0" value={categoryDraft.sortOrder} onChange={(e) => setCategoryDraft({ ...categoryDraft, sortOrder: e.target.value })} /></div>
             </div>
             <div className="field"><label className="label" htmlFor="cat-description">Description</label><textarea id="cat-description" className="textarea" rows={2} value={categoryDraft.description} onChange={(e) => setCategoryDraft({ ...categoryDraft, description: e.target.value })} /></div>
-            <div className="form-actions"><button type="submit" className="btn btn-sm">Save category</button><button type="button" className="btn btn-light btn-sm" onClick={() => setCategoryDraft(null)}>Cancel</button></div>
+            <div className="form-actions"><button type="submit" className="btn btn-sm" disabled={categorySaving}>{categorySaving ? "Saving…" : "Save category"}</button><button type="button" className="btn btn-light btn-sm" disabled={categorySaving} onClick={() => setCategoryDraft(null)}>Cancel</button></div>
           </form>
         ) : null}
         <ul className="category-admin-list">
