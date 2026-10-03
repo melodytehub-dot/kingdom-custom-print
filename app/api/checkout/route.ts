@@ -74,10 +74,11 @@ async function sanitise(items: CartItem[]): Promise<CartItem[]> {
       ),
     });
 
-    // Prefer the exact colour the shopper picked (the studio offers the full
-    // real garment palette); fall back to the matched catalogue colour.
-    const colorName = String(item.colorName ?? "").trim().slice(0, 40) || matched.name;
-    const colorHex = hexOr(item.colorHex, matched.hex);
+    // Persist only the catalogue colour that was matched above. The client
+    // may send presentation values for the preview, but order snapshots must
+    // never contain an arbitrary name or hex that is not offered by the blank.
+    const colorName = matched.name;
+    const colorHex = matched.hex;
 
     priced.push({
       ...item,
