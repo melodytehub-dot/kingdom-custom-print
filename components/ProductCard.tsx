@@ -2,6 +2,7 @@ import Link from "next/link";
 import Image from "next/image";
 import Garment from "./Garment";
 import { formatUSD, largestBreakQty, lowestPrintedUnit } from "@/lib/pricing";
+import { hasDedicatedMockupFamily, mockupsForProduct } from "@/lib/mockups";
 import type { Product } from "@/lib/types";
 
 function ColorDots({ colors }: { colors: Product["colors"] }) {
@@ -34,7 +35,10 @@ export default function ProductCard({
   const wasPrice = product.compareAt;
   const fromUnit = lowestPrintedUnit(product);
   const tier = largestBreakQty(product);
-  const image = product.images[0];
+  const generated = hasDedicatedMockupFamily(product) ? mockupsForProduct(product)[0] : null;
+  const image = generated
+    ? { url: generated.front, alt: `${product.name} in ${generated.name}` }
+    : product.images[0];
   const range = sizeRange(product);
 
   return (

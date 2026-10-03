@@ -19,6 +19,19 @@ type ProductLike = {
   colors: { slug: string; name: string; hex: string }[];
 };
 
+const DEDICATED_FAMILY_SLUGS = new Set([
+  "v-neck-tee",
+  "long-sleeve-tee",
+  "womens-fitted-tee",
+  "pocket-tee",
+  "youth-classic-tee",
+]);
+
+/** Product families whose generated mockups are the canonical storefront image. */
+export function hasDedicatedMockupFamily(product: ProductLike): boolean {
+  return product.kind !== "tee" || DEDICATED_FAMILY_SLUGS.has(product.slug);
+}
+
 // High-contrast transparent ghost-mannequin renders used by the studio.
 // The garment is isolated from its background so artwork stays crisp and
 // the stage can inherit the site's bone background.

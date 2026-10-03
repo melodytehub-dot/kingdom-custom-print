@@ -46,6 +46,31 @@ const browser = await chromium.launch({ executablePath: CHROME, headless: true }
 const context = await browser.newContext({ viewport: { width: 390, height: 844 } });
 let failures = 0;
 
+const shopPage = await context.newPage();
+try {
+  await shopPage.goto(`${BASE}/shop?qa=storefront-images`, {
+    waitUntil: "domcontentloaded",
+    timeout: 30000,
+  });
+  const cards = shopPage.locator(".pcard");
+  const cardCount = await cards.count();
+  for (let i = 0; i < cardCount; i += 1) {
+    await cards.nth(i).scrollIntoViewIfNeeded();
+  }
+  await shopPage.waitForTimeout(500);
+  const broken = await shopPage.locator(".pcard img").evaluateAll((images) =>
+    images.filter((image) => !image.complete || image.naturalWidth === 0).map((image) => image.alt || image.src)
+  );
+  const imagesOk = cardCount > 0 && broken.length === 0;
+  console.log(`${imagesOk ? "PASS" : "FAIL"} storefront product images — ${cardCount} cards, ${broken.length} broken`);
+  if (!imagesOk) failures += 1;
+} catch (error) {
+  failures += 1;
+  console.log(`FAIL storefront product images ${(error instanceof Error ? error.message : String(error)).split("\n")[0]}`);
+} finally {
+  await shopPage.close();
+}
+
 for (const [slug, family, expectedColors] of products) {
   const page = await context.newPage();
   try {

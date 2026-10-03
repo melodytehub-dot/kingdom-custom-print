@@ -6,6 +6,7 @@ import Link from "next/link";
 import Garment from "@/components/Garment";
 import ArrowRight from "@/components/icons/ArrowRight";
 import { formatUSD, lowestPrintedUnit, quoteProduct, resolveBreak } from "@/lib/pricing";
+import { hasDedicatedMockupFamily, mockupsForProduct } from "@/lib/mockups";
 import type { Product, ProductColor } from "@/lib/types";
 
 export default function ProductDetail({ product }: { product: Product }) {
@@ -26,6 +27,12 @@ export default function ProductDetail({ product }: { product: Product }) {
     () => product.colors.find((c) => c.slug === colorSlug) ?? firstColor,
     [colorSlug, product.colors, firstColor]
   );
+
+  const dedicatedMockups = useMemo(
+    () => (hasDedicatedMockupFamily(product) ? mockupsForProduct(product) : []),
+    [product]
+  );
+  const activeGenerated = dedicatedMockups.find((m) => m.slug === color?.slug) ?? dedicatedMockups[0];
 
   function pickColor(c: ProductColor) {
     setColorSlug(c.slug);
@@ -67,7 +74,9 @@ export default function ProductDetail({ product }: { product: Product }) {
     [product]
   );
 
-  const activeImage = product.images[imageIdx] ?? product.images[0];
+  const activeImage = activeGenerated
+    ? { url: activeGenerated.front, alt: `${product.name} in ${activeGenerated.name}` }
+    : product.images[imageIdx] ?? product.images[0];
   const canCustomize = totalQty > 0;
 
   function setQty(label: string, value: number) {
@@ -95,7 +104,7 @@ export default function ProductDetail({ product }: { product: Product }) {
           </p>
         ) : null}
 
-        {product.images.length > 1 ? (
+        {!activeGenerated && product.images.length > 1 ? (
           <ul className="pdp-thumbs">
             {product.images.map((img, i) => (
               <li key={img.id}>
