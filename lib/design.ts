@@ -3,9 +3,11 @@ import type {
   DesignLayer,
   GarmentSide,
   ImageLayer,
+  PersonalizationKind,
   PrintArea,
   TextLayer,
 } from "./types";
+import { measureTextLayer } from "@/components/customizer/textGeometry";
 
 /**
  * Layers are stored in normalized coordinates (0-100) relative to the
@@ -64,22 +66,26 @@ export function teeArea(side: GarmentSide): TeeArea {
 }
 
 /**
- * Unscaled box of a layer in view units. Text is measured with a simple
- * estimate — good enough for handles and for the cart preview.
+ * Unscaled box of a layer in view units. Images are fitted inside the print
+ * area using their own aspect ratio (so handles hug the artwork); text is
+ * measured with the real font so handles hug the glyphs.
  */
 export function layerBox(
   layer: DesignLayer,
   area: { w: number; h: number }
 ): { w: number; h: number } {
   if (layer.type === "image") {
-    return { w: area.w, h: area.h };
+    const aspect = layer.aspect > 0 ? layer.aspect : 1;
+    let w = area.w;
+    let h = w / aspect;
+    if (h > area.h) {
+      h = area.h;
+      w = h * aspect;
+    }
+    return { w, h };
   }
-  const lines = layer.text.split("\n");
-  const size = (layer.fontSize / 100) * area.h;
-  const longest = Math.max(...lines.map((l) => l.length), 1);
-  const w = Math.min(area.w * 1.4, Math.max(size * 0.8, longest * size * 0.6));
-  const h = Math.max(size, lines.length * size * layer.lineHeight);
-  return { w, h };
+  const m = measureTextLayer(layer, area.h);
+  return { w: m.w, h: m.h };
 }
 
 /**
@@ -130,6 +136,7 @@ export function newTextLayer(overrides: Partial<TextLayer> = {}): TextLayer {
     lineHeight: 1.05,
     strokeColor: "#FFFFFF",
     strokeWidth: 0,
+    arc: 0,
     ...overrides,
   };
 }
@@ -137,6 +144,7 @@ export function newTextLayer(overrides: Partial<TextLayer> = {}): TextLayer {
 export function newImageLayer(
   src: string,
   name: string,
+  aspect = 1,
   overrides: Partial<ImageLayer> = {}
 ): ImageLayer {
   return {
@@ -144,6 +152,7 @@ export function newImageLayer(
     type: "image",
     src,
     name,
+    aspect: aspect > 0 ? aspect : 1,
     x: 50,
     y: 50,
     scaleX: 0.6,
@@ -172,9 +181,13 @@ export function normalizeLayer(layer: DesignLayer): DesignLayer {
       ...patched,
       strokeColor: patched.strokeColor ?? "#FFFFFF",
       strokeWidth: Number.isFinite(patched.strokeWidth) ? patched.strokeWidth : 0,
+      arc: Number.isFinite(patched.arc) ? patched.arc : 0,
     };
   }
-  return patched;
+  return {
+    ...patched,
+    aspect: Number.isFinite(patched.aspect) && patched.aspect > 0 ? patched.aspect : 1,
+  };
 }
 
 export function normalizeDesign(design: Design): Design {
@@ -182,6 +195,17 @@ export function normalizeDesign(design: Design): Design {
     front: (design.front ?? []).map(normalizeLayer),
     back: (design.back ?? []).map(normalizeLayer),
   };
+}
+
+/** Which team personalisation (names / numbers) a design carries. */
+export function personalizationOf(design: {
+  front?: Array<{ type?: unknown; role?: unknown }>;
+  back?: Array<{ type?: unknown; role?: unknown }>;
+}): PersonalizationKind {
+  const layers = [...(design.front ?? []), ...(design.back ?? [])];
+  const names = layers.some((l) => l.type === "text" && l.role === "name");
+  const numbers = layers.some((l) => l.type === "text" && l.role === "number");
+  return names && numbers ? "both" : names ? "names" : numbers ? "numbers" : "none";
 }
 
 /** Clones a layer, offsets it slightly and drops it on top of the original. */
@@ -308,9 +332,48 @@ export interface DecodedImage {
   dataUrl: string;
 }
 
+/** Largest data URL the checkout accepts for one image. */
+export const MAX_IMAGE_DATA_URL = 380_000;
+
 /**
- * Reads a file into a data URL, downscaling oversized raster images so the
- * browser canvas and the stored payload stay small.
+ * Encodes a canvas as WebP (keeps transparency) and steps quality/size down
+ * until it fits under `limit`, so artwork is never silently dropped at checkout.
+ */
+export function encodeCanvasUnder(
+  source: HTMLCanvasElement,
+  limit = MAX_IMAGE_DATA_URL
+): { dataUrl: string; width: number; height: number } {
+  let canvas = source;
+  let quality = 0.92;
+  for (let attempt = 0; attempt < 12; attempt++) {
+    let dataUrl = canvas.toDataURL("image/webp", quality);
+    if (!dataUrl.startsWith("data:image/webp")) dataUrl = canvas.toDataURL("image/png");
+    if (dataUrl.length <= limit) {
+      return { dataUrl, width: canvas.width, height: canvas.height };
+    }
+    if (quality > 0.55) {
+      quality -= 0.12;
+    } else {
+      const next = document.createElement("canvas");
+      next.width = Math.max(64, Math.round(canvas.width * 0.8));
+      next.height = Math.max(64, Math.round(canvas.height * 0.8));
+      const c = next.getContext("2d");
+      if (!c) break;
+      c.imageSmoothingQuality = "high";
+      c.drawImage(canvas, 0, 0, next.width, next.height);
+      canvas = next;
+    }
+  }
+  return {
+    dataUrl: canvas.toDataURL("image/png"),
+    width: canvas.width,
+    height: canvas.height,
+  };
+}
+
+/**
+ * Reads a file into a data URL, downscaling oversized raster images and
+ * recompressing so the stored payload stays small enough to order.
  */
 export function readImageFile(
   file: File,
@@ -324,15 +387,16 @@ export function readImageFile(
       const img = new Image();
       img.onerror = () => reject(new Error("That file could not be decoded as an image."));
       img.onload = () => {
-        const largest = Math.max(img.width, img.height);
-        if (largest <= maxEdge) {
-          resolve({ width: img.width, height: img.height, dataUrl });
+        const isSvg = file.type === "image/svg+xml";
+        if (isSvg && dataUrl.length <= MAX_IMAGE_DATA_URL) {
+          resolve({ width: img.width || 1000, height: img.height || 1000, dataUrl });
           return;
         }
-        const scale = maxEdge / largest;
+        const largest = Math.max(img.width, img.height) || 1000;
+        const scale = Math.min(1, maxEdge / largest);
         const canvas = document.createElement("canvas");
-        canvas.width = Math.round(img.width * scale);
-        canvas.height = Math.round(img.height * scale);
+        canvas.width = Math.max(1, Math.round((img.width || 1000) * scale));
+        canvas.height = Math.max(1, Math.round((img.height || 1000) * scale));
         const ctx = canvas.getContext("2d");
         if (!ctx) {
           resolve({ width: img.width, height: img.height, dataUrl });
@@ -340,11 +404,7 @@ export function readImageFile(
         }
         ctx.imageSmoothingQuality = "high";
         ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-        resolve({
-          width: canvas.width,
-          height: canvas.height,
-          dataUrl: canvas.toDataURL("image/png"),
-        });
+        resolve(encodeCanvasUnder(canvas));
       };
       img.src = dataUrl;
     };

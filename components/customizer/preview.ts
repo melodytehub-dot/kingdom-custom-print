@@ -1,6 +1,6 @@
 import type { Design, DesignLayer, GarmentSide } from "@/lib/types";
 import { layerBox, teeArea } from "@/lib/design";
-import { canvasFontStack } from "@/lib/fonts";
+import { displayText, drawArcLine, fontShorthand, measureTextLayer } from "./textGeometry";
 
 /**
  * Renders a flattened preview of each side for the cart and order records.
@@ -19,29 +19,57 @@ function loadImage(src: string): Promise<HTMLImageElement> {
   });
 }
 
-function fitContain(iw: number, ih: number, bw: number, bh: number) {
-  const ratio = iw / ih || 1;
-  let dw = bw;
-  let dh = bw / ratio;
-  if (dh > bh) {
-    dh = bh;
-    dw = bh * ratio;
+/** Seeded PRNG so a distressed print looks the same every render. */
+function mulberry(seed: number) {
+  let a = seed >>> 0;
+  return () => {
+    a |= 0;
+    a = (a + 0x6d2b79f5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+const DISTRESS_DENSITY = [0, 0.05, 0.12, 0.22];
+
+/** Knocks speckles out of whatever has been drawn into `c` (destination-out). */
+function distress(c: CanvasRenderingContext2D, w: number, h: number, level: number, seed: number) {
+  const rand = mulberry(seed);
+  const count = Math.round(w * h * DISTRESS_DENSITY[Math.min(3, Math.max(0, level))] * 0.02);
+  c.save();
+  c.globalCompositeOperation = "destination-out";
+  for (let i = 0; i < count; i++) {
+    const r = 0.6 + rand() * (level >= 3 ? 5 : 3);
+    c.globalAlpha = 0.55 + rand() * 0.45;
+    c.beginPath();
+    c.arc(rand() * w, rand() * h, r, 0, Math.PI * 2);
+    c.fill();
   }
-  return { dw, dh };
+  c.restore();
 }
 
 function drawText(ctx: CanvasRenderingContext2D, layer: Extract<DesignLayer, { type: "text" }>, areaH: number) {
-  const size = (layer.fontSize / 100) * areaH;
-  const family = canvasFontStack(layer.font);
+  const m = measureTextLayer(layer, areaH);
+  const { size, lines, arc } = m;
   ctx.fillStyle = layer.color;
-  ctx.textAlign = layer.align === "left" ? "left" : layer.align === "right" ? "right" : "center";
   ctx.textBaseline = "middle";
-  ctx.font = `${layer.italic ? "italic " : ""}${layer.weight} ${size}px ${family}`;
+  ctx.textAlign = layer.align === "left" ? "left" : layer.align === "right" ? "right" : "center";
+  ctx.font = fontShorthand(layer, size);
 
-  const lines = layer.text.split("\n");
-  const dx = layer.align === "left" ? -areaH * 0.9 : layer.align === "right" ? areaH * 0.9 : 0;
+  if (arc) {
+    const yShift = (layer.arc > 0 ? -1 : 1) * (arc.sagitta / 2);
+    lines.forEach((line, i) => {
+      const dy = (i - (lines.length - 1) / 2) * size * layer.lineHeight;
+      ctx.save();
+      ctx.translate(0, dy);
+      drawArcLine(ctx, layer, line, size, arc, yShift);
+      ctx.restore();
+    });
+    return;
+  }
 
-  // Canvas letter spacing is supported in modern browsers; ignore where it is not.
+  const dx = layer.align === "left" ? -m.w / 2 : layer.align === "right" ? m.w / 2 : 0;
   const spacing = (layer.letterSpacing / 100) * size;
   if ("letterSpacing" in ctx) {
     (ctx as CanvasRenderingContext2D & { letterSpacing: string }).letterSpacing = `${spacing}px`;
@@ -49,7 +77,7 @@ function drawText(ctx: CanvasRenderingContext2D, layer: Extract<DesignLayer, { t
 
   lines.forEach((line, i) => {
     const y = (i - (lines.length - 1) / 2) * size * layer.lineHeight;
-    const text = layer.uppercase ? line.toUpperCase() : line;
+    const text = displayText(layer, line);
     if (layer.strokeWidth > 0) {
       ctx.lineWidth = (layer.strokeWidth / 100) * size;
       ctx.strokeStyle = layer.strokeColor;
@@ -92,21 +120,24 @@ async function renderSide(
   const ax = SIZE * frac.cx - aw / 2;
   const ay = SIZE * frac.cy - ah / 2;
 
-  ctx.save();
-  ctx.beginPath();
-  ctx.rect(ax, ay, aw, ah);
-  ctx.clip();
-
-  for (const layer of layers) {
+  for (const [index, layer] of layers.entries()) {
     const cx = ax + (layer.x / 100) * aw;
     const cy = ay + (layer.y / 100) * ah;
     const base = layerBox(layer, { w: aw, h: ah });
 
-    ctx.save();
-    ctx.globalAlpha = layer.opacity;
-    ctx.translate(cx, cy);
-    ctx.rotate((layer.rotation * Math.PI) / 180);
-    ctx.scale(
+    // Each layer is drawn on its own transparent sheet so distressing only
+    // erases that layer's ink and never the shirt underneath.
+    const sheet = document.createElement("canvas");
+    sheet.width = SIZE;
+    sheet.height = SIZE;
+    const sctx = sheet.getContext("2d");
+    if (!sctx) continue;
+    sctx.imageSmoothingQuality = "high";
+
+    sctx.save();
+    sctx.translate(cx, cy);
+    sctx.rotate((layer.rotation * Math.PI) / 180);
+    sctx.scale(
       layer.scaleX * (layer.flipH ? -1 : 1),
       layer.scaleY * (layer.flipV ? -1 : 1)
     );
@@ -114,18 +145,24 @@ async function renderSide(
     if (layer.type === "image") {
       try {
         const img = await loadImage(layer.src);
-        const { dw, dh } = fitContain(img.width, img.height, base.w, base.h);
-        ctx.drawImage(img, -dw / 2, -dh / 2, dw, dh);
+        sctx.drawImage(img, -base.w / 2, -base.h / 2, base.w, base.h);
       } catch {
         // Skip artwork that cannot be decoded; the rest of the design still renders.
       }
     } else {
-      drawText(ctx, layer, ah);
+      drawText(sctx, layer, ah);
     }
+    sctx.restore();
+
+    if ((layer.distress ?? 0) > 0) {
+      distress(sctx, SIZE, SIZE, layer.distress ?? 0, 977 + index * 31);
+    }
+
+    ctx.save();
+    ctx.globalAlpha = layer.opacity;
+    ctx.drawImage(sheet, 0, 0);
     ctx.restore();
   }
-
-  ctx.restore();
 
   try {
     return canvas.toDataURL("image/webp", 0.85);

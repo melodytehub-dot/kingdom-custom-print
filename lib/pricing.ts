@@ -1,4 +1,18 @@
-import type { GarmentSide, PriceBreak, Product, SizeLine } from "./types";
+import type {
+  GarmentSide,
+  PersonalizationKind,
+  PriceBreak,
+  Product,
+  SizeLine,
+} from "./types";
+
+/** Per-garment charge for printing individual names and/or numbers. */
+export const PERSONALIZATION_FEE: Record<PersonalizationKind, number> = {
+  none: 0,
+  names: 4,
+  numbers: 3,
+  both: 6,
+};
 
 export interface PriceQuote {
   /** Price for a single garment including print charges and size surcharges. */
@@ -46,12 +60,20 @@ export function quoteProduct(
     Product,
     "basePrice" | "printFeePerSide" | "priceBreaks" | "sizes"
   >,
-  options: { sides: GarmentSide[]; lines: SizeLine[] }
+  options: {
+    sides: GarmentSide[];
+    lines: SizeLine[];
+    personalization?: PersonalizationKind;
+  }
 ): PriceQuote {
   const quantity = totalQuantity(options.lines);
   const tier = resolveBreak(product.priceBreaks, quantity);
   const printCharge = round2(sidesUsedCount(options.sides) * product.printFeePerSide);
-  const unitBase = Math.max(0, product.basePrice + printCharge + (tier?.amountOff ?? 0));
+  const personalCharge = PERSONALIZATION_FEE[options.personalization ?? "none"];
+  const unitBase = Math.max(
+    0,
+    product.basePrice + printCharge + personalCharge + (tier?.amountOff ?? 0)
+  );
 
   const surchargeMap = new Map(product.sizes.map((s) => [s.label, s.surcharge]));
   const surchargeTotal = round2(

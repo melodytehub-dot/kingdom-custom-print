@@ -4,6 +4,8 @@ export interface FontOption {
   /** CSS custom property set by next/font (empty for plain system stacks). */
   cssVar: string;
   fallback: string;
+  /** Scripts the face can render; web-safe stacks cover Greek and Hebrew. */
+  scripts?: ("latin" | "greek" | "hebrew")[];
 }
 
 export const FONTS: FontOption[] = [
@@ -15,7 +17,10 @@ export const FONTS: FontOption[] = [
   { value: "playfair", label: "Playfair Display", cssVar: "--font-playfair", fallback: "Georgia, 'Times New Roman', serif" },
   { value: "pacifico", label: "Pacifico", cssVar: "--font-pacifico", fallback: "cursive" },
   { value: "lobster", label: "Lobster", cssVar: "--font-lobster", fallback: "cursive" },
-  { value: "serif", label: "Georgia", cssVar: "", fallback: "Georgia, 'Times New Roman', serif" },
+  { value: "serif", label: "Georgia", cssVar: "", fallback: "Georgia, 'Times New Roman', serif", scripts: ["latin", "greek"] },
+  { value: "arial", label: "Arial Bold", cssVar: "", fallback: "Arial, 'Helvetica Neue', Helvetica, sans-serif", scripts: ["latin", "greek", "hebrew"] },
+  { value: "times", label: "Times New Roman", cssVar: "", fallback: "'Times New Roman', Times, serif", scripts: ["latin", "greek", "hebrew"] },
+  { value: "courier", label: "Courier New", cssVar: "", fallback: "'Courier New', Courier, monospace", scripts: ["latin", "greek", "hebrew"] },
 ];
 
 const BY_VALUE = new Map(FONTS.map((f) => [f.value, f]));
@@ -40,4 +45,11 @@ export function canvasFontStack(value: string): string {
     if (resolved) return `${resolved}, ${f.fallback}`;
   }
   return f.fallback;
+}
+
+export type FontScript = "latin" | "greek" | "hebrew";
+
+/** Fonts that can render the given script (Latin is the default for brand faces). */
+export function fontsForScript(script: FontScript): FontOption[] {
+  return FONTS.filter((f) => (f.scripts ?? ["latin"]).includes(script));
 }

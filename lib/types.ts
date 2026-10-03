@@ -87,6 +87,10 @@ export interface BaseLayer {
   opacity: number;
   flipH: boolean;
   flipV: boolean;
+  /** Locked layers cannot be dragged, stretched or rotated until unlocked. */
+  locked?: boolean;
+  /** Distress level 0 (clean) to 3 (heavy) — knocks speckles out of the print. */
+  distress?: number;
 }
 
 export interface TextLayer extends BaseLayer {
@@ -105,14 +109,34 @@ export interface TextLayer extends BaseLayer {
   strokeColor: string;
   /** Stroke width as a percentage of the font size (0 = no outline). */
   strokeWidth: number;
+  /** Curve of the text: -100 (smile) … 0 (straight) … 100 (rainbow). */
+  arc: number;
   /** Marks a layer as a team name or number so the roster drives its text. */
-  role?: "name" | "number";
+  role?: "name" | "number" | "subtitle";
+}
+
+/** Non-destructive edits applied to an uploaded image's original pixels. */
+export interface ImageFx {
+  filter: "normal" | "single";
+  /** Ink colour used by the single-colour filter. */
+  inkColor: string;
+  removeBg: boolean;
+  crop: boolean;
+  superRes: boolean;
+  /** Colour swaps chosen in "Edit Colors". */
+  recolors: { from: string; to: string }[];
 }
 
 export interface ImageLayer extends BaseLayer {
   type: "image";
+  /** The pixels currently shown (original with `fx` applied). */
   src: string;
   name: string;
+  /** Width / height of `src`, so the handles hug the artwork. */
+  aspect: number;
+  /** Untouched upload, kept so edits can be re-applied or undone. */
+  origSrc?: string;
+  fx?: ImageFx;
 }
 
 export type DesignLayer = TextLayer | ImageLayer;
@@ -124,7 +148,11 @@ export interface RosterEntry {
   id: string;
   name: string;
   number: string;
+  subtitle?: string;
+  size?: string;
 }
+
+export type PersonalizationKind = "none" | "names" | "numbers" | "both";
 
 export interface NameNumberStyle {
   font: string;

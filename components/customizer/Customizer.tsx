@@ -3,11 +3,41 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import CartIcon from "@/components/icons/CartIcon";
-import DesignCanvas from "./DesignCanvas";
-import TextPanel from "./TextPanel";
-import LayerList from "./LayerList";
-import { ART_LIBRARY, type ArtItem } from "./art";
+import DesignCanvas, { VIEW, printAreaView } from "./DesignCanvas";
+import {
+  ArtPanel,
+  DistressPanel,
+  NamesIntro,
+  NamesTools,
+  NN_DEFAULTS,
+  ProductsPanel,
+  QuantityPanel,
+  ReviewPanel,
+  RosterEditor,
+  SavedPanel,
+  type NNSettings,
+  type NNSize,
+} from "./panels";
+import { ImageEditor, TextEditor, type LayerActionsProps } from "./editors";
+import {
+  AiArtIcon,
+  CartGlyph,
+  CheckGlyph,
+  CloudUploadIcon,
+  DistressIcon,
+  DollarIcon,
+  HeadsetIcon,
+  PersonalizeIcon,
+  RedoIcon,
+  RotateShirtIcon,
+  SaveIcon,
+  ShareIcon,
+  ShirtIcon,
+  TextBoxIcon,
+  UndoIcon,
+  UserIcon,
+} from "./icons";
+import { type ArtItem, ART_LIBRARY } from "./art";
 import {
   duplicateLayer,
   emptyDesign,
@@ -16,6 +46,7 @@ import {
   newTextLayer,
   normalizeDesign,
   persistDrafts,
+  personalizationOf,
   readImageFile,
   removeLayer,
   reorderLayer,
@@ -24,78 +55,99 @@ import {
   validateUpload,
   type SavedDraft,
 } from "@/lib/design";
+import { applyImageFx, DEFAULT_FX } from "@/lib/imageFx";
 import { drawPreview } from "./preview";
 import { TEE_MOCKUPS, mockupForColor, type TeeMockup } from "@/lib/mockups";
-import { FONTS } from "@/lib/fonts";
 import { useCart } from "@/lib/cart-context";
-import { formatUSD, quoteProduct } from "@/lib/pricing";
+import { quoteProduct } from "@/lib/pricing";
 import type {
   Design,
   DesignLayer,
   GarmentSide,
-  NameNumberStyle,
+  ImageFx,
+  ImageLayer,
   Product,
   RosterEntry,
   SizeLine,
+  TextLayer,
 } from "@/lib/types";
 
-const INK_COLORS = [
-  "#141414",
-  "#FFFFFF",
-  "#C8102E",
-  "#1C6B45",
-  "#E8A317",
-  "#26314C",
-  "#6B6862",
-  "#7A2E8E",
-  "#0F7B8C",
-];
-
 type Step = "design" | "quantity" | "review";
-type Tool = "products" | "text" | "art" | "upload" | "names" | "layers";
+type Panel =
+  | "none"
+  | "products"
+  | "text"
+  | "image"
+  | "art"
+  | "names-intro"
+  | "names"
+  | "roster"
+  | "distress"
+  | "saved";
 
 const STEP_ORDER: Step[] = ["design", "quantity", "review"];
-
 const STEP_LABEL: Record<Step, string> = {
   design: "Design",
   quantity: "Quantity",
   review: "Review",
 };
 
-const TOOLS: { id: Tool; label: string; icon: React.ReactNode }[] = [
-  { id: "products", label: "Products", icon: <ProductsGlyph /> },
-  { id: "text", label: "Text", icon: <TextGlyph /> },
-  { id: "upload", label: "Upload", icon: <UploadGlyph /> },
-  { id: "art", label: "Clipart", icon: <ArtGlyph /> },
-  { id: "names", label: "Names", icon: <NamesGlyph /> },
-  { id: "layers", label: "Layers", icon: <LayersGlyph /> },
-];
+/** Panels that sit under the shirt; everything else takes over the screen on mobile. */
+const SPLIT_PANELS: Panel[] = ["text", "image"];
+
+const NN_FONT_SIZES: Record<NNSize, { name: number; number: number; sub: number }> = {
+  small: { name: 4.5, number: 12, sub: 3.2 },
+  medium: { name: 6, number: 18, sub: 4 },
+  large: { name: 7.5, number: 26, sub: 4.6 },
+};
 
 interface DraftState {
   colorCode: string;
   design: Design;
   lines: Record<string, number>;
+  roster: RosterEntry[];
+  nn: NNSettings;
 }
 
 const uid = () => `r-${Math.random().toString(36).slice(2, 9)}`;
+const clamp = (n: number, min: number, max: number) => Math.min(max, Math.max(min, n));
+
+function luminance(hex: string): number {
+  const h = hex.replace("#", "");
+  const [r, g, b] = [0, 2, 4].map((i) => parseInt(h.slice(i, i + 2), 16) / 255);
+  return 0.299 * r + 0.587 * g + 0.114 * b;
+}
+
+/** Drops editor-only data (original pixels, fx recipe) before the cart stores a design. */
+function stripForCart(design: Design): Design {
+  const clean = (layers: DesignLayer[]) =>
+    layers.map((l) => {
+      if (l.type !== "image") return l;
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      const { origSrc, fx, ...rest } = l as ImageLayer;
+      return rest as ImageLayer;
+    });
+  return { front: clean(design.front), back: clean(design.back) };
+}
 
 export default function Customizer({
   product,
   products,
   initialColor,
   initialLines,
+  contactPhone,
 }: {
   product: Product;
   products: Product[];
   initialColor: string;
   initialLines: Record<string, number>;
+  contactPhone: string;
 }) {
   const { addItem, items } = useCart();
 
   const [step, setStep] = useState<Step>("design");
-  const [tool, setTool] = useState<Tool>("products");
+  const [panel, setPanel] = useState<Panel>("none");
   const [side, setSide] = useState<GarmentSide>("front");
-  const [zoom, setZoom] = useState(1);
   const [colorCode, setColorCode] = useState(() => {
     const match =
       TEE_MOCKUPS.find((m) => m.slug === initialColor || m.code === initialColor) ??
@@ -105,27 +157,32 @@ export default function Customizer({
   const [design, setDesign] = useState<Design>(emptyDesign);
   const [lines, setLines] = useState<Record<string, number>>(initialLines);
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [panelOpen, setPanelOpen] = useState(false);
-  const [flipping, setFlipping] = useState(false);
   const [drafts, setDrafts] = useState<SavedDraft[]>([]);
   const [notice, setNotice] = useState<{ tone: "ok" | "warn" | "error"; text: string } | null>(null);
   const [busy, setBusy] = useState(false);
+  const [fxBusy, setFxBusy] = useState(false);
   const [addedCount, setAddedCount] = useState(0);
   const [hist, setHist] = useState({ canUndo: false, canRedo: false });
   const [roster, setRoster] = useState<RosterEntry[]>([]);
-  const [nnStyle, setNnStyle] = useState<NameNumberStyle>({
-    font: "bebas",
-    color: "#141414",
-    strokeColor: "#FFFFFF",
-    strokeWidth: 0,
+  const [nn, setNn] = useState<NNSettings>(NN_DEFAULTS);
+  const [focusToken, setFocusToken] = useState(0);
+  const [flipping, setFlipping] = useState(false);
+  const [previews, setPreviews] = useState<{ front: string | null; back: string | null }>({
+    front: null,
+    back: null,
   });
 
   const fileInput = useRef<HTMLInputElement>(null);
-  const draftKey = `kcp.draft.v2.${product.slug}`;
+  const stageRef = useRef<HTMLElement>(null);
+  const [stageBox, setStageBox] = useState({ w: 0, h: 0 });
+  const [compact, setCompact] = useState(true);
 
+  const draftKey = `kcp.draft.v3.${product.slug}`;
+  const [ready, setReady] = useState(false);
   const historyRef = useRef<Design[]>([]);
   const futureRef = useRef<Design[]>([]);
   const applyingHistory = useRef(false);
+  const restored = useRef(false);
 
   const syncHist = useCallback(() => {
     setHist({
@@ -138,6 +195,7 @@ export default function Customizer({
     () => TEE_MOCKUPS.find((m) => m.code === colorCode) ?? TEE_MOCKUPS[0],
     [colorCode]
   );
+  const darkShirt = luminance(mockup.hex) < 0.42;
 
   const sizeLines = useMemo<SizeLine[]>(
     () => product.sizes.map((s) => ({ label: s.label, qty: lines[s.label] ?? 0 })),
@@ -146,10 +204,14 @@ export default function Customizer({
 
   const quantity = sizeLines.reduce((n, l) => n + l.qty, 0);
   const sides = usedSides(design);
-  const quote = quoteProduct(product, { sides, lines: sizeLines });
+  const personalization = personalizationOf(design);
+  const quote = quoteProduct(product, { sides, lines: sizeLines, personalization });
   const layers = design[side];
   const selected = selectedId ? layers.find((l) => l.id === selectedId) : undefined;
+  const selectedYRef = useRef<number | null>(null);
+  selectedYRef.current = selected ? selected.y : null;
   const cartCount = items.reduce((n, i) => n + i.quantity, 0);
+  const rosterLocked = roster.length > 0 && personalization !== "none";
 
   /* ---- restore draft on mount ---- */
   /* eslint-disable react-hooks/set-state-in-effect */
@@ -157,31 +219,42 @@ export default function Customizer({
     setDrafts(loadDrafts());
     try {
       const raw = window.localStorage.getItem(draftKey);
-      if (!raw) return;
-      const parsed = JSON.parse(raw) as DraftState;
-      if (parsed?.design?.front && parsed?.design?.back) {
-        setDesign(normalizeDesign(parsed.design));
-      }
-      if (parsed?.colorCode && TEE_MOCKUPS.some((m) => m.code === parsed.colorCode)) {
-        setColorCode(parsed.colorCode);
+      if (raw) {
+        const parsed = JSON.parse(raw) as Partial<DraftState>;
+        if (parsed?.design?.front && parsed?.design?.back) {
+          setDesign(normalizeDesign(parsed.design));
+        }
+        if (parsed?.colorCode && TEE_MOCKUPS.some((m) => m.code === parsed.colorCode)) {
+          setColorCode(parsed.colorCode);
+        }
+        if (Array.isArray(parsed?.roster)) setRoster(parsed.roster);
+        if (parsed?.nn) setNn({ ...NN_DEFAULTS, ...parsed.nn });
+        const fromUrl = Object.values(initialLines).some((n) => n > 0);
+        if (!fromUrl && parsed?.lines) {
+          setLines((prev) => ({ ...prev, ...parsed.lines }));
+        }
       }
     } catch {
       // A corrupt draft should not block the editor; start clean.
     }
+    restored.current = true;
+    setReady(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [draftKey]);
   /* eslint-enable react-hooks/set-state-in-effect */
 
   /* ---- autosave draft ---- */
   useEffect(() => {
+    if (!ready) return;
     try {
       window.localStorage.setItem(
         draftKey,
-        JSON.stringify({ colorCode, design, lines } satisfies DraftState)
+        JSON.stringify({ colorCode, design, lines, roster, nn } satisfies DraftState)
       );
     } catch {
       // Storage unavailable or full; the in-progress design still works.
     }
-  }, [draftKey, colorCode, design, lines]);
+  }, [ready, draftKey, colorCode, design, lines, roster, nn]);
 
   /* ---- undo history (debounced so a drag is one step) ---- */
   useEffect(() => {
@@ -199,24 +272,48 @@ export default function Customizer({
 
   useEffect(() => {
     if (!notice) return;
-    const t = setTimeout(() => setNotice(null), 5200);
+    const t = setTimeout(() => setNotice(null), 4200);
     return () => clearTimeout(t);
   }, [notice]);
 
-  /* ---- lock the page behind the full-screen studio on mobile ---- */
+  /* ---- the studio is a full-screen app: lock the page behind it ---- */
   useEffect(() => {
-    const mq = window.matchMedia("(max-width: 900px)");
-    const apply = () => {
-      if (mq.matches) document.body.dataset.lock = "true";
-      else delete document.body.dataset.lock;
-    };
-    apply();
-    mq.addEventListener("change", apply);
+    document.body.dataset.lock = "true";
     return () => {
-      mq.removeEventListener("change", apply);
       delete document.body.dataset.lock;
     };
   }, []);
+
+  /* ---- measure the stage so the shirt can be fitted and panned ---- */
+  useEffect(() => {
+    const el = stageRef.current;
+    if (!el) return;
+    const mq = window.matchMedia("(max-width: 900px)");
+    const read = () => {
+      setCompact(mq.matches);
+      setStageBox({ w: el.clientWidth, h: el.clientHeight });
+    };
+    read();
+    const ro = new ResizeObserver(read);
+    ro.observe(el);
+    mq.addEventListener("change", read);
+    return () => {
+      ro.disconnect();
+      mq.removeEventListener("change", read);
+    };
+  }, [step]);
+
+  /* ---- review step: render the flattened previews ---- */
+  useEffect(() => {
+    if (step !== "review") return;
+    let live = true;
+    drawPreview(mockup.front, mockup.back, stripForCart(design))
+      .then((p) => live && setPreviews(p))
+      .catch(() => live && setPreviews({ front: null, back: null }));
+    return () => {
+      live = false;
+    };
+  }, [step, mockup, design]);
 
   const patch = useCallback(
     (targetSide: GarmentSide, id: string, changes: Partial<DesignLayer>) => {
@@ -232,22 +329,31 @@ export default function Customizer({
     [side]
   );
 
-  const openTool = (next: Tool) => {
-    setPanelOpen((open) => !(tool === next && open));
-    setTool(next);
+  /* ---- selection + panel routing ---- */
+  const handleSelect = useCallback(
+    (id: string | null) => {
+      setSelectedId(id);
+      if (id) {
+        const layer = design[side].find((l) => l.id === id);
+        if (layer) setPanel(layer.type === "text" ? "text" : "image");
+      } else {
+        setPanel((p) => (SPLIT_PANELS.includes(p) ? "none" : p));
+      }
+    },
+    [design, side]
+  );
+
+  const closePanel = () => {
+    setSelectedId(null);
+    setPanel("none");
   };
 
-  const handleSelect = (id: string | null) => {
-    setSelectedId(id);
-  };
-
-  /** Opens the editor for a layer — only fired by the canvas "edit" control. */
   const editLayer = (id: string) => {
     const layer = design[side].find((l) => l.id === id);
     if (!layer) return;
     setSelectedId(id);
-    setTool(layer.type === "text" ? "text" : "layers");
-    setPanelOpen(true);
+    setPanel(layer.type === "text" ? "text" : "image");
+    setFocusToken((n) => n + 1);
   };
 
   const rotateSide = () => {
@@ -255,6 +361,7 @@ export default function Customizer({
     window.setTimeout(() => setFlipping(false), 320);
     setSide((s) => (s === "front" ? "back" : "front"));
     setSelectedId(null);
+    setPanel((p) => (SPLIT_PANELS.includes(p) ? "none" : p));
   };
 
   const shareDesign = async () => {
@@ -271,23 +378,23 @@ export default function Customizer({
     }
   };
 
+  /* ---- adding things ---- */
   const addText = () => {
-    const layer = newTextLayer();
+    const layer = newTextLayer(darkShirt ? { color: "#FFFFFF" } : {});
     setDesign((prev) => ({ ...prev, [side]: [...prev[side], layer] }));
     setSelectedId(layer.id);
-    setNotice({ tone: "ok", text: "Text added. Edit it in the panel." });
+    setPanel("text");
   };
 
-  const addTextAndOpen = () => {
-    addText();
-    setTool("text");
-    setPanelOpen(true);
+  const addImageLayer = (src: string, name: string, aspect: number) => {
+    const layer = newImageLayer(src, name, aspect, { origSrc: src, fx: { ...DEFAULT_FX } });
+    setDesign((prev) => ({ ...prev, [side]: [...prev[side], layer] }));
+    setSelectedId(layer.id);
+    setPanel("image");
   };
 
   const addArt = (item: ArtItem) => {
-    const layer = newImageLayer(item.src, item.name);
-    setDesign((prev) => ({ ...prev, [side]: [...prev[side], layer] }));
-    setSelectedId(layer.id);
+    addImageLayer(item.src, item.name, 1);
     setNotice({ tone: "ok", text: `${item.name} added to the ${side}.` });
   };
 
@@ -302,13 +409,8 @@ export default function Customizer({
     setBusy(true);
     try {
       const decoded = await readImageFile(file);
-      const layer = newImageLayer(decoded.dataUrl, file.name);
-      setDesign((prev) => ({ ...prev, [side]: [...prev[side], layer] }));
-      setSelectedId(layer.id);
-      setNotice({
-        tone: check.warning ? "warn" : "ok",
-        text: check.warning ?? `Added at ${decoded.width} × ${decoded.height}px. Drag the handles to fit.`,
-      });
+      addImageLayer(decoded.dataUrl, file.name, decoded.width / decoded.height);
+      if (check.warning) setNotice({ tone: "warn", text: check.warning });
     } catch (err) {
       setNotice({
         tone: "error",
@@ -320,66 +422,211 @@ export default function Customizer({
     }
   };
 
-  /** Updates the roster and mirrors the first entry onto any name/number layers. */
-  const commitRoster = (next: RosterEntry[]) => {
-    setRoster(next);
-    const first = next[0];
-    setDesign((prev) => {
-      const back = prev.back.map((l) => {
-        if (l.type !== "text") return l;
-        if (l.role === "name") return { ...l, text: first?.name || "NAME" };
-        if (l.role === "number") return { ...l, text: first?.number || "00" };
-        return l;
+  /* ---- image editing ---- */
+  const applyFx = async (layer: ImageLayer, next: Partial<ImageFx>) => {
+    const fx: ImageFx = { ...(layer.fx ?? DEFAULT_FX), ...next };
+    const orig = layer.origSrc ?? layer.src;
+    setFxBusy(true);
+    try {
+      const res = await applyImageFx(orig, fx);
+      patch(side, layer.id, {
+        fx,
+        origSrc: orig,
+        src: res.dataUrl,
+        aspect: res.aspect,
+      } as Partial<ImageLayer>);
+    } catch (err) {
+      setNotice({
+        tone: "error",
+        text: err instanceof Error ? err.message : "That edit could not be applied.",
       });
-      return { ...prev, back };
-    });
+    } finally {
+      setFxBusy(false);
+    }
   };
 
-  const addRosterRow = () => commitRoster([...roster, { id: uid(), name: "", number: "" }]);
-  const updateRoster = (id: string, patchRow: Partial<RosterEntry>) =>
-    commitRoster(roster.map((e) => (e.id === id ? { ...e, ...patchRow } : e)));
-  const removeRoster = (id: string) => commitRoster(roster.filter((e) => e.id !== id));
+  const resetImage = async (layer: ImageLayer) => {
+    const orig = layer.origSrc ?? layer.src;
+    setFxBusy(true);
+    try {
+      const res = await applyImageFx(orig, { ...DEFAULT_FX });
+      patch(side, layer.id, {
+        fx: { ...DEFAULT_FX },
+        origSrc: orig,
+        src: res.dataUrl,
+        aspect: res.aspect,
+        x: 50,
+        y: 50,
+        scaleX: 0.6,
+        scaleY: 0.6,
+        rotation: 0,
+        opacity: 1,
+        flipH: false,
+        flipV: false,
+      } as Partial<ImageLayer>);
+    } catch {
+      setNotice({ tone: "error", text: "Could not reset that artwork." });
+    } finally {
+      setFxBusy(false);
+    }
+  };
 
-  const addNamesNumbers = () => {
-    const first = roster[0] ?? { name: "NAME", number: "00" };
-    const nameLayer = newTextLayer({
-      role: "name",
-      text: first.name || "NAME",
-      x: 50,
-      y: 30,
-      fontSize: 7,
-      font: nnStyle.font,
-      color: nnStyle.color,
-      strokeColor: nnStyle.strokeColor,
-      strokeWidth: nnStyle.strokeWidth,
-      uppercase: true,
-      weight: 700,
-    });
-    const numLayer = newTextLayer({
-      role: "number",
-      text: first.number || "00",
-      x: 50,
-      y: 62,
-      fontSize: 22,
-      font: nnStyle.font,
-      color: nnStyle.color,
-      strokeColor: nnStyle.strokeColor,
-      strokeWidth: nnStyle.strokeWidth,
-      weight: 900,
-    });
+  /* ---- layer actions (shared by both editors) ---- */
+  const actionsFor = (layer: DesignLayer): LayerActionsProps => {
+    const index = layers.findIndex((l) => l.id === layer.id);
+    return {
+      locked: Boolean(layer.locked),
+      canBackward: index > 0,
+      canForward: index >= 0 && index < layers.length - 1,
+      flipH: layer.flipH,
+      flipV: layer.flipV,
+      onCenter: () => patchActive(layer.id, { x: 50, y: 50 }),
+      onBackward: () => setDesign((prev) => reorderLayer(prev, side, layer.id, "backward")),
+      onForward: () => setDesign((prev) => reorderLayer(prev, side, layer.id, "forward")),
+      onFlipH: () => patchActive(layer.id, { flipH: !layer.flipH }),
+      onFlipV: () => patchActive(layer.id, { flipV: !layer.flipV }),
+      onLock: () => patchActive(layer.id, { locked: !layer.locked }),
+      onDuplicate: () => {
+        const res = duplicateLayer(design, side, layer.id);
+        if (res) {
+          setDesign(res.design);
+          setSelectedId(res.id);
+        }
+      },
+    };
+  };
+
+  const deleteLayer = (id: string) => {
+    setDesign((prev) => removeLayer(prev, side, id));
+    if (selectedId === id) {
+      setSelectedId(null);
+      setPanel((p) => (SPLIT_PANELS.includes(p) ? "none" : p));
+    }
+  };
+
+  /* ---- distress ---- */
+  const distressLevel = layers.reduce((n, l) => Math.max(n, l.distress ?? 0), 0);
+  const setDistress = (level: number) => {
     setDesign((prev) => ({
       ...prev,
-      back: [
-        ...prev.back.filter((l) => l.type !== "text" || !l.role),
-        nameLayer,
-        numLayer,
-      ],
+      [side]: prev[side].map((l) => ({ ...l, distress: level })),
     }));
-    setSide("back");
-    setSelectedId(numLayer.id);
-    setNotice({ tone: "ok", text: "Names & numbers added to the back." });
   };
 
+  /* ---- names & numbers ---- */
+  const defaultSize = product.sizes.find((s) => s.label === "M")?.label ?? product.sizes[0]?.label ?? "M";
+  const sizeLabels = product.sizes.map((s) => s.label);
+
+  const syncLinesFromRoster = (rows: RosterEntry[]) => {
+    const counts: Record<string, number> = Object.fromEntries(product.sizes.map((s) => [s.label, 0]));
+    for (const r of rows) {
+      const label = r.size && r.size in counts ? r.size : defaultSize;
+      counts[label] = (counts[label] ?? 0) + 1;
+    }
+    setLines(counts);
+  };
+
+  const mirrorFirstRow = (rows: RosterEntry[]) => {
+    const first = rows[0];
+    setDesign((prev) => {
+      const remap = (list: DesignLayer[]) =>
+        list.map((l) => {
+          if (l.type !== "text") return l;
+          if (l.role === "name") return { ...l, text: first?.name || "NAME" };
+          if (l.role === "number") return { ...l, text: first?.number || "00" };
+          if (l.role === "subtitle") return { ...l, text: first?.subtitle || "SUBTITLE" };
+          return l;
+        });
+      return { front: remap(prev.front), back: remap(prev.back) };
+    });
+  };
+
+  const commitRoster = (rows: RosterEntry[]) => {
+    setRoster(rows);
+    mirrorFirstRow(rows);
+    syncLinesFromRoster(rows);
+  };
+
+  const startNames = () => {
+    setSelectedId(null);
+    setPanel(personalization === "none" ? "names-intro" : "names");
+  };
+
+  const enterRoster = () => {
+    if (!roster.length) {
+      const seed = [{ id: uid(), name: "", number: "", subtitle: "", size: defaultSize }];
+      setRoster(seed);
+      syncLinesFromRoster(seed);
+    }
+    setPanel("roster");
+  };
+
+  const removeRole = (d: Design): Design => {
+    const keep = (list: DesignLayer[]) => list.filter((l) => l.type !== "text" || !l.role);
+    return { front: keep(d.front), back: keep(d.back) };
+  };
+
+  const finishRoster = () => {
+    const rows = roster.length ? roster : [{ id: uid(), name: "", number: "", size: defaultSize }];
+    const first = rows[0];
+    const fs = NN_FONT_SIZES[nn.size];
+    const ink = nn.color;
+    const strokeColor = luminance(ink) > 0.5 ? "#141414" : "#FFFFFF";
+    const common = { font: nn.font, color: ink, strokeColor, strokeWidth: 0, weight: 700 as const };
+    const created: TextLayer[] = [];
+
+    if (nn.names && nn.numbers) {
+      created.push(
+        newTextLayer({ ...common, role: "name", text: first.name || "NAME", y: 24, fontSize: fs.name })
+      );
+      created.push(
+        newTextLayer({ ...common, role: "number", text: first.number || "00", y: 56, fontSize: fs.number, weight: 900 })
+      );
+    } else if (nn.names) {
+      created.push(
+        newTextLayer({ ...common, role: "name", text: first.name || "NAME", y: 30, fontSize: fs.name * 1.4 })
+      );
+    } else if (nn.numbers) {
+      created.push(
+        newTextLayer({ ...common, role: "number", text: first.number || "00", y: 45, fontSize: fs.number, weight: 900 })
+      );
+    }
+    if (nn.names && nn.subtitles) {
+      created.push(
+        newTextLayer({
+          ...common,
+          role: "subtitle",
+          text: first.subtitle || "SUBTITLE",
+          y: nn.numbers ? 88 : 56,
+          fontSize: fs.sub,
+        })
+      );
+    }
+
+    setDesign((prev) => {
+      const cleaned = removeRole(prev);
+      return { ...cleaned, [nn.side]: [...cleaned[nn.side], ...created] };
+    });
+    setRoster(rows);
+    syncLinesFromRoster(rows);
+    setSide(nn.side);
+    setSelectedId(null);
+    setPanel("none");
+    setNotice({
+      tone: "ok",
+      text: `${rows.length} ${rows.length === 1 ? "shirt" : "shirts"} added to your names & numbers list.`,
+    });
+  };
+
+  const removeNames = () => {
+    setDesign((prev) => removeRole(prev));
+    setRoster([]);
+    setNn(NN_DEFAULTS);
+    setPanel("none");
+    setNotice({ tone: "ok", text: "Names & numbers removed." });
+  };
+
+  /* ---- history ---- */
   const undo = () => {
     const h = historyRef.current;
     if (h.length < 2) return;
@@ -390,6 +637,7 @@ export default function Customizer({
     applyingHistory.current = true;
     setDesign(prev);
     setSelectedId(null);
+    setPanel((p) => (SPLIT_PANELS.includes(p) ? "none" : p));
     syncHist();
   };
 
@@ -402,18 +650,11 @@ export default function Customizer({
     applyingHistory.current = true;
     setDesign(next);
     setSelectedId(null);
+    setPanel((p) => (SPLIT_PANELS.includes(p) ? "none" : p));
     syncHist();
   };
 
-  const startOver = () => {
-    applyingHistory.current = true;
-    historyRef.current = [...historyRef.current, emptyDesign()].slice(-30);
-    futureRef.current = [];
-    setDesign(emptyDesign());
-    setSelectedId(null);
-    syncHist();
-  };
-
+  /* ---- drafts ---- */
   const saveDraft = () => {
     const entry: SavedDraft = {
       id: `d-${Date.now().toString(36)}`,
@@ -425,7 +666,7 @@ export default function Customizer({
       design,
       savedAt: Date.now(),
     };
-    const next = [entry, ...drafts.filter((d) => d.id !== entry.id)].slice(0, 12);
+    const next = [entry, ...drafts].slice(0, 12);
     setDrafts(next);
     persistDrafts(next);
     setNotice({ tone: "ok", text: "Design saved to this device." });
@@ -439,6 +680,7 @@ export default function Customizer({
     setSelectedId(null);
     const m = mockupForColor(found.colorName, found.colorHex);
     if (m) setColorCode(m.code);
+    setPanel("none");
     setNotice({ tone: "ok", text: `Loaded your saved ${found.productName} design.` });
   };
 
@@ -448,6 +690,7 @@ export default function Customizer({
     persistDrafts(next);
   };
 
+  /* ---- quantity ---- */
   const setQty = (label: string, value: number) => {
     setLines((prev) => ({
       ...prev,
@@ -457,9 +700,7 @@ export default function Customizer({
 
   const fillAllInSize = (label: string) => {
     const total = quantity || 1;
-    setLines(
-      Object.fromEntries(product.sizes.map((s) => [s.label, s.label === label ? total : 0]))
-    );
+    setLines(Object.fromEntries(product.sizes.map((s) => [s.label, s.label === label ? total : 0])));
   };
 
   const handleAddToCart = async () => {
@@ -468,13 +709,20 @@ export default function Customizer({
       setStep("quantity");
       return;
     }
+    if (personalization !== "none" && roster.every((r) => !r.name.trim() && !r.number.trim())) {
+      setNotice({ tone: "warn", text: "Your names & numbers list is empty. Add names or numbers first." });
+      setStep("design");
+      setPanel("roster");
+      return;
+    }
     if (sides.length === 0) {
       setNotice({ tone: "warn", text: "No artwork added — this shirt will be added blank." });
     }
 
     setBusy(true);
     try {
-      const previews = await drawPreview(mockup.front, mockup.back, design);
+      const cartDesign = stripForCart(design);
+      const rendered = await drawPreview(mockup.front, mockup.back, cartDesign);
       addItem({
         productId: product.id,
         productSlug: product.slug,
@@ -484,10 +732,10 @@ export default function Customizer({
         colorName: mockup.name,
         colorHex: mockup.hex,
         sidesUsed: sides,
-        design,
+        design: cartDesign,
         roster: roster.length ? roster : undefined,
-        previewFront: previews.front,
-        previewBack: previews.back,
+        previewFront: rendered.front,
+        previewBack: rendered.back,
         lines: sizeLines.filter((l) => l.qty > 0),
         surcharges: Object.fromEntries(product.sizes.map((sz) => [sz.label, sz.surcharge])),
         unitPrice: quote.unitBase,
@@ -498,6 +746,7 @@ export default function Customizer({
       setNotice({ tone: "ok", text: "Added to cart." });
       applyingHistory.current = true;
       setDesign(emptyDesign());
+      setRoster([]);
       setLines(Object.fromEntries(product.sizes.map((s) => [s.label, 0])));
       setSelectedId(null);
     } catch {
@@ -510,88 +759,284 @@ export default function Customizer({
     }
   };
 
+  /* ---- steps ---- */
   const stepIndex = STEP_ORDER.indexOf(step);
 
-  function goNext() {
-    if (step === "design" && quantity <= 0) {
-      setNotice({ tone: "warn", text: "Set a quantity before reviewing." });
+  const goStep = (next: Step) => {
+    setStep(next);
+    setSelectedId(null);
+    setPanel("none");
+  };
+
+  const goNext = () => {
+    if (step === "review") {
+      void handleAddToCart();
+      return;
     }
-    if (stepIndex < STEP_ORDER.length - 1) setStep(STEP_ORDER[stepIndex + 1]);
-    setPanelOpen(true);
-  }
+    goStep(STEP_ORDER[stepIndex + 1]);
+  };
 
-  function goBack() {
-    if (stepIndex > 0) setStep(STEP_ORDER[stepIndex - 1]);
-    setPanelOpen(true);
-  }
-
-  /** Inspector shared by the Text and Layers tools. */
-  function renderInspector() {
-    if (!selected) {
-      return <p className="empty-note small muted">Select a layer on the shirt to edit it.</p>;
+  /* ---- stage fit: shirt fills the width on phones, fits whole on desktop ---- */
+  const split = SPLIT_PANELS.includes(panel);
+  const fit = useMemo(() => {
+    const { w, h } = stageBox;
+    if (!w || !h) return { size: 0, left: 0, ty: 0 };
+    const size = compact ? w * 1.12 : Math.min(w * 1.04, h * 1.06);
+    const top = 0.054 * size;
+    const silhouetteH = 0.892 * size;
+    let ty = (h - silhouetteH) / 2 - top;
+    if (silhouetteH > h * 0.96) ty = -top + h * 0.02;
+    const selY = selectedYRef.current;
+    if (split && selectedId && compact && selY !== null) {
+      const pa = printAreaView(side);
+      const focusY = ((pa.y + (selY / 100) * pa.h) / VIEW) * size;
+      const wanted = h * 0.6 - focusY;
+      const maxTy = -top + h * 0.06;
+      const minTy = h - 0.946 * size - h * 0.04;
+      ty = minTy < maxTy ? clamp(wanted, minTy, maxTy) : ty;
     }
+    return { size, left: (w - size) / 2, ty };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [stageBox, compact, split, selectedId, side]);
 
-    const body =
-      selected.type === "text" ? (
-        <TextPanel
-          layer={selected}
-          inks={INK_COLORS}
-          onChange={(changes) => patchActive(selected.id, changes)}
+  /* ---- what the rail highlights ---- */
+  const railActive =
+    panel === "products"
+      ? "products"
+      : split && selected?.type === "text"
+        ? "text"
+        : split
+          ? "upload"
+          : panel === "art"
+            ? "art"
+            : panel.startsWith("names") || panel === "roster"
+              ? "names"
+              : panel === "distress"
+                ? "distress"
+                : panel === "saved"
+                  ? "saved"
+                  : "";
+
+  const callHref = contactPhone ? `tel:${contactPhone.replace(/[^\d+]/g, "")}` : "/contact";
+
+  /* ---------------------------------------------------------------------
+     Panel content
+     --------------------------------------------------------------------- */
+  const hasNames = personalization !== "none";
+
+  function renderPanel() {
+    if (step === "quantity") {
+      return (
+        <QuantityPanel
+          product={product}
+          lines={lines}
+          quantity={quantity}
+          quote={quote}
+          rosterLocked={rosterLocked}
+          onQty={setQty}
+          onFill={fillAllInSize}
+          onEditRoster={() => {
+            setStep("design");
+            setPanel("roster");
+          }}
         />
-      ) : (
-        <div className="image-inspector">
-          <p className="small wrap-anywhere">
-            <strong>{selected.name}</strong>
-          </p>
-          <label className="range-row" htmlFor={`op-${selected.id}`}>
-            <span>Opacity</span>
-            <input
-              id={`op-${selected.id}`}
-              type="range"
-              min={0.1}
-              max={1}
-              step={0.05}
-              value={selected.opacity}
-              onChange={(e) => patchActive(selected.id, { opacity: Number(e.target.value) })}
-            />
-            <span className="tnum small">{Math.round(selected.opacity * 100)}%</span>
-          </label>
-        </div>
       );
-
-    const id = selected.id;
-    return (
-      <>
-        {body}
-        <LayerActions
-          flipH={selected.flipH}
-          flipV={selected.flipV}
-          onCenter={() => patchActive(id, { x: 50, y: 50 })}
-          onBackward={() => setDesign((prev) => reorderLayer(prev, side, id, "backward"))}
-          onForward={() => setDesign((prev) => reorderLayer(prev, side, id, "forward"))}
-          onFlipH={() => patchActive(id, { flipH: !selected.flipH })}
-          onFlipV={() => patchActive(id, { flipV: !selected.flipV })}
-          onDuplicate={() => {
-            const res = duplicateLayer(design, side, id);
-            if (res) {
-              setDesign(res.design);
-              setSelectedId(res.id);
-            }
-          }}
-          onDelete={() => {
-            setDesign((prev) => removeLayer(prev, side, id));
-            setSelectedId(null);
-          }}
+    }
+    if (step === "review") {
+      return (
+        <ReviewPanel
+          product={product}
+          mockup={mockup}
+          sidesLabel={
+            sides.length ? sides.map((s) => (s === "front" ? "Front" : "Back")).join(" + ") : "Blank shirt"
+          }
+          elements={design.front.length + design.back.length}
+          quantity={quantity}
+          quote={quote}
+          roster={rosterLocked ? roster.length : 0}
+          previews={previews}
+          rows={
+            addedCount > 0 ? (
+              <Link href="/cart" className="rot-cta rot-cta-ghost">
+                Go to cart ({addedCount})
+              </Link>
+            ) : null
+          }
         />
-      </>
-    );
+      );
+    }
+
+    switch (panel) {
+      case "products":
+        return (
+          <ProductsPanel
+            product={product}
+            products={products}
+            mockup={mockup}
+            onColor={setColorCode}
+            onClose={closePanel}
+          />
+        );
+      case "text":
+        return selected?.type === "text" ? (
+          <TextEditor
+            layer={selected}
+            focusToken={focusToken}
+            actions={actionsFor(selected)}
+            onChange={(changes) => patchActive(selected.id, changes)}
+            onClose={closePanel}
+          />
+        ) : null;
+      case "image":
+        return selected?.type === "image" ? (
+          <ImageEditor
+            layer={selected}
+            busy={fxBusy}
+            eyebrow={ART_LIBRARY.some((a) => a.src === selected.origSrc) ? "Add Art" : "Upload Art"}
+            actions={actionsFor(selected)}
+            onFx={(next) => void applyFx(selected, next)}
+            onChange={(changes) => patchActive(selected.id, changes)}
+            onReset={() => void resetImage(selected)}
+            onClose={closePanel}
+          />
+        ) : null;
+      case "art":
+        return <ArtPanel onAdd={addArt} onClose={closePanel} />;
+      case "names-intro":
+        return <NamesIntro onStart={() => setPanel("names")} onClose={closePanel} />;
+      case "names":
+        return (
+          <NamesTools
+            settings={nn}
+            onChange={(p) => setNn((s) => ({ ...s, ...p }))}
+            onEnter={enterRoster}
+            onRemove={removeNames}
+            hasExisting={hasNames}
+            onClose={closePanel}
+          />
+        );
+      case "roster":
+        return (
+          <RosterEditor
+            settings={nn}
+            roster={roster}
+            sizes={sizeLabels}
+            onUpdate={(id, p) => commitRoster(roster.map((e) => (e.id === id ? { ...e, ...p } : e)))}
+            onAdd={() =>
+              commitRoster([
+                ...roster,
+                { id: uid(), name: "", number: "", subtitle: "", size: roster[roster.length - 1]?.size ?? defaultSize },
+              ])
+            }
+            onRemove={(id) => commitRoster(roster.filter((e) => e.id !== id))}
+            onDone={finishRoster}
+            onBack={() => setPanel("names")}
+          />
+        );
+      case "distress":
+        return (
+          <DistressPanel
+            level={distressLevel}
+            hasLayers={layers.length > 0}
+            side={side}
+            onPick={setDistress}
+            onClose={closePanel}
+          />
+        );
+      case "saved":
+        return (
+          <SavedPanel
+            drafts={drafts}
+            onSave={saveDraft}
+            onLoad={loadDraft}
+            onDelete={deleteDraft}
+            onClose={closePanel}
+          />
+        );
+      default:
+        return (
+          <div className="rot-scroll rot-empty">
+            <p className="rot-eyebrow">Design Studio</p>
+            <h2 className="rot-ptitle">Start designing</h2>
+            <p className="rot-phint">
+              Add text, upload your artwork or pick clipart. Tap anything on the shirt to edit it.
+            </p>
+          </div>
+        );
+    }
   }
+
+  const layout =
+    step !== "design" ? "full" : panel === "none" ? "none" : split ? "split" : "full";
+
+  const tools: { id: string; label: string; icon: React.ReactNode; onClick: () => void }[] = [
+    {
+      id: "products",
+      label: "Products",
+      icon: <ShirtIcon size={38} />,
+      onClick: () => {
+        setSelectedId(null);
+        setPanel("products");
+      },
+    },
+    {
+      id: "text",
+      label: "Add Text",
+      icon: <TextBoxIcon size={38} />,
+      onClick: addText,
+    },
+    {
+      id: "upload",
+      label: "Upload Art",
+      icon: <CloudUploadIcon size={38} />,
+      onClick: () => fileInput.current?.click(),
+    },
+    {
+      id: "art",
+      label: "Add Art",
+      icon: <AiArtIcon size={42} />,
+      onClick: () => {
+        setSelectedId(null);
+        setPanel("art");
+      },
+    },
+    {
+      id: "names",
+      label: "Personalize",
+      icon: <PersonalizeIcon size={40} />,
+      onClick: startNames,
+    },
+    {
+      id: "saved",
+      label: "Saved",
+      icon: <UserIcon size={38} />,
+      onClick: () => {
+        setSelectedId(null);
+        setDrafts(loadDrafts());
+        setPanel("saved");
+      },
+    },
+    {
+      id: "distress",
+      label: "Distress",
+      icon: <DistressIcon size={38} />,
+      onClick: () => {
+        setSelectedId(null);
+        setPanel("distress");
+      },
+    },
+  ];
 
   return (
-    <div className="studio">
-      {/* Mobile app bar (ROT-style): brand, price, save, cart, primary action */}
-      <div className="studio-appbar">
-        <Link href="/" className="studio-appbar-brand" aria-label="Kingdom Custom Print — home">
+    <div
+      className="rot"
+      data-step={step}
+      data-layout={layout}
+      style={{ ["--step" as string]: stepIndex }}
+    >
+      {/* ---- App bar ---- */}
+      <header className="rot-bar">
+        <Link href="/" className="rot-logo" aria-label="Kingdom Custom Print — home">
           <Image
             src="/brand/kingdom-logo.png"
             alt="Kingdom Custom Print"
@@ -600,1067 +1045,167 @@ export default function Customizer({
             loading="eager"
           />
         </Link>
-
-        <div className="studio-appbar-actions">
-          <span className="studio-appbar-price tnum">
-            {formatUSD(quote.unitBase)}
-            <small> ea</small>
-          </span>
-          <button
-            type="button"
-            className="studio-appbar-btn"
-            onClick={saveDraft}
-            aria-label="Save design"
-          >
-            <SaveGlyph />
-            <span className="studio-appbar-btn-label">Save</span>
+        <div className="rot-bar-actions">
+          <Link href={callHref} className="rot-barbtn">
+            <HeadsetIcon size={34} />
+            <span>Call or Chat</span>
+          </Link>
+          <button type="button" className="rot-barbtn" onClick={saveDraft}>
+            <SaveIcon size={34} />
+            <span>Save</span>
           </button>
-          <Link
-            href="/cart"
-            className="studio-appbar-btn"
-            aria-label={`Cart, ${cartCount} item${cartCount === 1 ? "" : "s"}`}
-          >
-            <CartIcon />
-            {cartCount > 0 ? <span className="studio-top-badge tnum">{cartCount}</span> : null}
-          </Link>
-          {step === "review" ? (
-            <button
-              type="button"
-              className="studio-appbar-primary"
-              onClick={handleAddToCart}
-              disabled={busy}
-            >
-              {busy ? "Adding…" : addedCount > 0 ? "Add another" : "Add to cart"}
-            </button>
-          ) : (
-            <button type="button" className="studio-appbar-primary" onClick={goNext}>
-              Next
-            </button>
-          )}
+          {cartCount > 0 ? (
+            <Link href="/cart" className="rot-barbtn rot-cartbtn" aria-label={`Cart, ${cartCount} items`}>
+              <CartGlyph size={34} />
+              <span>Cart</span>
+              <b className="rot-cartbadge">{cartCount}</b>
+            </Link>
+          ) : null}
+          <button type="button" className="rot-next" onClick={goNext} disabled={busy}>
+            {step === "review" ? <CartGlyph size={34} /> : <DollarIcon size={34} />}
+            <span>{step === "review" ? (busy ? "Adding…" : addedCount ? "Add more" : "Add to Cart") : "Next"}</span>
+          </button>
         </div>
-      </div>
+      </header>
 
-      {/* Top bar: steps + cart */}
-      <div className="studio-top">
-        <button
-          type="button"
-          className="studio-back"
-          onClick={goBack}
-          disabled={stepIndex === 0}
-          aria-label="Previous step"
+      {/* ---- Steps ---- */}
+      <nav className="rot-steps" aria-label="Order steps">
+        {STEP_ORDER.map((key, i) => {
+          const active = step === key;
+          const done = stepIndex > i;
+          return (
+            <button
+              key={key}
+              type="button"
+              className={`rot-step${active ? " is-active" : ""}${done ? " is-done" : ""}`}
+              aria-current={active ? "step" : undefined}
+              onClick={() => goStep(key)}
+            >
+              <span className="rot-step-n">{done ? <CheckGlyph size={16} /> : i + 1}</span>
+              <span className="rot-step-label">{STEP_LABEL[key]}</span>
+            </button>
+          );
+        })}
+        <span className="rot-steps-bar" aria-hidden="true" />
+      </nav>
+
+      {notice ? (
+        <p
+          className={`rot-toast is-${notice.tone}`}
+          role={notice.tone === "error" ? "alert" : "status"}
         >
-          <BackGlyph />
-        </button>
-        <ol className="studio-steps">
-          {STEP_ORDER.map((key, i) => {
-            const active = step === key;
-            const done = stepIndex > i;
-            return (
-              <li key={key}>
-                <button
-                  type="button"
-                  className={`studio-step${active ? " is-active" : ""}${done ? " is-done" : ""}`}
-                  aria-current={active ? "step" : undefined}
-                  onClick={() => {
-                    setStep(key);
-                    setPanelOpen(true);
-                  }}
-                >
-                  <span className="studio-step-n tnum">{i + 1}</span>
-                  <span className="studio-step-label">{STEP_LABEL[key]}</span>
+          {notice.text}
+        </p>
+      ) : null}
+
+      {/* ---- Body ---- */}
+      <div className="rot-body">
+        <div className="rot-main">
+          <section className="rot-stage" ref={stageRef} aria-label="Design preview">
+            <div className="rot-stage-top">
+              <div className="rot-history" role="group" aria-label="History">
+                <button type="button" onClick={undo} disabled={!hist.canUndo} aria-label="Undo">
+                  <UndoIcon size={22} />
                 </button>
-              </li>
-            );
-          })}
-        </ol>
-
-        <div className="studio-top-side">
-          <Link href="/cart" className="studio-top-link">
-            <CartIcon />
-            <span>Cart</span>
-            {cartCount > 0 ? <span className="studio-top-badge tnum">{cartCount}</span> : null}
-          </Link>
-          <Link href="/contact" className="studio-top-link studio-top-help">
-            Need help?
-          </Link>
-        </div>
-      </div>
-
-      <div className="studio-main">
-        {/* Tool rail */}
-        {step === "design" ? (
-          <nav className="studio-rail" aria-label="Design tools">
-            {TOOLS.map((t) => (
-              <button
-                key={t.id}
-                type="button"
-                className={`studio-rail-btn${tool === t.id ? " is-active" : ""}`}
-                onClick={() => openTool(t.id)}
-                aria-pressed={tool === t.id}
-              >
-                <span className="studio-rail-icon" aria-hidden="true">
-                  {t.icon}
-                </span>
-                <span className="studio-rail-label">{t.label}</span>
-              </button>
-            ))}
-          </nav>
-        ) : null}
-
-        {/* Scrim + contextual panel (bottom sheet on mobile) */}
-        {panelOpen ? (
-          <button
-            type="button"
-            className="studio-scrim"
-            aria-label="Close panel"
-            onClick={() => setPanelOpen(false)}
-          />
-        ) : null}
-        <aside className={`studio-panel${panelOpen ? " is-open" : ""}`} aria-label="Design controls">
-          <div className="studio-sheet-head">
-            <span className="studio-sheet-grip" aria-hidden="true" />
-            <button
-              type="button"
-              className="studio-sheet-close"
-              onClick={() => setPanelOpen(false)}
-              aria-label="Close panel"
-            >
-              <CloseGlyph />
-            </button>
-          </div>
-          {notice ? (
-            <p
-              className={`cust-notice is-${notice.tone} studio-notice`}
-              role={notice.tone === "error" ? "alert" : "status"}
-            >
-              {notice.text}
-            </p>
-          ) : null}
-
-          {step === "design" && tool === "products" ? (
-            <>
-              <PanelHead
-                eyebrow="Products"
-                title="Pick a blank & colour"
-                hint="Choose the shirt, then a colour. The preview swaps to that exact garment."
-              />
-
-              <div className="studio-product">
-                <div className="studio-product-media">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={mockup.front} alt="" className="studio-product-img" />
-                </div>
-                <div className="studio-product-info">
-                  <p className="studio-product-name wrap-anywhere">{product.name}</p>
-                  {product.styleCode ? (
-                    <p className="small muted">Style {product.styleCode}</p>
-                  ) : null}
-                  <p className="studio-product-color small">
-                    <span className="studio-dot" style={{ background: mockup.hex }} aria-hidden="true" />
-                    {mockup.name}
-                  </p>
-                </div>
-              </div>
-
-              <div className="pane">
-                <p className="label">
-                  Colour <span className="opt-value">{mockup.name}</span>
-                </p>
-                <div className="swatches swatches-lg">
-                  {TEE_MOCKUPS.map((m) => (
-                    <button
-                      key={m.code}
-                      type="button"
-                      className={`swatch${m.code === mockup.code ? " is-active" : ""}`}
-                      style={{ background: m.hex }}
-                      onClick={() => setColorCode(m.code)}
-                      aria-pressed={m.code === mockup.code}
-                      title={m.name}
-                    >
-                      <span className="sr-only">{m.name}</span>
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <div className="pane">
-                <p className="label">Switch blank</p>
-                <div className="studio-blank-row">
-                  {products.map((p) => (
-                    <Link
-                      key={p.id}
-                      href={`/customize/${p.slug}`}
-                      className={`studio-blank${p.id === product.id ? " is-active" : ""}`}
-                      aria-current={p.id === product.id ? "true" : undefined}
-                    >
-                      {p.images[0] ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img src={p.images[0].url} alt="" />
-                      ) : (
-                        <Image src="/brand/kingdom-logo.png" alt="" width={40} height={24} />
-                      )}
-                      <span className="wrap-anywhere">{p.name}</span>
-                    </Link>
-                  ))}
-                </div>
-              </div>
-            </>
-          ) : null}
-
-          {step === "design" && tool === "text" ? (
-            <>
-              <PanelHead
-                eyebrow="Add text"
-                title="Type your message"
-                hint={`Adds to the ${side}. Drag it to move, then use the round handles to stretch, rotate, resize or edit.`}
-              />
-              <button type="button" className="btn btn-block" onClick={addText}>
-                + Add a text layer
-              </button>
-              <div className="pane">{renderInspector()}</div>
-            </>
-          ) : null}
-
-          {step === "design" && tool === "upload" ? (
-            <>
-              <PanelHead
-                eyebrow="Upload art"
-                title="Add your artwork"
-                hint="PNG, JPG, WEBP or SVG up to 8 MB. Vector prints sharpest — outline fonts first."
-              />
-              <button
-                type="button"
-                className="btn btn-block"
-                onClick={() => fileInput.current?.click()}
-                disabled={busy}
-              >
-                {busy ? "Reading…" : "Choose a file"}
-              </button>
-              <p className="hint">It is placed on the {side} and can be moved, resized and flipped.</p>
-            </>
-          ) : null}
-
-          {step === "design" && tool === "art" ? (
-            <>
-              <PanelHead
-                eyebrow="Clipart"
-                title="Ready-made graphics"
-                hint="Drop in a graphic, then resize, rotate, flip and fade it like any layer."
-              />
-              <ul className="studio-art-grid">
-                {ART_LIBRARY.map((item) => (
-                  <li key={item.id}>
-                    <button type="button" onClick={() => addArt(item)} title={item.name}>
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src={item.src} alt="" />
-                      <span>{item.name}</span>
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            </>
-          ) : null}
-
-          {step === "design" && tool === "names" ? (
-            <>
-              <PanelHead
-                eyebrow="Names & numbers"
-                title="Add team names & numbers"
-                hint="Set the style, then build a roster. Each shirt can print its own name and number."
-              />
-
-              <div className="field">
-                <label className="label" htmlFor="nn-font">
-                  Font
-                </label>
-                <select
-                  id="nn-font"
-                  className="select"
-                  value={nnStyle.font}
-                  onChange={(e) => setNnStyle((s) => ({ ...s, font: e.target.value }))}
-                >
-                  {FONTS.map((f) => (
-                    <option key={f.value} value={f.value}>
-                      {f.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="field">
-                <span className="label">Ink colour</span>
-                <div className="swatches">
-                  {INK_COLORS.map((c) => (
-                    <button
-                      key={c}
-                      type="button"
-                      className={`swatch${c.toLowerCase() === nnStyle.color.toLowerCase() ? " is-active" : ""}`}
-                      style={{ background: c }}
-                      onClick={() => setNnStyle((s) => ({ ...s, color: c }))}
-                      aria-pressed={c.toLowerCase() === nnStyle.color.toLowerCase()}
-                      title={c}
-                    >
-                      <span className="sr-only">{c}</span>
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <div className="field">
-                <span className="label">
-                  Outline <span className="opt-value">{nnStyle.strokeWidth > 0 ? `${nnStyle.strokeWidth}%` : "Off"}</span>
-                </span>
-                <div className="swatches">
-                  {["#FFFFFF", "#141414", "#C8102E", "#E8A317", "#1C6B45", "#26314C"].map((c) => (
-                    <button
-                      key={c}
-                      type="button"
-                      className={`swatch${c.toLowerCase() === nnStyle.strokeColor.toLowerCase() ? " is-active" : ""}`}
-                      style={{ background: c }}
-                      onClick={() => setNnStyle((s) => ({ ...s, strokeColor: c }))}
-                      aria-pressed={c.toLowerCase() === nnStyle.strokeColor.toLowerCase()}
-                      title={c}
-                    >
-                      <span className="sr-only">{c}</span>
-                    </button>
-                  ))}
-                </div>
-                <label className="range-row" htmlFor="nn-stroke">
-                  <span>Width</span>
-                  <input
-                    id="nn-stroke"
-                    type="range"
-                    min={0}
-                    max={20}
-                    step={1}
-                    value={nnStyle.strokeWidth}
-                    onChange={(e) => setNnStyle((s) => ({ ...s, strokeWidth: Number(e.target.value) }))}
-                  />
-                  <span className="tnum small">{nnStyle.strokeWidth}</span>
-                </label>
-              </div>
-
-              <div className="field">
-                <span className="label">
-                  Roster <span className="opt-value">{roster.length || "none"}</span>
-                </span>
-                {roster.length ? (
-                  <ul className="roster-list">
-                    {roster.map((entry) => (
-                      <li key={entry.id}>
-                        <input
-                          className="input"
-                          value={entry.name}
-                          placeholder="Name"
-                          onChange={(e) => updateRoster(entry.id, { name: e.target.value })}
-                          aria-label="Player name"
-                        />
-                        <input
-                          className="input roster-num"
-                          value={entry.number}
-                          placeholder="00"
-                          inputMode="numeric"
-                          onChange={(e) => updateRoster(entry.id, { number: e.target.value })}
-                          aria-label="Player number"
-                        />
-                        <button
-                          type="button"
-                          className="icon-btn"
-                          onClick={() => removeRoster(entry.id)}
-                          aria-label="Remove row"
-                        >
-                          <svg width="14" height="14" viewBox="0 0 18 18" fill="none" aria-hidden="true">
-                            <path
-                              d="M3 5h12M7.5 5V3.5h3V5M5 5l.8 10.2A1 1 0 0 0 6.8 16h4.4a1 1 0 0 0 1-.8L13 5"
-                              stroke="currentColor"
-                              strokeWidth="1.3"
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                            />
-                          </svg>
-                        </button>
-                      </li>
-                    ))}
-                  </ul>
-                ) : (
-                  <p className="empty-note small muted">No players yet. Add a row to start a roster.</p>
-                )}
-                <button type="button" className="btn btn-light btn-block" onClick={addRosterRow}>
-                  + Add player
+                <button type="button" onClick={redo} disabled={!hist.canRedo} aria-label="Redo">
+                  <RedoIcon size={22} />
                 </button>
               </div>
-
-              <button type="button" className="btn btn-block" onClick={addNamesNumbers}>
-                Add names & numbers to the back
-              </button>
-            </>
-          ) : null}
-
-          {step === "design" && tool === "layers" ? (
-            <>
-              <PanelHead
-                eyebrow="Layers"
-                title={`${side === "front" ? "Front" : "Back"} elements`}
-                hint="Select a layer to edit it, then use the handles on the shirt or the actions below to reorder, flip, duplicate or delete."
-              />
-              <LayerList
-                layers={layers}
-                selectedId={selectedId}
-                onSelect={setSelectedId}
-                onRemove={(id) => {
-                  setDesign((prev) => removeLayer(prev, side, id));
-                  if (selectedId === id) setSelectedId(null);
-                }}
-              />
-              {layers.length === 0 ? (
-                <p className="empty-note small muted">
-                  Nothing on this side yet. Use Text, Upload, Clipart or Names.
-                </p>
-              ) : null}
-              <div className="pane">{renderInspector()}</div>
-            </>
-          ) : null}
-
-          {step === "quantity" ? (
-            <>
-              <PanelHead
-                eyebrow="Step 2"
-                title="Quantity & sizes"
-                hint="Enter quantities per size. The price drops as the run crosses a break."
-              />
-              <div className="size-run">
-                {product.sizes.map((s) => (
-                  <div
-                    key={s.label}
-                    className={`size-cell${(lines[s.label] ?? 0) > 0 ? " has-qty" : ""}`}
-                  >
-                    <label htmlFor={`c-qty-${s.label}`} className="size-label">
-                      {s.label}
-                      {s.surcharge > 0 ? <span className="size-add">+{formatUSD(s.surcharge)}</span> : null}
-                    </label>
-                    <div className="size-stepper">
-                      <button
-                        type="button"
-                        onClick={() => setQty(s.label, (lines[s.label] ?? 0) - 1)}
-                        disabled={(lines[s.label] ?? 0) <= 0}
-                        aria-label={`Decrease ${s.label}`}
-                      >
-                        &minus;
-                      </button>
-                      <input
-                        id={`c-qty-${s.label}`}
-                        type="number"
-                        inputMode="numeric"
-                        min={0}
-                        max={999}
-                        value={lines[s.label] ?? 0}
-                        onChange={(e) => setQty(s.label, Number(e.target.value))}
-                        aria-label={`${s.label} quantity`}
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setQty(s.label, (lines[s.label] ?? 0) + 1)}
-                        aria-label={`Increase ${s.label}`}
-                      >
-                        +
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-
-              <div className="quick-sizes">
-                <span className="small muted">Put all {quantity || 1} in one size:</span>
-                {["XS", "S", "M", "L", "XL", "2XL", "3XL"].map((label) => {
-                  if (!product.sizes.some((s) => s.label === label)) return null;
-                  return (
-                    <button
-                      key={label}
-                      type="button"
-                      className="quick-btn"
-                      onClick={() => fillAllInSize(label)}
-                    >
-                      All {label}
-                    </button>
-                  );
-                })}
-              </div>
-            </>
-          ) : null}
-
-          {step === "review" ? (
-            <>
-              <PanelHead
-                eyebrow="Step 3"
-                title="Review your order"
-                hint="Check the design and the size run, then add it to the cart."
-              />
-              <ul className="review-list">
-                <li>
-                  <span>Blank</span>
-                  <strong>{product.name}</strong>
-                </li>
-                <li>
-                  <span>Colour</span>
-                  <strong>{mockup.name}</strong>
-                </li>
-                <li>
-                  <span>Printed sides</span>
-                  <strong>
-                    {sides.length
-                      ? sides.map((s) => (s === "front" ? "Front" : "Back")).join(" + ")
-                      : "Blank shirt"}
-                  </strong>
-                </li>
-                <li>
-                  <span>Elements</span>
-                  <strong>{design.front.length + design.back.length || "None"}</strong>
-                </li>
-                {roster.length ? (
-                  <li>
-                    <span>Roster</span>
-                    <strong className="tnum">{roster.length} names</strong>
-                  </li>
-                ) : null}
-                <li>
-                  <span>Shirts</span>
-                  <strong className="tnum">{quantity}</strong>
-                </li>
-                <li>
-                  <span>Price each</span>
-                  <strong className="tnum">{formatUSD(quote.unitBase)}</strong>
-                </li>
-                <li className="review-total">
-                  <span>Subtotal</span>
-                  <strong className="tnum">{formatUSD(quote.total)}</strong>
-                </li>
-              </ul>
-
-              {drafts.length ? (
-                <div className="drafts">
-                  <p className="eyebrow">Saved designs</p>
-                  <ul>
-                    {drafts.map((d) => (
-                      <li key={d.id}>
-                        <button type="button" className="draft-load" onClick={() => loadDraft(d.id)}>
-                          <span className="draft-dot" style={{ background: d.colorHex }} aria-hidden="true" />
-                          <span className="draft-meta">
-                            <span className="wrap-anywhere">{d.productName}</span>
-                            <span className="small muted">
-                              {new Date(d.savedAt).toLocaleDateString()}
-                            </span>
-                          </span>
-                        </button>
-                        <button
-                          type="button"
-                          className="icon-btn"
-                          onClick={() => deleteDraft(d.id)}
-                          aria-label={`Delete saved ${d.productName} design`}
-                        >
-                          <svg width="15" height="15" viewBox="0 0 18 18" aria-hidden="true">
-                            <path
-                              d="M3 5h12M7.5 5V3.5h3V5M5 5l.8 10.2A1 1 0 0 0 6.8 16h4.4a1 1 0 0 0 1-.8L13 5"
-                              stroke="currentColor"
-                              strokeWidth="1.3"
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              fill="none"
-                            />
-                          </svg>
-                        </button>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              ) : null}
-            </>
-          ) : null}
-
-          <input
-            ref={fileInput}
-            type="file"
-            accept="image/png,image/jpeg,image/webp,image/svg+xml"
-            onChange={(e) => onUpload(e.target.files?.[0])}
-            className="sr-only"
-            aria-label="Upload artwork file"
-          />
-        </aside>
-
-        {/* Stage */}
-        <section className="studio-stage" aria-label="Design preview">
-          <div
-            className={`stage-canvas${flipping ? " is-flipping" : ""}`}
-            style={{ ["--stage-zoom" as string]: `${zoom}` }}
-          >
-            <div className="stage-tools" role="group" aria-label="History">
-              <button type="button" onClick={undo} disabled={!hist.canUndo} aria-label="Undo">
-                <UndoGlyph />
-              </button>
-              <button type="button" onClick={redo} disabled={!hist.canRedo} aria-label="Redo">
-                <RedoGlyph />
-              </button>
-              <button type="button" onClick={startOver} aria-label="Start over">
-                <ResetGlyph />
+              <button
+                type="button"
+                className="rot-rotate"
+                onClick={rotateSide}
+                aria-label={`Rotate to the ${side === "front" ? "back" : "front"}`}
+              >
+                <span className="rot-rotate-icon">
+                  <RotateShirtIcon />
+                </span>
+                <span className="rot-rotate-label">Rotate</span>
               </button>
             </div>
 
-            <button
-              type="button"
-              className="stage-rotate"
-              onClick={rotateSide}
-              aria-label={`Rotate to the ${side === "front" ? "back" : "front"}`}
-            >
-              <span className="stage-rotate-icon" aria-hidden="true">
-                <RotateTeeGlyph />
-              </span>
-              <span className="stage-rotate-label">Rotate</span>
-              <span className="stage-rotate-side">{side === "front" ? "Front" : "Back"}</span>
-            </button>
+            {fit.size > 0 ? (
+              <div
+                className={`rot-shirt${flipping ? " is-flipping" : ""}`}
+                style={{
+                  width: fit.size,
+                  height: fit.size,
+                  left: fit.left,
+                  transform: `translateY(${fit.ty}px)`,
+                }}
+              >
+                <DesignCanvas
+                  frontSrc={mockup.front}
+                  backSrc={mockup.back}
+                  side={side}
+                  design={design}
+                  selectedId={selectedId}
+                  onSelect={handleSelect}
+                  onChange={patch}
+                  onCommit={() => undefined}
+                  onDelete={deleteLayer}
+                  onEdit={editLayer}
+                />
+              </div>
+            ) : null}
 
-            <DesignCanvas
-              frontSrc={mockup.front}
-              backSrc={mockup.back}
-              side={side}
-              design={design}
-              selectedId={selectedId}
-              onSelect={handleSelect}
-              onChange={patch}
-              onCommit={() => undefined}
-              onDelete={(id) => {
-                setDesign((prev) => removeLayer(prev, side, id));
-                if (selectedId === id) setSelectedId(null);
-              }}
-              onEdit={editLayer}
-            />
-
-            {layers.length === 0 ? (
-              <div className="stage-add" role="group" aria-label="Add to your design">
-                <button type="button" onClick={addTextAndOpen}>
-                  <TextGlyph />
-                  <span>Add text</span>
+            {layers.length === 0 && panel === "none" && step === "design" ? (
+              <div className="rot-quickadd" role="group" aria-label="Add to your design">
+                <button type="button" onClick={addText}>
+                  <TextBoxIcon size={26} />
+                  <span>Add Text</span>
                 </button>
-                <button type="button" onClick={() => openTool("upload")}>
-                  <UploadGlyph />
-                  <span>Upload art</span>
+                <button type="button" onClick={() => fileInput.current?.click()} disabled={busy}>
+                  <CloudUploadIcon size={26} />
+                  <span>{busy ? "Reading…" : "Upload Art"}</span>
                 </button>
-                <button type="button" onClick={() => openTool("art")}>
-                  <ArtGlyph />
-                  <span>Add art</span>
+                <button type="button" onClick={() => setPanel("art")}>
+                  <AiArtIcon size={28} />
+                  <span>Add Art</span>
                 </button>
-                <button type="button" onClick={() => openTool("names")}>
-                  <NamesGlyph />
-                  <span>Names &amp; numbers</span>
+                <button type="button" onClick={startNames}>
+                  <PersonalizeIcon size={26} />
+                  <span>Names & Numbers</span>
                 </button>
               </div>
             ) : null}
 
-            <button
-              type="button"
-              className="stage-share"
-              onClick={shareDesign}
-              aria-label="Share this design"
-            >
-              <ShareGlyph />
-              <span>Share</span>
+            <button type="button" className="rot-share" onClick={shareDesign} aria-label="Share this design">
+              <ShareIcon size={34} />
+              <span>SHARE</span>
             </button>
-          </div>
+          </section>
 
-          <div className="stage-zoom">
-            <button
-              type="button"
-              onClick={() => setZoom((z) => Math.max(0.75, Math.round((z - 0.15) * 100) / 100))}
-              aria-label="Zoom out"
-            >
-              &minus;
-            </button>
-            <span className="tnum small">{Math.round(zoom * 100)}%</span>
-            <button
-              type="button"
-              onClick={() => setZoom((z) => Math.min(1.6, Math.round((z + 0.15) * 100) / 100))}
-              aria-label="Zoom in"
-            >
-              +
-            </button>
-          </div>
-        </section>
-      </div>
-
-      {/* Bottom action bar */}
-      <div className="studio-footer">
-        <div className="studio-price">
-          <span className="studio-price-unit tnum">
-            {formatUSD(quote.unitBase)}
-            <small> each</small>
-          </span>
-          <span className="studio-price-total small muted">
-            {quantity > 0
-              ? `${quantity} shirt${quantity === 1 ? "" : "s"} · ${formatUSD(quote.total)}`
-              : "Set a quantity to see the total"}
-          </span>
+          <nav className="rot-rail" aria-label="Design tools">
+            {tools.map((t) => (
+              <button
+                key={t.id}
+                type="button"
+                className={`rot-tool${railActive === t.id ? " is-active" : ""}`}
+                onClick={t.onClick}
+                disabled={step !== "design"}
+              >
+                <span className="rot-tool-icon">{t.icon}</span>
+                <span className="rot-tool-label">{t.label}</span>
+              </button>
+            ))}
+          </nav>
         </div>
 
-        <div className="studio-footer-actions">
-          {stepIndex > 0 ? (
-            <button type="button" className="btn btn-light" onClick={goBack}>
-              Back
-            </button>
-          ) : null}
-          <button type="button" className="btn btn-light" onClick={saveDraft}>
-            Save design
-          </button>
-          {step === "review" ? (
-            <button type="button" className="btn btn-red" onClick={handleAddToCart} disabled={busy}>
-              {busy ? "Adding…" : addedCount > 0 ? "Add another" : "Add to cart"}
-            </button>
-          ) : (
-            <button type="button" className="btn" onClick={goNext}>
-              Next step
-            </button>
-          )}
-          {addedCount > 0 ? (
-            <Link href="/cart" className="btn btn-light">
-              Go to cart ({addedCount})
-            </Link>
-          ) : null}
-        </div>
+        <aside className="rot-panel" aria-label="Design controls">
+          {renderPanel()}
+        </aside>
       </div>
+
+      <input
+        ref={fileInput}
+        type="file"
+        accept="image/png,image/jpeg,image/webp,image/svg+xml,image/gif"
+        onChange={(e) => onUpload(e.target.files?.[0])}
+        className="rot-hidden-file"
+        aria-label="Upload artwork file"
+        tabIndex={-1}
+      />
     </div>
-  );
-}
-
-function PanelHead({ eyebrow, title, hint }: { eyebrow: string; title: string; hint: string }) {
-  return (
-    <header className="studio-panel-head">
-      <p className="eyebrow">{eyebrow}</p>
-      <h2 className="h3 studio-panel-title">{title}</h2>
-      <p className="small muted">{hint}</p>
-    </header>
-  );
-}
-
-function LayerActions({
-  flipH,
-  flipV,
-  onCenter,
-  onBackward,
-  onForward,
-  onFlipH,
-  onFlipV,
-  onDuplicate,
-  onDelete,
-}: {
-  flipH: boolean;
-  flipV: boolean;
-  onCenter: () => void;
-  onBackward: () => void;
-  onForward: () => void;
-  onFlipH: () => void;
-  onFlipV: () => void;
-  onDuplicate: () => void;
-  onDelete: () => void;
-}) {
-  return (
-    <div className="layer-actions" role="group" aria-label="Layer actions">
-      <button type="button" onClick={onCenter}>
-        <CenterGlyph />
-        <span>Center</span>
-      </button>
-      <div className="layer-actions-split">
-        <button type="button" onClick={onBackward} aria-label="Send backward">
-          <OrderDownGlyph />
-        </button>
-        <button type="button" onClick={onForward} aria-label="Bring forward">
-          <OrderUpGlyph />
-        </button>
-      </div>
-      <div className="layer-actions-split">
-        <button
-          type="button"
-          className={flipH ? "is-on" : ""}
-          aria-pressed={flipH}
-          onClick={onFlipH}
-          aria-label="Flip horizontal"
-        >
-          <FlipHGlyph />
-        </button>
-        <button
-          type="button"
-          className={flipV ? "is-on" : ""}
-          aria-pressed={flipV}
-          onClick={onFlipV}
-          aria-label="Flip vertical"
-        >
-          <FlipVGlyph />
-        </button>
-      </div>
-      <button type="button" onClick={onDuplicate}>
-        <DupGlyph />
-        <span>Duplicate</span>
-      </button>
-      <button type="button" className="is-danger" onClick={onDelete}>
-        <TrashGlyph />
-        <span>Delete</span>
-      </button>
-    </div>
-  );
-}
-
-/* -------------------------------------------------------------------------
-   Rail glyphs
-   ------------------------------------------------------------------------- */
-
-function ProductsGlyph() {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
-      <path
-        d="M9 3 5 5.2 3.4 9.6l2.8 1 .8 9.4h10l.8-9.4 2.8-1L19 5.2 15 3a3 3 0 0 1-6 0Z"
-        stroke="currentColor"
-        strokeWidth="1.6"
-        strokeLinejoin="round"
-      />
-    </svg>
-  );
-}
-
-function TextGlyph() {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
-      <path
-        d="M4 6V4h16v2M12 4v16M8 20h8"
-        stroke="currentColor"
-        strokeWidth="1.6"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
-  );
-}
-
-function UploadGlyph() {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
-      <path
-        d="M12 16V4m0 0L7.5 8.5M12 4l4.5 4.5M4 16v2.5A1.5 1.5 0 0 0 5.5 20h13a1.5 1.5 0 0 0 1.5-1.5V16"
-        stroke="currentColor"
-        strokeWidth="1.6"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
-  );
-}
-
-function ArtGlyph() {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
-      <rect x="3.5" y="3.5" width="17" height="17" rx="2" stroke="currentColor" strokeWidth="1.6" />
-      <circle cx="8.6" cy="8.6" r="1.6" fill="currentColor" />
-      <path
-        d="m5 17 4.6-4.4L13 15.4l2.4-2.2L19 16"
-        stroke="currentColor"
-        strokeWidth="1.5"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
-  );
-}
-
-function NamesGlyph() {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
-      <path d="M4 6h10M4 11h7M4 16h6" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
-      <path
-        d="M16 20c0-2.2 1.6-3.6 3.5-3.6S23 17.8 23 20M19.5 13.4a2.2 2.2 0 1 0 0-4.4 2.2 2.2 0 0 0 0 4.4Z"
-        stroke="currentColor"
-        strokeWidth="1.5"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
-  );
-}
-
-function LayersGlyph() {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
-      <path d="m12 3 9 5-9 5-9-5 9-5Z" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" />
-      <path
-        d="m3 13 9 5 9-5"
-        stroke="currentColor"
-        strokeWidth="1.6"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
-  );
-}
-
-function SaveGlyph() {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
-      <path
-        d="M5 3.5h10.5L20.5 8.5V19a1.5 1.5 0 0 1-1.5 1.5H5A1.5 1.5 0 0 1 3.5 19V5A1.5 1.5 0 0 1 5 3.5Z"
-        stroke="currentColor"
-        strokeWidth="1.6"
-        strokeLinejoin="round"
-      />
-      <path d="M7.5 3.5v5h7v-5M7.5 20.5v-5h9v5" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" />
-    </svg>
-  );
-}
-
-function BackGlyph() {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
-      <path
-        d="M15 5.5 8.5 12l6.5 6.5"
-        stroke="currentColor"
-        strokeWidth="1.8"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
-  );
-}
-
-function CloseGlyph() {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
-      <path d="M6 6l12 12M18 6 6 18" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-    </svg>
-  );
-}
-
-function UndoGlyph() {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
-      <path d="M9 7H5v4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-      <path d="M5 11a8 8 0 1 1 2.4 7" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-    </svg>
-  );
-}
-
-function RedoGlyph() {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
-      <path d="M15 7h4v4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-      <path d="M19 11a8 8 0 1 0-2.4 7" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-    </svg>
-  );
-}
-
-function ResetGlyph() {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
-      <path d="M4 5v5h5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-      <path d="M4.4 10a8 8 0 1 1-1 4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-    </svg>
-  );
-}
-
-function ShareGlyph() {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
-      <circle cx="18" cy="5" r="2.6" stroke="currentColor" strokeWidth="1.7" />
-      <circle cx="6" cy="12" r="2.6" stroke="currentColor" strokeWidth="1.7" />
-      <circle cx="18" cy="19" r="2.6" stroke="currentColor" strokeWidth="1.7" />
-      <path d="m8.3 10.7 7.4-4.4M8.3 13.3l7.4 4.4" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
-    </svg>
-  );
-}
-
-function RotateTeeGlyph() {
-  return (
-    <svg viewBox="0 0 40 40" fill="none" aria-hidden="true">
-      <path
-        d="M14 7 9 9.5 7 14l3 1.2.6 6.8h18.8l.6-6.8 3-1.2-2-4.5L26 7a6 6 0 0 1-12 0Z"
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinejoin="round"
-      />
-      <path d="M9 27a12 12 0 0 0 20 4.5" stroke="#2f7bff" strokeWidth="2.4" strokeLinecap="round" />
-      <path
-        d="m29.5 31.5.6-4.6-4.6.6"
-        stroke="#2f7bff"
-        strokeWidth="2.4"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-      <path d="M31 27a12 12 0 0 0-20-4.5" stroke="#2f7bff" strokeWidth="2.4" strokeLinecap="round" />
-      <path
-        d="m10.5 22.5-.6 4.6 4.6-.6"
-        stroke="#2f7bff"
-        strokeWidth="2.4"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
-  );
-}
-
-function CenterGlyph() {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
-      <path d="M12 3v4M12 17v4M3 12h4M17 12h4" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
-      <rect x="9" y="9" width="6" height="6" rx="1" stroke="currentColor" strokeWidth="1.7" />
-    </svg>
-  );
-}
-
-function OrderUpGlyph() {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
-      <path d="M12 19V6m0 0-5 5m5-5 5 5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  );
-}
-
-function OrderDownGlyph() {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
-      <path d="M12 5v13m0 0-5-5m5 5 5-5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  );
-}
-
-function FlipHGlyph() {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
-      <path d="M12 3v18" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
-      <path d="M9 6 4 12l5 6V6ZM15 6l5 6-5 6V6Z" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" />
-    </svg>
-  );
-}
-
-function FlipVGlyph() {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
-      <path d="M3 12h18" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
-      <path d="M6 9 12 4l6 5H6ZM6 15l6 5 6-5H6Z" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" />
-    </svg>
-  );
-}
-
-function DupGlyph() {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
-      <rect x="8" y="8" width="12" height="12" rx="2" stroke="currentColor" strokeWidth="1.7" />
-      <path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2" stroke="currentColor" strokeWidth="1.7" />
-    </svg>
-  );
-}
-
-function TrashGlyph() {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
-      <path
-        d="M4 6h16M9 6V4h6v2M6 6l1 14h10l1-14"
-        stroke="currentColor"
-        strokeWidth="1.7"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
   );
 }

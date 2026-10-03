@@ -4,6 +4,7 @@ import { siteUrl, stripeClient } from "@/lib/stripe";
 import { getProductById } from "@/lib/catalog";
 import { quoteProduct } from "@/lib/pricing";
 import { FONTS } from "@/lib/fonts";
+import { personalizationOf } from "@/lib/design";
 import type { CartItem, Design, DesignLayer, GarmentSide, RosterEntry } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -68,6 +69,9 @@ async function sanitise(items: CartItem[]): Promise<CartItem[]> {
     const quote = quoteProduct(product, {
       sides: designSides(item.design),
       lines,
+      personalization: personalizationOf(
+        (item.design ?? {}) as Parameters<typeof personalizationOf>[0]
+      ),
     });
 
     // Prefer the exact colour the shopper picked (the studio offers the full
@@ -138,6 +142,8 @@ function sanitiseDesign(design: unknown): Design {
         opacity: clampNum(l.opacity, 0.1, 1, 1),
         flipH: Boolean(l.flipH),
         flipV: Boolean(l.flipV),
+        locked: l.locked ? true : undefined,
+        distress: clampNum(l.distress, 0, 3, 0),
       };
 
       if (l.type === "text") {
@@ -148,7 +154,7 @@ function sanitiseDesign(design: unknown): Design {
           type: "text",
           text,
           font: FONT_VALUES.has(String(l.font)) ? String(l.font) : "anton",
-          fontSize: clampNum(l.fontSize, 2, 40, 7),
+          fontSize: clampNum(l.fontSize, 2, 60, 7),
           color: hexOr(l.color, "#141414"),
           weight: [400, 700, 900].includes(Number(l.weight))
             ? (Number(l.weight) as 400 | 700 | 900)
@@ -162,19 +168,24 @@ function sanitiseDesign(design: unknown): Design {
           lineHeight: clampNum(l.lineHeight, 0.7, 3, 1.05),
           strokeColor: hexOr(l.strokeColor, "#FFFFFF"),
           strokeWidth: clampNum(l.strokeWidth, 0, 30, 0),
-          role: l.role === "name" || l.role === "number" ? l.role : undefined,
+          arc: clampNum(l.arc, -100, 100, 0),
+          role:
+            l.role === "name" || l.role === "number" || l.role === "subtitle"
+              ? l.role
+              : undefined,
         });
         continue;
       }
 
       if (l.type === "image") {
         const src = String(l.src ?? "");
-        if (!src.startsWith("data:image/") || src.length > 400_000) continue;
+        if (!src.startsWith("data:image/") || src.length > 600_000) continue;
         out.push({
           ...base,
           type: "image",
           src,
           name: String(l.name ?? "artwork").slice(0, 120),
+          aspect: clampNum(l.aspect, 0.05, 20, 1),
         });
       }
     }
@@ -193,6 +204,8 @@ function sanitiseRoster(roster: unknown): RosterEntry[] | undefined {
       id: String(r.id ?? `r-${i}`).slice(0, 40),
       name: String(r.name ?? "").slice(0, 40),
       number: String(r.number ?? "").slice(0, 12),
+      subtitle: String(r.subtitle ?? "").slice(0, 40) || undefined,
+      size: String(r.size ?? "").slice(0, 20) || undefined,
     };
   });
 }

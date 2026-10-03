@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import Customizer from "@/components/customizer/Customizer";
-import { getProductBySlug, getProducts } from "@/lib/catalog";
+import { getProductBySlug, getProducts, getSettings } from "@/lib/catalog";
 import type { Product } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -44,7 +44,10 @@ export default async function CustomizePage({ params, searchParams }: Params) {
   const product = await getProductBySlug(slug);
   if (!product) notFound();
 
-  const products = await getProducts({});
+  const [products, settings] = await Promise.all([
+    getProducts({}),
+    getSettings().catch(() => null),
+  ]);
 
   return (
     <div className="studio-page">
@@ -54,6 +57,7 @@ export default async function CustomizePage({ params, searchParams }: Params) {
         products={products}
         initialColor={color ?? ""}
         initialLines={parseSizes(sizes, product)}
+        contactPhone={settings?.contactPhone ?? ""}
       />
     </div>
   );
