@@ -3,7 +3,8 @@
 import Link from "next/link";
 import Image from "next/image";
 import type { ReactNode } from "react";
-import type { GarmentSide, Product, RosterEntry } from "@/lib/types";
+import type { DesignLayer, GarmentSide, Product, RosterEntry, TextLayer } from "@/lib/types";
+import { newImageLayer, newTextLayer } from "@/lib/design";
 import type { SavedDraft } from "@/lib/design";
 import { PERSONALIZATION_FEE, formatUSD, type PriceQuote } from "@/lib/pricing";
 import { TEE_MOCKUPS, type TeeMockup } from "@/lib/mockups";
@@ -121,6 +122,142 @@ export function ArtPanel({ onAdd, onClose }: { onAdd: (item: ArtItem) => void; o
           </li>
         ))}
       </ul>
+    </div>
+  );
+}
+
+/* -------------------------------------------------------------------------
+   Free AI design assistant
+   ------------------------------------------------------------------------- */
+
+function conceptFromPrompt(prompt: string): {
+  title: string;
+  subtitle: string;
+  ink: string;
+  accent: string;
+  font: string;
+  art: ArtItem;
+  arc: number;
+  summary: string;
+} {
+  const value = prompt.trim();
+  const lower = value.toLowerCase();
+  const art =
+    lower.includes("basket") || lower.includes("sport") || lower.includes("team")
+      ? ART_LIBRARY.find((item) => item.id === "burst")!
+      : lower.includes("music") || lower.includes("concert")
+        ? ART_LIBRARY.find((item) => item.id === "bolt")!
+        : lower.includes("heart") || lower.includes("love")
+          ? ART_LIBRARY.find((item) => item.id === "heart")!
+          : lower.includes("faith") || lower.includes("church")
+            ? ART_LIBRARY.find((item) => item.id === "cross")!
+            : lower.includes("crown") || lower.includes("king")
+              ? ART_LIBRARY.find((item) => item.id === "crown")!
+              : ART_LIBRARY.find((item) => item.id === "star")!;
+
+  const quoted = value.match(/[“"]([^”"]+)[”"]/);
+  const afterFor = value.match(/\bfor\s+(.+)$/i)?.[1];
+  const rawTitle = quoted?.[1] ?? afterFor ?? value;
+  const title = rawTitle
+    .replace(/\b(create|design|make|a|an|shirt|t-shirt|tee|logo)\b/gi, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 28)
+    .toUpperCase() || "YOUR TEAM";
+
+  const vintage = /vintage|retro|old school|classic/.test(lower);
+  const minimal = /minimal|simple|clean/.test(lower);
+  const faith = /faith|church|christian|bible/.test(lower);
+  const ink = faith ? "#F7F1DE" : vintage ? "#F4C95D" : minimal ? "#141414" : "#FFFFFF";
+  const accent = faith ? "#D6A84F" : vintage ? "#8E3B2E" : lower.includes("basket") ? "#F47B20" : "#E11D48";
+  const font = vintage ? "bebas" : minimal ? "montserrat" : "anton";
+  const arc = vintage ? -12 : lower.includes("sport") || lower.includes("team") ? 8 : 0;
+  const subtitle = afterFor && afterFor.toUpperCase() !== title ? afterFor.slice(0, 22).toUpperCase() : "CUSTOM APPAREL";
+  const styleName = vintage ? "vintage" : minimal ? "minimal" : faith ? "faith" : "bold";
+
+  return {
+    title,
+    subtitle,
+    ink,
+    accent,
+    font,
+    art,
+    arc,
+    summary: `${styleName} ${art.name.toLowerCase()} concept with ${title.toLowerCase()} lettering`,
+  };
+}
+
+export function AiDesignPanel({
+  side,
+  onGenerate,
+  onClose,
+}: {
+  side: GarmentSide;
+  onGenerate: (layers: DesignLayer[], summary: string) => void;
+  onClose: () => void;
+}) {
+  const [prompt, setPrompt] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  const generate = () => {
+    setBusy(true);
+    // Keep the first version completely local: no API key, upload, or request.
+    // The same callback can later be backed by an in-browser WebGPU model.
+    const concept = conceptFromPrompt(prompt);
+    const headline: TextLayer = newTextLayer({
+      text: concept.title,
+      font: concept.font,
+      color: concept.ink,
+      strokeColor: concept.accent,
+      strokeWidth: concept.ink === "#141414" ? 0 : 1.5,
+      fontSize: 15,
+      y: 37,
+      arc: concept.arc,
+      weight: 900,
+    });
+    const subline: TextLayer = newTextLayer({
+      text: concept.subtitle,
+      font: "montserrat",
+      color: concept.accent,
+      fontSize: 4.2,
+      y: 63,
+      weight: 700,
+      letterSpacing: 7,
+    });
+    const graphic = newImageLayer(concept.art.src, concept.art.name, 1, {
+      x: 50,
+      y: 50,
+      scaleX: 0.34,
+      scaleY: 0.34,
+      opacity: 0.92,
+    });
+    onGenerate([graphic, headline, subline], concept.summary);
+    setBusy(false);
+  };
+
+  return (
+    <div className="rot-scroll">
+      <PanelHeader
+        eyebrow="Free AI assistant"
+        title="Generate a concept"
+        hint="Describe a team, event or brand. This browser-local assistant creates editable text and art layers without an API key."
+        onClose={onClose}
+      />
+      <div className="rot-ai-panel">
+        <label htmlFor="ai-design-prompt">What should go on the {side}?</label>
+        <textarea
+          id="ai-design-prompt"
+          value={prompt}
+          onChange={(event) => setPrompt(event.target.value)}
+          placeholder='“Kings United” basketball team, bold retro style'
+          rows={4}
+        />
+        <button type="button" className="rot-cta" onClick={generate} disabled={busy}>
+          <CheckGlyph size={18} /> {busy ? "Creating…" : "Generate editable design"}
+        </button>
+        <p className="rot-phint">Nothing is uploaded or sent anywhere. Every generated layer can be edited after it is added.</p>
+        <p className="rot-ai-examples">Try: “church youth retreat”, “summer concert”, or “minimal coffee brand”.</p>
+      </div>
     </div>
   );
 }
@@ -758,4 +895,3 @@ export function ReviewPanel({
     </div>
   );
 }
-

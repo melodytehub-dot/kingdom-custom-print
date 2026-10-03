@@ -280,6 +280,7 @@
   top: 0;
   transition: transform 0.28s ease;
   will-change: transform;
+  filter: contrast(1.28) saturate(0.94) drop-shadow(0 16px 18px rgba(34, 36, 42, 0.1));
 }
 
 .rot-canvas,
@@ -296,9 +297,9 @@
   overflow: visible;
 }
 
-.rot-shirt.is-flipping .rot-canvas {
-  animation: rot-flip 0.32s ease;
-}
+  .rot-shirt.is-flipping .rot-canvas {
+    animation: rot-flip 0.32s ease;
+  }
 
 @keyframes rot-flip {
   0% {
@@ -493,6 +494,47 @@
   overflow-y: auto;
   overscroll-behavior: contain;
   padding: 14px 22px 32px;
+}
+
+.rot-ai-panel {
+  display: grid;
+  gap: 14px;
+  padding: 8px 0 28px;
+}
+
+.rot-ai-panel label {
+  color: #34343a;
+  font-size: 15px;
+  font-weight: 650;
+}
+
+.rot-ai-panel textarea {
+  width: 100%;
+  min-height: 116px;
+  resize: vertical;
+  border: 1px solid #cfd3d9;
+  border-radius: 12px;
+  padding: 14px;
+  color: #292a31;
+  background: #fff;
+  font: inherit;
+  line-height: 1.45;
+}
+
+.rot-ai-panel textarea:focus {
+  outline: 2px solid rgba(47, 123, 255, 0.25);
+  border-color: #2f7bff;
+}
+
+.rot-ai-panel .rot-cta {
+  justify-content: center;
+}
+
+.rot-ai-examples {
+  margin: 0;
+  color: #676a72;
+  font-size: 13px;
+  line-height: 1.5;
 }
 
 .rot-editor {

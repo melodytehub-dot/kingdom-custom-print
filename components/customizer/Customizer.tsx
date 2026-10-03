@@ -6,6 +6,7 @@ import Image from "next/image";
 import DesignCanvas, { VIEW, printAreaView } from "./DesignCanvas";
 import {
   ArtPanel,
+  AiDesignPanel,
   DistressPanel,
   NamesIntro,
   NamesTools,
@@ -79,6 +80,7 @@ type Panel =
   | "text"
   | "image"
   | "art"
+  | "ai"
   | "names-intro"
   | "names"
   | "roster"
@@ -208,8 +210,6 @@ export default function Customizer({
   const quote = quoteProduct(product, { sides, lines: sizeLines, personalization });
   const layers = design[side];
   const selected = selectedId ? layers.find((l) => l.id === selectedId) : undefined;
-  const selectedYRef = useRef<number | null>(null);
-  selectedYRef.current = selected ? selected.y : null;
   const cartCount = items.reduce((n, i) => n + i.quantity, 0);
   const rosterLocked = roster.length > 0 && personalization !== "none";
 
@@ -552,6 +552,13 @@ export default function Customizer({
     setPanel(personalization === "none" ? "names-intro" : "names");
   };
 
+  const generateAiDesign = (created: DesignLayer[], summary: string) => {
+    setDesign((prev) => ({ ...prev, [side]: [...prev[side], ...created] }));
+    setSelectedId(null);
+    setPanel("none");
+    setNotice({ tone: "ok", text: `Added ${summary}. You can edit each layer now.` });
+  };
+
   const enterRoster = () => {
     if (!roster.length) {
       const seed = [{ id: uid(), name: "", number: "", subtitle: "", size: defaultSize }];
@@ -781,12 +788,14 @@ export default function Customizer({
   const fit = useMemo(() => {
     const { w, h } = stageBox;
     if (!w || !h) return { size: 0, left: 0, ty: 0 };
-    const size = compact ? w * 1.12 : Math.min(w * 1.04, h * 1.06);
+    // RushOrderTees keeps the garment large in the square workspace. The
+    // previous fit left too much empty space above and below the shirt.
+    const size = compact ? w * 1.14 : Math.min(w * 1.1, h * 1.1);
     const top = 0.054 * size;
     const silhouetteH = 0.892 * size;
     let ty = (h - silhouetteH) / 2 - top;
     if (silhouetteH > h * 0.96) ty = -top + h * 0.02;
-    const selY = selectedYRef.current;
+    const selY = selected?.y ?? null;
     if (split && selectedId && compact && selY !== null) {
       const pa = printAreaView(side);
       const focusY = ((pa.y + (selY / 100) * pa.h) / VIEW) * size;
@@ -797,7 +806,7 @@ export default function Customizer({
     }
     return { size, left: (w - size) / 2, ty };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [stageBox, compact, split, selectedId, side]);
+  }, [stageBox, compact, split, selectedId, selected?.y, side]);
 
   /* ---- what the rail highlights ---- */
   const railActive =
@@ -902,6 +911,8 @@ export default function Customizer({
         ) : null;
       case "art":
         return <ArtPanel onAdd={addArt} onClose={closePanel} />;
+      case "ai":
+        return <AiDesignPanel side={side} onGenerate={generateAiDesign} onClose={closePanel} />;
       case "names-intro":
         return <NamesIntro onStart={() => setPanel("names")} onClose={closePanel} />;
       case "names":
@@ -998,6 +1009,15 @@ export default function Customizer({
       onClick: () => {
         setSelectedId(null);
         setPanel("art");
+      },
+    },
+    {
+      id: "ai",
+      label: "AI Design",
+      icon: <AiArtIcon size={42} />,
+      onClick: () => {
+        setSelectedId(null);
+        setPanel("ai");
       },
     },
     {
