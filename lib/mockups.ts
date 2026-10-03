@@ -89,7 +89,17 @@ export function mockupByCode(code: string): TeeMockup | undefined {
 
 /** Returns the correct silhouette family and only the colors offered by a blank. */
 export function mockupsForProduct(product: ProductLike): TeeMockup[] {
-  const family = product.slug === "v-neck-tee" ? "vneck" : product.slug === "long-sleeve-tee" ? "longsleeve" : null;
+  const family = product.slug === "v-neck-tee"
+    ? "vneck"
+    : product.slug === "long-sleeve-tee"
+      ? "longsleeve"
+      : product.slug === "womens-fitted-tee"
+        ? "fitted"
+        : product.slug === "pocket-tee"
+          ? "pocket"
+          : product.slug === "youth-classic-tee"
+            ? "youth"
+            : null;
   return product.colors.map((color) => {
     const base = mockupForColor(color.name, color.hex) ?? TEE_MOCKUPS[0];
     if (!family) return base;

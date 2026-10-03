@@ -42,20 +42,22 @@ const addText = page.getByRole("button", { name: /^add text$/i }).first();
 await addText.click();
 await page.waitForTimeout(400);
 
-const layerCount = await page.locator('[data-layer-id], .layer-row, .layer-item').count();
-check("text layer appears in layer list", layerCount > 0, `${layerCount} rows`);
+const layerPreview = page.locator('.rot-canvas-svg[aria-label*="1 design element"]');
+check("text layer appears in preview", await layerPreview.count() > 0, `${await page.locator('.rot-canvas-svg').count()} preview`);
 
 // Sizes live behind the Quantity step on this flow.
-await page.getByRole("button", { name: /continue to quantity/i }).first().click();
+await page.getByRole("button", { name: /^next$/i }).first().click();
 await page.waitForTimeout(800);
-const qtyInput = page.locator('input[id^="c-qty-"]').first();
+const qtyInput = page.locator('input[id^="q-"]').first();
 await qtyInput.waitFor({ state: "visible", timeout: 15000 });
 await qtyInput.fill("2");
 await page.waitForTimeout(600);
 
-const canvas = await page.locator(".canvas-wrap svg, .design-canvas").first().boundingBox();
+const canvas = await page.locator(".rot-canvas").first().boundingBox();
 check("design canvas rendered", !!canvas && canvas.width > 200, canvas ? `${Math.round(canvas.width)}×${Math.round(canvas.height)}` : "missing");
 
+await page.getByRole("button", { name: /^next$/i }).first().click();
+await page.waitForTimeout(700);
 await page.getByRole("button", { name: /^add to cart$/i }).first().click();
 await page.waitForTimeout(1800);
 
