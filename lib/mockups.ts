@@ -13,7 +13,7 @@ export interface TeeMockup {
 
 type ProductLike = {
   slug: string;
-  colors: { name: string; hex: string }[];
+  colors: { slug: string; name: string; hex: string }[];
 };
 
 // High-contrast transparent ghost-mannequin renders used by the studio.
@@ -102,9 +102,15 @@ export function mockupsForProduct(product: ProductLike): TeeMockup[] {
             : null;
   return product.colors.map((color) => {
     const base = mockupForColor(color.name, color.hex) ?? TEE_MOCKUPS[0];
-    if (!family) return base;
-    return {
+    const productColor = {
       ...base,
+      slug: color.slug,
+      name: color.name,
+      hex: color.hex,
+    };
+    if (!family) return productColor;
+    return {
+      ...productColor,
       front: `/img/mockups/families/${family}/${base.code}_fr.webp`,
       back: `/img/mockups/families/${family}/${base.code}_bk.webp`,
     };
