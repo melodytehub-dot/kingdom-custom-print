@@ -1258,10 +1258,10 @@
   display: block;
   width: 100%;
   min-width: 0;
-  padding: 10px 4px;
+  padding: 8px 4px;
   border-bottom: 1px solid var(--rot-line);
-  font-size: 21px;
-  line-height: 1.15;
+  font-size: 16px;
+  line-height: 1.25;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -2195,7 +2195,8 @@
 }
 
 .rot-fontname {
-  font-size: 20px;
+  font-size: 16px;
+  line-height: 1.2;
 }
 
 .rot-swatch {
@@ -2277,7 +2278,7 @@
 }
 
 .rot-act > span {
-  font-size: 9px;
+  font-size: 8.5px;
   font-weight: 500;
   letter-spacing: 0.02em;
   white-space: nowrap;
@@ -2285,8 +2286,8 @@
 
 .rot-actbtn,
 .rot-actpair .rot-actbtn {
-  width: 38px;
-  height: 34px;
+  width: 34px;
+  height: 32px;
   border-radius: 7px;
 }
 
@@ -2295,8 +2296,8 @@
 }
 
 .rot-actbtn svg {
-  width: 19px;
-  height: 19px;
+  width: 16px;
+  height: 16px;
 }
 
 .rot-filter {
@@ -2307,6 +2308,7 @@
 
 .rot-filter-thumb {
   width: 68px;
+  height: 68px;
 }
 
 .rot-colorline {
