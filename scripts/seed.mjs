@@ -1,4 +1,5 @@
 import postgres from "postgres";
+import { additionalCategories, additionalProducts } from "./additional-catalog.mjs";
 
 if (!process.env.DATABASE_URL) {
   console.error("DATABASE_URL is not set. Run with --env-file=.env.local");
@@ -16,6 +17,7 @@ const sql = postgres(process.env.DATABASE_URL, { max: 1, ssl: "require" });
 
 const categories = [
   { slug: "t-shirts", name: "T-Shirts", description: "Short and long sleeve blanks for everyday custom prints.", sort: 1 },
+  ...additionalCategories,
 ];
 
 /* Reusable colour palettes ------------------------------------------------ */
@@ -132,7 +134,7 @@ const PREMIUM_BREAKS = [
   { min_qty: 100, off: -4.25 },
 ];
 
-const products = [
+const baseProducts = [
   /* ------------------------------- T-shirts ------------------------------ */
   {
     slug: "crown-classic-tee",
@@ -458,8 +460,9 @@ const products = [
     images: [{ url: "/img/products/long-sleeve-tee.jpg", alt: "Long Sleeve Tee" }],
   },
 
-  /* ------------------------------ Sweatshirts ---------------------------- */
 ];
+
+const products = [...baseProducts, ...additionalProducts];
 
 const settings = {
   announcement: { value: "Free US shipping on orders over $75" },

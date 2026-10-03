@@ -24,6 +24,11 @@ const products = [
   ["youth-classic-tee", "youth", 14],
   ["v-neck-tee", "vneck", 6],
   ["long-sleeve-tee", "longsleeve", 6],
+  ["premium-pullover-hoodie", "hoodie", 8],
+  ["heavyweight-crewneck", "crew", 8],
+  ["five-panel-cap", "cap", 6],
+  ["canvas-tote", "tote", 3],
+  ["ceramic-mug", "mug", 3],
 ];
 
 const generatedFamilies = ["hoodie", "crew", "cap", "mug", "tote"];
