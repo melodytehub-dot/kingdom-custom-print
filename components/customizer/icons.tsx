@@ -112,6 +112,15 @@ export const AiArtIcon = ({ size }: P) => (
   </svg>
 );
 
+/** Plain artwork icon for clipart; the AI mark stays reserved for the generator. */
+export const ArtIcon = ({ size }: P) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" aria-hidden="true">
+    <rect x="3" y="4" width="18" height="16" rx="2" stroke="currentColor" strokeWidth="1.8" />
+    <circle cx="8" cy="9" r="1.6" fill="currentColor" />
+    <path d="m5 17 4.2-4.3 3.3 3 2.5-2.6L19 17" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+  </svg>
+);
+
 export const PersonalizeIcon = ({ size }: P) => (
   <Svg size={size}>
     <path d="M21 11.5a8.5 8.5 0 0 1-12.4 7.6L3 20.5l1.5-4.8A8.5 8.5 0 1 1 21 11.5Z" />

@@ -490,6 +490,8 @@ export function TextEditor({
 
   // A layer switch always returns to the main view.
   useEffect(() => {
+    // This local view intentionally resets when the selected layer changes.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setView("main");
   }, [layer.id]);
 
@@ -769,6 +771,8 @@ export function ImageEditor({
   }, [original]);
 
   useEffect(() => {
+    // This local view intentionally resets when the selected layer changes.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setView("main");
   }, [layer.id]);
 

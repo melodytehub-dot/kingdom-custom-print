@@ -22,6 +22,7 @@ import {
 import { ImageEditor, TextEditor, type LayerActionsProps } from "./editors";
 import {
   AiArtIcon,
+  ArtIcon,
   CartGlyph,
   CheckGlyph,
   CloudUploadIcon,
@@ -177,6 +178,9 @@ export default function Customizer({
 
   const fileInput = useRef<HTMLInputElement>(null);
   const stageRef = useRef<HTMLElement>(null);
+  const openFilePicker = useCallback(() => {
+    fileInput.current?.click();
+  }, []);
   const [stageBox, setStageBox] = useState({ w: 0, h: 0 });
   const [compact, setCompact] = useState(true);
 
@@ -815,7 +819,6 @@ export default function Customizer({
       ty = minTy < maxTy ? clamp(wanted, minTy, maxTy) : ty;
     }
     return { size, left: (w - size) / 2, ty };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [stageBox, compact, split, selectedId, selected?.y, side, zoom]);
 
   /* ---- what the rail highlights ---- */
@@ -1010,12 +1013,12 @@ export default function Customizer({
       id: "upload",
       label: "Upload Art",
       icon: <CloudUploadIcon size={38} />,
-      onClick: () => fileInput.current?.click(),
+      onClick: openFilePicker,
     },
     {
       id: "art",
       label: "Add Art",
-      icon: <AiArtIcon size={42} />,
+      icon: <ArtIcon size={38} />,
       onClick: () => {
         setSelectedId(null);
         setPanel("art");
@@ -1212,12 +1215,12 @@ export default function Customizer({
                   <TextBoxIcon size={26} />
                   <span>Add Text</span>
                 </button>
-                <button type="button" onClick={() => fileInput.current?.click()} disabled={busy}>
+                <button type="button" onClick={openFilePicker} disabled={busy}>
                   <CloudUploadIcon size={26} />
                   <span>{busy ? "Reading…" : "Upload Art"}</span>
                 </button>
                 <button type="button" onClick={() => setPanel("art")}>
-                  <AiArtIcon size={28} />
+                  <ArtIcon size={26} />
                   <span>Add Art</span>
                 </button>
                 <button type="button" onClick={startNames}>
@@ -1234,6 +1237,8 @@ export default function Customizer({
           </section>
 
           <nav className="rot-rail" aria-label="Design tools">
+            {/* The tool callbacks intentionally close over the hidden file input ref. */}
+            {/* eslint-disable-next-line react-hooks/refs */}
             {tools.map((t) => (
               <button
                 key={t.id}
