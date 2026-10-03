@@ -11,6 +11,8 @@ export const revalidate = 60;
 
 const CATEGORY_IMAGE: Record<string, string> = {
   "t-shirts": "/img/cat-tees.jpg",
+  "sweatshirts": "/img/mockups/families/hoodie/WHT_fr.webp",
+  "accessories": "/img/mockups/families/cap/WHT_fr.webp",
 };
 
 const STEPS = [
@@ -197,10 +199,10 @@ export default async function HomePage() {
                     <span className="cat-media">
                       <Image
                         src={CATEGORY_IMAGE[c.slug] ?? "/img/cat-tees.jpg"}
-                        alt=""
+                        alt={`${c.name} category`}
                         fill
                         sizes="(max-width: 640px) 50vw, 25vw"
-                        className="cat-img"
+                        className={`cat-img${CATEGORY_IMAGE[c.slug] ? " cat-img-product" : ""}`}
                       />
                     </span>
                     <span className="cat-foot">
