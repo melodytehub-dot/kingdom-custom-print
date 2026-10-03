@@ -297,7 +297,9 @@
 }
 
 .rot-shirt-photo {
-  filter: brightness(0.88) contrast(1.78) saturate(0.96) drop-shadow(0 16px 18px rgba(34, 36, 42, 0.1));
+  /* Garment assets already contain their own shading; avoid shifting the
+     selected swatch's hue/value with a global contrast filter. */
+  filter: drop-shadow(0 16px 18px rgba(34, 36, 42, 0.1));
 }
 
 .rot-canvas,
@@ -2221,6 +2223,157 @@
 .rot-ai-panel textarea {
   max-width: 100%;
   box-sizing: border-box;
+}
+
+.rot-te-head {
+  align-items: flex-start;
+  margin-bottom: 8px;
+}
+
+.rot-te-head .rot-ptitle {
+  font-size: 16px;
+  line-height: 1.2;
+}
+
+.rot-tabs {
+  flex: none;
+  max-width: 62%;
+}
+
+.rot-tab {
+  padding: 6px 6px 8px;
+  font-size: 11px;
+  letter-spacing: 0.02em;
+}
+
+.rot-tab.is-active::after {
+  height: 2px;
+}
+
+.rot-textarea {
+  min-height: 66px;
+  padding: 9px 10px;
+  font-size: 14px;
+  line-height: 1.35;
+}
+
+.rot-chip {
+  width: 32px;
+  height: 30px;
+  font-size: 12px;
+}
+
+.rot-actionbar {
+  gap: 3px;
+  padding: 7px 8px calc(6px + env(safe-area-inset-bottom));
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
+}
+
+.rot-actionbar::-webkit-scrollbar {
+  display: none;
+}
+
+.rot-act {
+  flex: 0 0 auto;
+  gap: 3px;
+}
+
+.rot-act > span {
+  font-size: 9px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+
+.rot-actbtn,
+.rot-actpair .rot-actbtn {
+  width: 38px;
+  height: 34px;
+  border-radius: 7px;
+}
+
+.rot-actpair {
+  border-radius: 7px;
+}
+
+.rot-actbtn svg {
+  width: 19px;
+  height: 19px;
+}
+
+.rot-filter {
+  gap: 5px;
+  padding-bottom: 5px;
+  font-size: 11px;
+}
+
+.rot-filter-thumb {
+  width: 68px;
+}
+
+.rot-colorline {
+  gap: 9px;
+  padding: 8px 0;
+  font-size: 12px;
+}
+
+.rot-distress-opt {
+  gap: 5px;
+  padding: 8px;
+  font-size: 12px;
+}
+
+.rot-check {
+  gap: 6px;
+  font-size: 13px;
+}
+
+.rot-check input {
+  width: 18px;
+  height: 18px;
+}
+
+.rot-pillselect {
+  height: 40px;
+}
+
+.rot-pillselect select {
+  padding-inline: 12px 30px;
+  font-size: 14px;
+}
+
+.rot-pricenote {
+  margin-top: 14px;
+  padding-top: 12px;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.rot-size label {
+  font-size: 13px;
+}
+
+.rot-stepper button,
+.rot-stepper input {
+  width: 30px;
+  height: 30px;
+}
+
+.rot-stepper input {
+  font-size: 13px;
+}
+
+.rot-totals > div,
+.rot-review li {
+  padding: 8px 0;
+  font-size: 13px;
+}
+
+.rot-totals .is-total,
+.rot-review .is-total {
+  font-size: 15px;
 }
 
 .rot-cta {
