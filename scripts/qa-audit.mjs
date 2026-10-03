@@ -174,7 +174,12 @@ const run = async () => {
         for (const e of pageErrors) {
           record("JS-ERROR", route.name, vp.name, e);
         }
-        for (const e of consoleErrors.filter((c) => !c.includes("favicon"))) {
+        const unexpectedConsoleErrors = consoleErrors.filter(
+          (c) =>
+            !c.includes("favicon") &&
+            !(route.name === "not-found" && /404|Failed to load resource/.test(c))
+        );
+        for (const e of unexpectedConsoleErrors) {
           record("CONSOLE", route.name, vp.name, e);
         }
 
