@@ -11,6 +11,11 @@ export interface TeeMockup {
   back: string;
 }
 
+type ProductLike = {
+  slug: string;
+  colors: { name: string; hex: string }[];
+};
+
 // High-contrast transparent ghost-mannequin renders used by the studio.
 // The garment is isolated from its background so artwork stays crisp and
 // the stage can inherit the site's bone background.
@@ -61,9 +66,37 @@ export function mockupForColor(name: string, hex: string): TeeMockup | undefined
   const bySlug = TEE_MOCKUPS.find((m) => m.slug === name);
   if (bySlug) return bySlug;
   const h = hex.replace("#", "").toLowerCase();
-  return TEE_MOCKUPS.find((m) => m.hex.replace("#", "").toLowerCase() === h);
+  const exact = TEE_MOCKUPS.find((m) => m.hex.replace("#", "").toLowerCase() === h);
+  if (exact) return exact;
+
+  // Catalogue blanks use a wider set of vendor-specific colour names than
+  // the shared mockup library. Pick the nearest real fabric render instead of
+  // silently falling back to white when a colour such as Ivory or Teal is
+  // selected.
+  const rgb = h.match(/../g)?.map((part) => Number.parseInt(part, 16));
+  if (!rgb || rgb.length !== 3) return undefined;
+  return TEE_MOCKUPS.reduce((nearest, candidate) => {
+    const candidateRgb = candidate.hex.replace("#", "").match(/../g)?.map((part) => Number.parseInt(part, 16));
+    if (!candidateRgb || candidateRgb.length !== 3) return nearest;
+    const distance = rgb.reduce((sum, channel, index) => sum + (channel - candidateRgb[index]) ** 2, 0);
+    return distance < nearest.distance ? { item: candidate, distance } : nearest;
+  }, { item: TEE_MOCKUPS[0], distance: Number.POSITIVE_INFINITY }).item;
 }
 
 export function mockupByCode(code: string): TeeMockup | undefined {
   return TEE_MOCKUPS.find((m) => m.code === code);
+}
+
+/** Returns the correct silhouette family and only the colors offered by a blank. */
+export function mockupsForProduct(product: ProductLike): TeeMockup[] {
+  const family = product.slug === "v-neck-tee" ? "vneck" : product.slug === "long-sleeve-tee" ? "longsleeve" : null;
+  return product.colors.map((color) => {
+    const base = mockupForColor(color.name, color.hex) ?? TEE_MOCKUPS[0];
+    if (!family) return base;
+    return {
+      ...base,
+      front: `/img/mockups/families/${family}/${base.code}_fr.webp`,
+      back: `/img/mockups/families/${family}/${base.code}_bk.webp`,
+    };
+  });
 }

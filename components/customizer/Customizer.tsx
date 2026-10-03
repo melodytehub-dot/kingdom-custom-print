@@ -59,7 +59,7 @@ import {
 } from "@/lib/design";
 import { applyImageFx, DEFAULT_FX } from "@/lib/imageFx";
 import { drawPreview } from "./preview";
-import { TEE_MOCKUPS, mockupForColor, type TeeMockup } from "@/lib/mockups";
+import { mockupForColor, mockupsForProduct, TEE_MOCKUPS, type TeeMockup } from "@/lib/mockups";
 import { useCart } from "@/lib/cart-context";
 import { quoteProduct } from "@/lib/pricing";
 import type {
@@ -148,14 +148,15 @@ export default function Customizer({
 }) {
   const { addItem, items } = useCart();
 
+  const productMockups = useMemo(() => mockupsForProduct(product), [product]);
+
   const [step, setStep] = useState<Step>("design");
   const [panel, setPanel] = useState<Panel>("none");
   const [side, setSide] = useState<GarmentSide>("front");
   const [colorCode, setColorCode] = useState(() => {
     const match =
-      TEE_MOCKUPS.find((m) => m.slug === initialColor || m.code === initialColor) ??
-      mockupForColor(product.colors[0]?.name ?? "White", product.colors[0]?.hex ?? "#FFFFFF");
-    return match?.code ?? "WHT";
+      productMockups.find((m) => m.slug === initialColor || m.code === initialColor) ?? productMockups[0] ?? TEE_MOCKUPS[0];
+    return match.code;
   });
   const [design, setDesign] = useState<Design>(emptyDesign);
   const [lines, setLines] = useState<Record<string, number>>(initialLines);
@@ -199,8 +200,8 @@ export default function Customizer({
   }, []);
 
   const mockup: TeeMockup = useMemo(
-    () => TEE_MOCKUPS.find((m) => m.code === colorCode) ?? TEE_MOCKUPS[0],
-    [colorCode]
+    () => productMockups.find((m) => m.code === colorCode) ?? productMockups[0] ?? TEE_MOCKUPS[0],
+    [colorCode, productMockups]
   );
   const changeColor = useCallback((code: string) => {
     setColorCode(code);
@@ -232,7 +233,7 @@ export default function Customizer({
         if (parsed?.design?.front && parsed?.design?.back) {
           setDesign(normalizeDesign(parsed.design));
         }
-        if (parsed?.colorCode && TEE_MOCKUPS.some((m) => m.code === parsed.colorCode)) {
+        if (parsed?.colorCode && productMockups.some((m) => m.code === parsed.colorCode)) {
           setColorCode(parsed.colorCode);
         }
         if (Array.isArray(parsed?.roster)) setRoster(parsed.roster);
@@ -248,7 +249,7 @@ export default function Customizer({
     restored.current = true;
     setReady(true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [draftKey]);
+  }, [draftKey, productMockups]);
   /* eslint-enable react-hooks/set-state-in-effect */
 
   /* ---- autosave draft ---- */
@@ -898,6 +899,7 @@ export default function Customizer({
             product={product}
             products={products}
             mockup={mockup}
+            mockups={productMockups}
             onColor={changeColor}
             onClose={closePanel}
           />

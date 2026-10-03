@@ -27,12 +27,14 @@ export function ProductsPanel({
   product,
   products,
   mockup,
+  mockups,
   onColor,
   onClose,
 }: {
   product: Product;
   products: Product[];
   mockup: TeeMockup;
+  mockups: TeeMockup[];
   onColor: (code: string) => void;
   onClose: () => void;
 }) {
@@ -59,7 +61,7 @@ export function ProductsPanel({
 
       <h3 className="rot-sub">Color</h3>
       <div className="rot-swatchgrid">
-        {TEE_MOCKUPS.map((m) => (
+        {mockups.map((m) => (
           <button
             key={m.code}
             type="button"
