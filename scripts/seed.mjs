@@ -380,7 +380,7 @@ const baseProducts = [
     ],
     sizes: WOMEN_SIZES,
     breaks: TEE_BREAKS,
-    images: [{ url: "/img/products/womens-fitted-tee.jpg", alt: "Women's Fitted Tee" }],
+    images: [{ url: "/img/mockups/families/fitted/WHT_fr.webp", alt: "Women's Fitted Tee in White" }],
   },
   {
     slug: "youth-classic-tee",
@@ -401,7 +401,7 @@ const baseProducts = [
     colors: CLASSIC_COLORS,
     sizes: YOUTH_SIZES,
     breaks: TEE_BREAKS,
-    images: [{ url: "/img/products/youth-classic-tee.jpg", alt: "Youth Classic Tee" }],
+    images: [{ url: "/img/mockups/families/youth/WHT_fr.webp", alt: "Youth Classic Tee in White" }],
   },
   {
     slug: "v-neck-tee",
@@ -429,7 +429,7 @@ const baseProducts = [
     ],
     sizes: ADULT_SIZES,
     breaks: TEE_BREAKS,
-    images: [{ url: "/img/products/v-neck-tee.jpg", alt: "V-Neck Tee" }],
+    images: [{ url: "/img/mockups/families/vneck/WHT_fr.webp", alt: "V-Neck Tee in White" }],
   },
   {
     slug: "long-sleeve-tee",
@@ -457,7 +457,7 @@ const baseProducts = [
     ],
     sizes: ADULT_SIZES,
     breaks: PREMIUM_BREAKS,
-    images: [{ url: "/img/products/long-sleeve-tee.jpg", alt: "Long Sleeve Tee" }],
+    images: [{ url: "/img/mockups/families/longsleeve/BLK_fr.webp", alt: "Long Sleeve Tee in Black" }],
   },
 
 ];

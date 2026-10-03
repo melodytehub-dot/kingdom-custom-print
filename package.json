@@ -11,6 +11,7 @@
     "db:migrate": "node --env-file=.env.local scripts/migrate.mjs",
     "db:seed": "node --env-file=.env.local scripts/seed.mjs",
     "db:seed-additional": "node --env-file=.env.local scripts/seed-additional-catalog.mjs",
+    "db:repair-special-images": "node --env-file=.env.local scripts/repair-special-product-images.mjs",
     "db:reset": "node --env-file=.env.local scripts/migrate.mjs --force && node --env-file=.env.local scripts/seed.mjs",
     "qa-audit": "node scripts/qa-audit.mjs",
     "qa-cart-flow": "node scripts/qa-cart-flow.mjs",
