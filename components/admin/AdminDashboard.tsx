@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import Garment from "@/components/Garment";
 import ArrowRight from "@/components/icons/ArrowRight";
 import { formatUSD } from "@/lib/pricing";
+import { mockupsForProduct } from "@/lib/mockups";
 import { ORDER_STATUSES, type OrderStatus, type Product, type ProductKind } from "@/lib/types";
 import type {
   AdminOrder,
@@ -740,9 +741,7 @@ function ProductsPanel({ data }: { data: AdminData }) {
         <ul className="product-admin-list">
           {products.map((p) => (
             <li key={p.id} className="product-admin-row">
-              <div className="pa-thumb">
-                <Garment kind={p.kind} color={p.colors[0]?.hex ?? "#141414"} />
-              </div>
+              <AdminProductThumb product={p} />
               <div className="grow">
                 <p className="wrap-anywhere">
                   <strong>{p.name}</strong>
@@ -798,6 +797,21 @@ function ProductsPanel({ data }: { data: AdminData }) {
         />
       )}
     </section>
+  );
+}
+
+function AdminProductThumb({ product }: { product: Product }) {
+  const mockup = mockupsForProduct(product)[0];
+
+  return (
+    <div className="pa-thumb">
+      {mockup ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={mockup.front} alt={`${product.name} preview`} />
+      ) : (
+        <Garment kind={product.kind} color={product.colors[0]?.hex ?? "#141414"} />
+      )}
+    </div>
   );
 }
 
