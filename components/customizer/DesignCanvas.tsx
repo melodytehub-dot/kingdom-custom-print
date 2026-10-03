@@ -30,9 +30,8 @@ interface CanvasProps {
   onSelect: (id: string | null) => void;
   onChange: (side: GarmentSide, id: string, patch: Partial<DesignLayer>) => void;
   onCommit: () => void;
-  onDuplicate: (id: string) => void;
   onDelete: (id: string) => void;
-  onReorder: (id: string, dir: "front" | "back" | "forward" | "backward") => void;
+  onEdit: (id: string) => void;
 }
 
 const VIEW = 900;
@@ -75,9 +74,8 @@ export default function DesignCanvas({
   onSelect,
   onChange,
   onCommit,
-  onDuplicate,
   onDelete,
-  onReorder,
+  onEdit,
 }: CanvasProps) {
   const svgRef = useRef<SVGSVGElement>(null);
   const dragRef = useRef<DragState | null>(null);
@@ -94,7 +92,6 @@ export default function DesignCanvas({
   );
 
   const layers = design[side];
-  const selected = selectedId ? layers.find((l) => l.id === selectedId) : undefined;
   const photo = side === "front" ? frontSrc : backSrc;
 
   const toView = useCallback((clientX: number, clientY: number) => {
@@ -279,188 +276,219 @@ export default function DesignCanvas({
           pointerEvents="none"
         />
 
-        <rect
-          x={areaOrigin.x}
-          y={areaOrigin.y}
-          width={area.w}
-          height={area.h}
-          fill="none"
-          stroke="rgba(200,16,46,0.55)"
-          strokeWidth="1.6"
-          strokeDasharray="7 6"
-          pointerEvents="none"
-        />
+        <defs>
+          <clipPath id="print-clip">
+            <rect x={areaOrigin.x} y={areaOrigin.y} width={area.w} height={area.h} />
+          </clipPath>
+        </defs>
 
+        {/* Artwork is clipped to the printable area… */}
         <g clipPath="url(#print-clip)">
-          <defs>
-            <clipPath id="print-clip">
-              <rect x={areaOrigin.x} y={areaOrigin.y} width={area.w} height={area.h} />
-            </clipPath>
-          </defs>
           {layers.map((layer) => (
-            <LayerNode
+            <LayerContent key={layer.id} layer={layer} area={area} areaOrigin={areaOrigin} />
+          ))}
+        </g>
+
+        {/* …but the hit areas and controls live above the clip so they never
+            get cut off at the print boundary. */}
+        <g>
+          {layers.map((layer) => (
+            <LayerOverlay
               key={layer.id}
               layer={layer}
               area={area}
               areaOrigin={areaOrigin}
               selected={layer.id === selectedId}
               onPointerDown={startDrag}
+              onDelete={onDelete}
+              onEdit={onEdit}
             />
           ))}
         </g>
       </svg>
-
-      {selected ? (
-        <div className="canvas-float" role="toolbar" aria-label="Selected element">
-          <span className="canvas-float-name">
-            {selected.type === "text" ? selected.text.split("\n")[0] || "Text" : selected.name}
-          </span>
-          <button type="button" onClick={() => onChange(side, selected.id, { flipH: !selected.flipH })} title="Flip horizontal">
-            <FlipIcon axis="h" />
-          </button>
-          <button type="button" onClick={() => onChange(side, selected.id, { flipV: !selected.flipV })} title="Flip vertical">
-            <FlipIcon axis="v" />
-          </button>
-          <button type="button" onClick={() => onReorder(selected.id, "forward")} title="Bring forward">
-            <OrderIcon dir="up" />
-          </button>
-          <button type="button" onClick={() => onReorder(selected.id, "backward")} title="Send backward">
-            <OrderIcon dir="down" />
-          </button>
-          <button type="button" onClick={() => onDuplicate(selected.id)} title="Duplicate">
-            <DupIcon />
-          </button>
-          <button type="button" className="is-danger" onClick={() => onDelete(selected.id)} title="Delete">
-            <TrashIcon />
-          </button>
-        </div>
-      ) : null}
     </div>
   );
 }
 
-function LayerNode({
+function LayerContent({
+  layer,
+  area,
+  areaOrigin,
+}: {
+  layer: DesignLayer;
+  area: { w: number; h: number };
+  areaOrigin: { x: number; y: number };
+}) {
+  const cx = areaOrigin.x + (layer.x / 100) * area.w;
+  const cy = areaOrigin.y + (layer.y / 100) * area.h;
+  const fh = layer.flipH ? -1 : 1;
+  const fv = layer.flipV ? -1 : 1;
+
+  return (
+    <g
+      transform={`translate(${cx} ${cy}) rotate(${layer.rotation}) scale(${layer.scaleX * fh} ${layer.scaleY * fv})`}
+      opacity={layer.opacity}
+    >
+      {layer.type === "image" ? (
+        <image
+          href={(layer as ImageLayer).src}
+          x={-area.w / 2}
+          y={-area.h / 2}
+          width={area.w}
+          height={area.h}
+          preserveAspectRatio="xMidYMid meet"
+          pointerEvents="none"
+        />
+      ) : (
+        <TextNode layer={layer as TextLayer} area={area} />
+      )}
+    </g>
+  );
+}
+
+function LayerOverlay({
   layer,
   area,
   areaOrigin,
   selected,
   onPointerDown,
+  onDelete,
+  onEdit,
 }: {
   layer: DesignLayer;
   area: { w: number; h: number };
   areaOrigin: { x: number; y: number };
   selected: boolean;
   onPointerDown: (e: ReactPointerEvent, layer: DesignLayer, tool: Tool, edge?: Edge | null) => void;
+  onDelete: (id: string) => void;
+  onEdit: (id: string) => void;
 }) {
   const cx = areaOrigin.x + (layer.x / 100) * area.w;
   const cy = areaOrigin.y + (layer.y / 100) * area.h;
   const base = layerBox(layer, area);
   const box = effBox(base, layer);
-  const fh = layer.flipH ? -1 : 1;
-  const fv = layer.flipV ? -1 : 1;
-
-  const handles: { edge: Edge; x: number; y: number }[] = [
-    { edge: "nw", x: -box.w / 2, y: -box.h / 2 },
-    { edge: "n", x: 0, y: -box.h / 2 },
-    { edge: "ne", x: box.w / 2, y: -box.h / 2 },
-    { edge: "e", x: box.w / 2, y: 0 },
-    { edge: "se", x: box.w / 2, y: box.h / 2 },
-    { edge: "s", x: 0, y: box.h / 2 },
-    { edge: "sw", x: -box.w / 2, y: box.h / 2 },
-    { edge: "w", x: -box.w / 2, y: 0 },
-  ];
-
-  const cursor: Record<Edge, string> = {
-    nw: "nwse-resize",
-    n: "ns-resize",
-    ne: "nesw-resize",
-    e: "ew-resize",
-    se: "nwse-resize",
-    s: "ns-resize",
-    sw: "nesw-resize",
-    w: "ew-resize",
-  };
+  const halfW = box.w / 2;
+  const halfH = box.h / 2;
+  const GAP = 58;
 
   return (
-    <g>
-      {/* Content, scaled */}
-      <g transform={`translate(${cx} ${cy}) rotate(${layer.rotation}) scale(${layer.scaleX * fh} ${layer.scaleY * fv})`} opacity={layer.opacity}>
-        {layer.type === "image" ? (
-          <image
-            href={(layer as ImageLayer).src}
-            x={-area.w / 2}
-            y={-area.h / 2}
-            width={area.w}
-            height={area.h}
-            preserveAspectRatio="xMidYMid meet"
+    <g transform={`translate(${cx} ${cy}) rotate(${layer.rotation})`}>
+      <rect
+        x={-halfW - 6}
+        y={-halfH - 6}
+        width={box.w + 12}
+        height={box.h + 12}
+        fill="transparent"
+        style={{ cursor: "move" }}
+        onPointerDown={(e) => onPointerDown(e, layer, "move")}
+      />
+
+      {selected ? (
+        <>
+          <rect
+            x={-halfW}
+            y={-halfH}
+            width={box.w}
+            height={box.h}
+            fill="none"
+            stroke="#2f7bff"
+            strokeWidth="2.5"
+            strokeDasharray="8 6"
             pointerEvents="none"
           />
-        ) : (
-          <TextNode layer={layer as TextLayer} area={area} />
-        )}
-      </g>
 
-      {/* Hit area + selection UI, rotation only (handles stay constant size) */}
-      <g transform={`translate(${cx} ${cy}) rotate(${layer.rotation})`}>
-        <rect
-          x={-box.w / 2 - 6}
-          y={-box.h / 2 - 6}
-          width={box.w + 12}
-          height={box.h + 12}
-          fill="transparent"
-          style={{ cursor: "move" }}
-          onPointerDown={(e) => onPointerDown(e, layer, "move")}
-        />
+          <ControlButton
+            x={-halfW - GAP}
+            y={-halfH - GAP}
+            label="Delete"
+            onActivate={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              onDelete(layer.id);
+            }}
+          >
+            <TrashIcon />
+          </ControlButton>
 
-        {selected ? (
-          <>
-            <rect
-              x={-box.w / 2}
-              y={-box.h / 2}
-              width={box.w}
-              height={box.h}
-              fill="none"
-              stroke="#c8102e"
-              strokeWidth="2"
-              pointerEvents="none"
-            />
-            <line
-              x1={0}
-              y1={-box.h / 2}
-              x2={0}
-              y2={-box.h / 2 - 34}
-              stroke="#c8102e"
-              strokeWidth="2"
-              pointerEvents="none"
-            />
-            <circle
-              cx={0}
-              cy={-box.h / 2 - 40}
-              r={11}
-              fill="#fff"
-              stroke="#c8102e"
-              strokeWidth="2"
-              style={{ cursor: "grab" }}
-              onPointerDown={(e) => onPointerDown(e, layer, "rotate")}
-            />
-            {handles.map((h) => (
-              <rect
-                key={h.edge}
-                x={h.x - 8}
-                y={h.y - 8}
-                width={16}
-                height={16}
-                rx={3}
-                fill="#fff"
-                stroke="#c8102e"
-                strokeWidth="2"
-                style={{ cursor: cursor[h.edge] }}
-                onPointerDown={(e) => onPointerDown(e, layer, "scale", h.edge)}
-              />
-            ))}
-          </>
-        ) : null}
-      </g>
+          <ControlButton
+            x={0}
+            y={-halfH - GAP}
+            label="Stretch vertically"
+            onActivate={(e) => onPointerDown(e, layer, "scale", "n")}
+          >
+            <StretchIcon axis="v" />
+          </ControlButton>
+
+          <ControlButton
+            x={halfW + GAP}
+            y={-halfH - GAP}
+            label="Rotate"
+            onActivate={(e) => onPointerDown(e, layer, "rotate")}
+          >
+            <RotateIcon />
+          </ControlButton>
+
+          <ControlButton
+            x={halfW + GAP}
+            y={0}
+            label="Stretch horizontally"
+            onActivate={(e) => onPointerDown(e, layer, "scale", "e")}
+          >
+            <StretchIcon axis="h" />
+          </ControlButton>
+
+          <ControlButton
+            x={-halfW - GAP}
+            y={halfH + GAP}
+            label="Edit text"
+            onActivate={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              onEdit(layer.id);
+            }}
+          >
+            <text textAnchor="middle" dominantBaseline="central" fontSize="21" fontWeight="600" fill="#2c2b28">
+              edit
+            </text>
+          </ControlButton>
+
+          <ControlButton
+            x={halfW + GAP}
+            y={halfH + GAP}
+            label="Resize"
+            onActivate={(e) => onPointerDown(e, layer, "scale", "se")}
+          >
+            <ScaleIcon />
+          </ControlButton>
+        </>
+      ) : null}
+    </g>
+  );
+}
+
+function ControlButton({
+  x,
+  y,
+  label,
+  onActivate,
+  children,
+}: {
+  x: number;
+  y: number;
+  label: string;
+  onActivate: (e: ReactPointerEvent) => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <g
+      transform={`translate(${x} ${y})`}
+      style={{ cursor: "pointer" }}
+      onPointerDown={onActivate}
+      role="button"
+      aria-label={label}
+    >
+      <circle r={38} fill="#fff" stroke="#d9d5cd" strokeWidth={1.5} />
+      {children}
     </g>
   );
 }
@@ -509,53 +537,57 @@ function TextNode({
 
 /* --------------------------------- icons --------------------------------- */
 
-function FlipIcon({ axis }: { axis: "h" | "v" }) {
+function Icon({ children, transform }: { children: React.ReactNode; transform?: string }) {
   return (
-    <svg viewBox="0 0 18 18" width="16" height="16" fill="none" aria-hidden="true">
-      <path
-        d={axis === "h" ? "M9 2v14M6 5 2.5 9 6 13M12 5l3.5 4L12 13" : "M2 9h14M5 6 9 2.5 13 6M5 12l4 3.5L13 12"}
-        stroke="currentColor"
-        strokeWidth="1.5"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
-  );
-}
-
-function OrderIcon({ dir }: { dir: "up" | "down" }) {
-  return (
-    <svg viewBox="0 0 18 18" width="16" height="16" fill="none" aria-hidden="true">
-      <path
-        d={dir === "up" ? "M9 14V4m0 0L5 8m4-4 4 4" : "M9 4v10m0 0 4-4m-4 4-4-4"}
-        stroke="currentColor"
-        strokeWidth="1.5"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
-  );
-}
-
-function DupIcon() {
-  return (
-    <svg viewBox="0 0 18 18" width="16" height="16" fill="none" aria-hidden="true">
-      <rect x="6" y="6" width="9" height="9" rx="1.5" stroke="currentColor" strokeWidth="1.5" />
-      <path d="M12 6V4.5A1.5 1.5 0 0 0 10.5 3h-6A1.5 1.5 0 0 0 3 4.5v6A1.5 1.5 0 0 0 4.5 12H6" stroke="currentColor" strokeWidth="1.5" />
+    <svg
+      x={-15}
+      y={-15}
+      width={30}
+      height={30}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="#2c2b28"
+      strokeWidth={2}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      transform={transform}
+    >
+      {children}
     </svg>
   );
 }
 
 function TrashIcon() {
   return (
-    <svg viewBox="0 0 18 18" width="16" height="16" fill="none" aria-hidden="true">
-      <path
-        d="M3 5h12M7.5 5V3.5h3V5M5 5l.8 10.2A1 1 0 0 0 6.8 16h4.4a1 1 0 0 0 1-.8L13 5"
-        stroke="currentColor"
-        strokeWidth="1.5"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
+    <Icon>
+      <path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14" />
+    </Icon>
+  );
+}
+
+function StretchIcon({ axis }: { axis: "h" | "v" }) {
+  return (
+    <Icon transform={axis === "h" ? "rotate(90)" : undefined}>
+      <path d="M12 4v16" />
+      <path d="M8 8l4-4 4 4" />
+      <path d="M8 16l4 4 4-4" />
+    </Icon>
+  );
+}
+
+function RotateIcon() {
+  return (
+    <Icon>
+      <path d="M23 4v6h-6" />
+      <path d="M20.5 15a9 9 0 1 1-2.1-9.4L23 10" />
+    </Icon>
+  );
+}
+
+function ScaleIcon() {
+  return (
+    <Icon>
+      <path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7" />
+    </Icon>
   );
 }

@@ -520,7 +520,7 @@
   display: flex;
   flex-direction: column;
   padding: clamp(14px, 2vw, 22px);
-  background: var(--bone);
+  background: #f7f7f5;
   min-width: 0;
 }
 
@@ -608,7 +608,7 @@
 
 .stage-canvas .canvas-wrap {
   position: relative;
-  width: min(100%, var(--stage-size, 58vh), 620px);
+  width: min(100%, var(--stage-size, 58vh), 720px);
   aspect-ratio: 1 / 1;
   transform: scale(var(--stage-zoom, 1));
   transition: transform 0.16s var(--ease);
@@ -618,7 +618,202 @@
   display: block;
   width: 100%;
   height: 100%;
+  max-height: none;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
   touch-action: none;
+}
+
+/* Floating stage controls (ROT-style): history top-left, rotate top-right,
+   share bottom-right. */
+.stage-tools {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  z-index: 5;
+  display: flex;
+  gap: 6px;
+}
+
+.stage-tools button {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: var(--shadow-sm);
+  color: var(--ink-2);
+  transition: background var(--dur) var(--ease), color var(--dur) var(--ease);
+}
+
+.stage-tools button svg {
+  width: 20px;
+  height: 20px;
+}
+
+.stage-tools button:hover:not(:disabled) {
+  background: var(--ink);
+  color: #fff;
+}
+
+.stage-tools button:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.stage-rotate {
+  position: absolute;
+  top: 6px;
+  right: 10px;
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  width: 80px;
+  padding: 6px 4px;
+  color: var(--ink);
+}
+
+.stage-rotate-icon {
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+}
+
+.stage-rotate-icon svg {
+  width: 48px;
+  height: 48px;
+}
+
+.stage-rotate-label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.stage-rotate-side {
+  font-size: 9.5px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.stage-rotate:active .stage-rotate-icon {
+  transform: rotate(180deg);
+  transition: transform 0.3s var(--ease);
+}
+
+.stage-share {
+  position: absolute;
+  right: 10px;
+  bottom: 10px;
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  width: 62px;
+  padding: 9px 4px;
+  border-radius: 12px;
+  background: #fff;
+  box-shadow: var(--shadow-md);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-2);
+}
+
+.stage-share svg {
+  width: 22px;
+  height: 22px;
+}
+
+@keyframes stage-flip {
+  0% {
+    transform: scaleX(1);
+  }
+  50% {
+    transform: scaleX(0.02);
+  }
+  100% {
+    transform: scaleX(1);
+  }
+}
+
+.stage-canvas.is-flipping .canvas-wrap {
+  animation: stage-flip 0.32s var(--ease);
+}
+
+/* Per-layer action row shown under the inspector. */
+.layer-actions {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(58px, 1fr));
+  gap: 6px;
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--line);
+}
+
+.layer-actions button {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 9px 4px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  background: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ink-2);
+  transition: border-color var(--dur) var(--ease), color var(--dur) var(--ease);
+}
+
+.layer-actions button svg {
+  width: 20px;
+  height: 20px;
+}
+
+.layer-actions button:hover {
+  border-color: var(--ink);
+  color: var(--ink);
+}
+
+.layer-actions button.is-on {
+  border-color: var(--ink);
+  background: var(--bone);
+  color: var(--ink);
+}
+
+.layer-actions button.is-danger:hover {
+  border-color: var(--danger);
+  color: var(--danger);
+}
+
+.layer-actions-split {
+  display: flex;
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  overflow: hidden;
+}
+
+.layer-actions-split button {
+  flex: 1;
+  border: 0;
+  border-radius: 0;
+}
+
+.layer-actions-split button + button {
+  border-left: 1px solid var(--line);
 }
 
 /* Floating toolbar over the selected element */
@@ -762,7 +957,7 @@
    inside it, with the action bar always visible. */
 @media (min-width: 901px) {
   .studio {
-    --stage-size: calc(100dvh - var(--header-h) - var(--banner-h) - 290px);
+    --stage-size: calc(100dvh - var(--header-h) - var(--banner-h) - 230px);
     /* 2px safety so the pinned action bar is never clipped by rounding. */
     height: calc(100dvh - var(--header-h) - var(--banner-h) - 2px);
     overflow: hidden;
@@ -1206,7 +1401,7 @@
 /* Mobile: square stage sized to the space between the app bar and the tool rail. */
 @media (max-width: 900px) {
   .stage-canvas .canvas-wrap {
-    width: min(88vw, calc(100dvh - 250px), 460px);
+    width: min(94vw, calc(100dvh - 230px), 560px);
     transform: none;
   }
 }

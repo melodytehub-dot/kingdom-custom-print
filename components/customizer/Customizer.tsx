@@ -106,6 +106,7 @@ export default function Customizer({
   const [lines, setLines] = useState<Record<string, number>>(initialLines);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [panelOpen, setPanelOpen] = useState(false);
+  const [flipping, setFlipping] = useState(false);
   const [drafts, setDrafts] = useState<SavedDraft[]>([]);
   const [notice, setNotice] = useState<{ tone: "ok" | "warn" | "error"; text: string } | null>(null);
   const [busy, setBusy] = useState(false);
@@ -238,7 +239,36 @@ export default function Customizer({
 
   const handleSelect = (id: string | null) => {
     setSelectedId(id);
-    if (id) setPanelOpen(true);
+  };
+
+  /** Opens the editor for a layer — only fired by the canvas "edit" control. */
+  const editLayer = (id: string) => {
+    const layer = design[side].find((l) => l.id === id);
+    if (!layer) return;
+    setSelectedId(id);
+    setTool(layer.type === "text" ? "text" : "layers");
+    setPanelOpen(true);
+  };
+
+  const rotateSide = () => {
+    setFlipping(true);
+    window.setTimeout(() => setFlipping(false), 320);
+    setSide((s) => (s === "front" ? "back" : "front"));
+    setSelectedId(null);
+  };
+
+  const shareDesign = async () => {
+    const url = window.location.href;
+    try {
+      if (navigator.share) {
+        await navigator.share({ title: `${product.name} design`, url });
+        return;
+      }
+      await navigator.clipboard.writeText(url);
+      setNotice({ tone: "ok", text: "Design link copied to your clipboard." });
+    } catch {
+      // The user dismissed the share sheet; nothing to report.
+    }
   };
 
   const addText = () => {
@@ -497,17 +527,18 @@ export default function Customizer({
 
   /** Inspector shared by the Text and Layers tools. */
   function renderInspector() {
-    if (selected?.type === "text") {
-      return (
+    if (!selected) {
+      return <p className="empty-note small muted">Select a layer on the shirt to edit it.</p>;
+    }
+
+    const body =
+      selected.type === "text" ? (
         <TextPanel
           layer={selected}
           inks={INK_COLORS}
           onChange={(changes) => patchActive(selected.id, changes)}
         />
-      );
-    }
-    if (selected?.type === "image") {
-      return (
+      ) : (
         <div className="image-inspector">
           <p className="small wrap-anywhere">
             <strong>{selected.name}</strong>
@@ -525,28 +556,35 @@ export default function Customizer({
             />
             <span className="tnum small">{Math.round(selected.opacity * 100)}%</span>
           </label>
-          <div className="toggle-row" role="group" aria-label="Flip image">
-            <button
-              type="button"
-              className={`toggle${selected.flipH ? " is-on" : ""}`}
-              aria-pressed={selected.flipH}
-              onClick={() => patchActive(selected.id, { flipH: !selected.flipH })}
-            >
-              Flip H
-            </button>
-            <button
-              type="button"
-              className={`toggle${selected.flipV ? " is-on" : ""}`}
-              aria-pressed={selected.flipV}
-              onClick={() => patchActive(selected.id, { flipV: !selected.flipV })}
-            >
-              Flip V
-            </button>
-          </div>
         </div>
       );
-    }
-    return <p className="empty-note small muted">Select a layer on the shirt to edit it.</p>;
+
+    const id = selected.id;
+    return (
+      <>
+        {body}
+        <LayerActions
+          flipH={selected.flipH}
+          flipV={selected.flipV}
+          onCenter={() => patchActive(id, { x: 50, y: 50 })}
+          onBackward={() => setDesign((prev) => reorderLayer(prev, side, id, "backward"))}
+          onForward={() => setDesign((prev) => reorderLayer(prev, side, id, "forward"))}
+          onFlipH={() => patchActive(id, { flipH: !selected.flipH })}
+          onFlipV={() => patchActive(id, { flipV: !selected.flipV })}
+          onDuplicate={() => {
+            const res = duplicateLayer(design, side, id);
+            if (res) {
+              setDesign(res.design);
+              setSelectedId(res.id);
+            }
+          }}
+          onDelete={() => {
+            setDesign((prev) => removeLayer(prev, side, id));
+            setSelectedId(null);
+          }}
+        />
+      </>
+    );
   }
 
   return (
@@ -774,7 +812,7 @@ export default function Customizer({
               <PanelHead
                 eyebrow="Add text"
                 title="Type your message"
-                hint={`Adds to the ${side}. Drag to move, pull the corners to resize, use the top handle to rotate.`}
+                hint={`Adds to the ${side}. Drag it to move, then use the round handles to stretch, rotate, resize or edit.`}
               />
               <button type="button" className="btn btn-block" onClick={addText}>
                 + Add a text layer
@@ -963,7 +1001,7 @@ export default function Customizer({
               <PanelHead
                 eyebrow="Layers"
                 title={`${side === "front" ? "Front" : "Back"} elements`}
-                hint="Select a layer to edit it. Use the floating toolbar to reorder, flip, duplicate or delete."
+                hint="Select a layer to edit it, then use the handles on the shirt or the actions below to reorder, flip, duplicate or delete."
               />
               <LayerList
                 layers={layers}
@@ -1150,39 +1188,35 @@ export default function Customizer({
 
         {/* Stage */}
         <section className="studio-stage" aria-label="Design preview">
-          <div className="stage-top">
-            <div className="stage-side-tabs" role="group" aria-label="Shirt side">
-              {(["front", "back"] as const).map((s) => (
-                <button
-                  key={s}
-                  type="button"
-                  className={`stage-side-btn${side === s ? " is-active" : ""}`}
-                  aria-pressed={side === s}
-                  onClick={() => {
-                    setSide(s);
-                    setSelectedId(null);
-                  }}
-                >
-                  {s === "front" ? "Front" : "Back"}
-                  <span className="stage-side-count tnum">{design[s].length || ""}</span>
-                </button>
-              ))}
-            </div>
-
-            <div className="stage-history">
-              <button type="button" onClick={undo} disabled={!hist.canUndo}>
-                Undo
+          <div
+            className={`stage-canvas${flipping ? " is-flipping" : ""}`}
+            style={{ ["--stage-zoom" as string]: `${zoom}` }}
+          >
+            <div className="stage-tools" role="group" aria-label="History">
+              <button type="button" onClick={undo} disabled={!hist.canUndo} aria-label="Undo">
+                <UndoGlyph />
               </button>
-              <button type="button" onClick={redo} disabled={!hist.canRedo}>
-                Redo
+              <button type="button" onClick={redo} disabled={!hist.canRedo} aria-label="Redo">
+                <RedoGlyph />
               </button>
-              <button type="button" onClick={startOver}>
-                Start over
+              <button type="button" onClick={startOver} aria-label="Start over">
+                <ResetGlyph />
               </button>
             </div>
-          </div>
 
-          <div className="stage-canvas" style={{ ["--stage-zoom" as string]: `${zoom}` }}>
+            <button
+              type="button"
+              className="stage-rotate"
+              onClick={rotateSide}
+              aria-label={`Rotate to the ${side === "front" ? "back" : "front"}`}
+            >
+              <span className="stage-rotate-icon" aria-hidden="true">
+                <RotateTeeGlyph />
+              </span>
+              <span className="stage-rotate-label">Rotate</span>
+              <span className="stage-rotate-side">{side === "front" ? "Front" : "Back"}</span>
+            </button>
+
             <DesignCanvas
               frontSrc={mockup.front}
               backSrc={mockup.back}
@@ -1192,18 +1226,11 @@ export default function Customizer({
               onSelect={handleSelect}
               onChange={patch}
               onCommit={() => undefined}
-              onDuplicate={(id) => {
-                const res = duplicateLayer(design, side, id);
-                if (res) {
-                  setDesign(res.design);
-                  setSelectedId(res.id);
-                }
-              }}
               onDelete={(id) => {
                 setDesign((prev) => removeLayer(prev, side, id));
                 if (selectedId === id) setSelectedId(null);
               }}
-              onReorder={(id, dir) => setDesign((prev) => reorderLayer(prev, side, id, dir))}
+              onEdit={editLayer}
             />
 
             {layers.length === 0 ? (
@@ -1220,8 +1247,22 @@ export default function Customizer({
                   <ArtGlyph />
                   <span>Add art</span>
                 </button>
+                <button type="button" onClick={() => openTool("names")}>
+                  <NamesGlyph />
+                  <span>Names &amp; numbers</span>
+                </button>
               </div>
             ) : null}
+
+            <button
+              type="button"
+              className="stage-share"
+              onClick={shareDesign}
+              aria-label="Share this design"
+            >
+              <ShareGlyph />
+              <span>Share</span>
+            </button>
           </div>
 
           <div className="stage-zoom">
@@ -1294,6 +1335,73 @@ function PanelHead({ eyebrow, title, hint }: { eyebrow: string; title: string; h
       <h2 className="h3 studio-panel-title">{title}</h2>
       <p className="small muted">{hint}</p>
     </header>
+  );
+}
+
+function LayerActions({
+  flipH,
+  flipV,
+  onCenter,
+  onBackward,
+  onForward,
+  onFlipH,
+  onFlipV,
+  onDuplicate,
+  onDelete,
+}: {
+  flipH: boolean;
+  flipV: boolean;
+  onCenter: () => void;
+  onBackward: () => void;
+  onForward: () => void;
+  onFlipH: () => void;
+  onFlipV: () => void;
+  onDuplicate: () => void;
+  onDelete: () => void;
+}) {
+  return (
+    <div className="layer-actions" role="group" aria-label="Layer actions">
+      <button type="button" onClick={onCenter}>
+        <CenterGlyph />
+        <span>Center</span>
+      </button>
+      <div className="layer-actions-split">
+        <button type="button" onClick={onBackward} aria-label="Send backward">
+          <OrderDownGlyph />
+        </button>
+        <button type="button" onClick={onForward} aria-label="Bring forward">
+          <OrderUpGlyph />
+        </button>
+      </div>
+      <div className="layer-actions-split">
+        <button
+          type="button"
+          className={flipH ? "is-on" : ""}
+          aria-pressed={flipH}
+          onClick={onFlipH}
+          aria-label="Flip horizontal"
+        >
+          <FlipHGlyph />
+        </button>
+        <button
+          type="button"
+          className={flipV ? "is-on" : ""}
+          aria-pressed={flipV}
+          onClick={onFlipV}
+          aria-label="Flip vertical"
+        >
+          <FlipVGlyph />
+        </button>
+      </div>
+      <button type="button" onClick={onDuplicate}>
+        <DupGlyph />
+        <span>Duplicate</span>
+      </button>
+      <button type="button" className="is-danger" onClick={onDelete}>
+        <TrashGlyph />
+        <span>Delete</span>
+      </button>
+    </div>
   );
 }
 
@@ -1420,6 +1528,139 @@ function CloseGlyph() {
   return (
     <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
       <path d="M6 6l12 12M18 6 6 18" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function UndoGlyph() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path d="M9 7H5v4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M5 11a8 8 0 1 1 2.4 7" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function RedoGlyph() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path d="M15 7h4v4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M19 11a8 8 0 1 0-2.4 7" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function ResetGlyph() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path d="M4 5v5h5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M4.4 10a8 8 0 1 1-1 4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function ShareGlyph() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <circle cx="18" cy="5" r="2.6" stroke="currentColor" strokeWidth="1.7" />
+      <circle cx="6" cy="12" r="2.6" stroke="currentColor" strokeWidth="1.7" />
+      <circle cx="18" cy="19" r="2.6" stroke="currentColor" strokeWidth="1.7" />
+      <path d="m8.3 10.7 7.4-4.4M8.3 13.3l7.4 4.4" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function RotateTeeGlyph() {
+  return (
+    <svg viewBox="0 0 40 40" fill="none" aria-hidden="true">
+      <path
+        d="M14 7 9 9.5 7 14l3 1.2.6 6.8h18.8l.6-6.8 3-1.2-2-4.5L26 7a6 6 0 0 1-12 0Z"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinejoin="round"
+      />
+      <path d="M9 27a12 12 0 0 0 20 4.5" stroke="#2f7bff" strokeWidth="2.4" strokeLinecap="round" />
+      <path
+        d="m29.5 31.5.6-4.6-4.6.6"
+        stroke="#2f7bff"
+        strokeWidth="2.4"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path d="M31 27a12 12 0 0 0-20-4.5" stroke="#2f7bff" strokeWidth="2.4" strokeLinecap="round" />
+      <path
+        d="m10.5 22.5-.6 4.6 4.6-.6"
+        stroke="#2f7bff"
+        strokeWidth="2.4"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+function CenterGlyph() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path d="M12 3v4M12 17v4M3 12h4M17 12h4" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
+      <rect x="9" y="9" width="6" height="6" rx="1" stroke="currentColor" strokeWidth="1.7" />
+    </svg>
+  );
+}
+
+function OrderUpGlyph() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path d="M12 19V6m0 0-5 5m5-5 5 5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+function OrderDownGlyph() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path d="M12 5v13m0 0-5-5m5 5 5-5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+function FlipHGlyph() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path d="M12 3v18" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
+      <path d="M9 6 4 12l5 6V6ZM15 6l5 6-5 6V6Z" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+function FlipVGlyph() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path d="M3 12h18" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
+      <path d="M6 9 12 4l6 5H6ZM6 15l6 5 6-5H6Z" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+function DupGlyph() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <rect x="8" y="8" width="12" height="12" rx="2" stroke="currentColor" strokeWidth="1.7" />
+      <path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2" stroke="currentColor" strokeWidth="1.7" />
+    </svg>
+  );
+}
+
+function TrashGlyph() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path
+        d="M4 6h16M9 6V4h6v2M6 6l1 14h10l1-14"
+        stroke="currentColor"
+        strokeWidth="1.7"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
     </svg>
   );
 }

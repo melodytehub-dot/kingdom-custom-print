@@ -55,8 +55,8 @@ export interface TeeArea {
 }
 
 export const TEE_PRINT_AREA: Record<GarmentSide, TeeArea> = {
-  front: { w: 0.32, h: 0.42, cx: 0.5, cy: 0.4 },
-  back: { w: 0.36, h: 0.46, cx: 0.5, cy: 0.4 },
+  front: { w: 0.44, h: 0.54, cx: 0.5, cy: 0.47 },
+  back: { w: 0.48, h: 0.6, cx: 0.5, cy: 0.45 },
 };
 
 export function teeArea(side: GarmentSide): TeeArea {
