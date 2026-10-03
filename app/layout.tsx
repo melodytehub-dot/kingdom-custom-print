@@ -8,6 +8,11 @@ import {
   Playfair_Display,
   Pacifico,
   Lobster,
+  Montserrat,
+  Raleway,
+  Roboto_Condensed,
+  Merriweather,
+  Permanent_Marker,
 } from "next/font/google";
 import "./globals.css";
 import "./site.css";
@@ -77,6 +82,37 @@ const lobster = Lobster({
   variable: "--font-lobster",
 });
 
+const montserrat = Montserrat({
+  subsets: ["latin"],
+  display: "swap",
+  variable: "--font-montserrat",
+});
+
+const raleway = Raleway({
+  subsets: ["latin"],
+  display: "swap",
+  variable: "--font-raleway",
+});
+
+const robotoCondensed = Roboto_Condensed({
+  subsets: ["latin"],
+  display: "swap",
+  variable: "--font-roboto-condensed",
+});
+
+const merriweather = Merriweather({
+  subsets: ["latin"],
+  display: "swap",
+  variable: "--font-merriweather",
+});
+
+const permanentMarker = Permanent_Marker({
+  subsets: ["latin"],
+  weight: "400",
+  display: "swap",
+  variable: "--font-permanent-marker",
+});
+
 const FONT_VARS = [
   inter.variable,
   anton.variable,
@@ -86,6 +122,11 @@ const FONT_VARS = [
   playfair.variable,
   pacifico.variable,
   lobster.variable,
+  montserrat.variable,
+  raleway.variable,
+  robotoCondensed.variable,
+  merriweather.variable,
+  permanentMarker.variable,
 ].join(" ");
 
 const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";

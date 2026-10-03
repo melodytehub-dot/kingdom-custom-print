@@ -2037,3 +2037,205 @@
 .rot-colorline > span strong {
   flex-basis: 100%;
 }
+
+/* Compact studio scale: keep the designer dense like the rest of the site. */
+.rot {
+  --rot-bar-h: 60px;
+}
+
+.rot-logo {
+  padding-inline: 10px;
+}
+
+.rot-logo img {
+  height: 38px;
+}
+
+.rot-barbtn,
+.rot-next {
+  min-width: 54px;
+  padding-inline: 8px;
+  font-size: 10px;
+}
+
+.rot-next {
+  min-width: 72px;
+}
+
+.rot-cartbadge {
+  top: 8px;
+  right: 4px;
+  min-width: 16px;
+  height: 16px;
+  font-size: 9px;
+  line-height: 16px;
+}
+
+.rot-steps {
+  height: 40px;
+}
+
+.rot-step {
+  gap: 5px;
+  font-size: clamp(8px, 1vw, 10px);
+  letter-spacing: 0.06em;
+}
+
+.rot-step-n {
+  width: 20px;
+  height: 20px;
+  font-size: 11px;
+}
+
+.rot-rail {
+  min-height: 58px;
+}
+
+.rot-tool {
+  min-height: 58px;
+  padding: 4px 3px;
+  gap: 1px;
+}
+
+.rot-tool-icon {
+  height: 28px;
+  transform: scale(0.7);
+}
+
+.rot-tool-label {
+  font-size: 9px;
+  letter-spacing: 0.03em;
+}
+
+.rot-scroll,
+.rot-editor-scroll {
+  padding: 10px 16px 22px;
+}
+
+.rot-eyebrow {
+  font-size: 11px;
+}
+
+.rot-ptitle {
+  font-size: 16px;
+}
+
+.rot-phint {
+  margin-top: 5px;
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.rot-iconbtn {
+  width: 32px;
+  height: 32px;
+}
+
+.rot-sub {
+  margin: 16px 0 8px;
+  font-size: 14px;
+}
+
+.rot-muted,
+.rot-product-color {
+  font-size: 10px;
+}
+
+.rot-product-name {
+  font-size: 15px;
+}
+
+.rot-product img {
+  width: 76px;
+  height: 76px;
+}
+
+.rot-swatchgrid {
+  gap: 6px;
+}
+
+.rot-garment {
+  width: 36px;
+  height: 36px;
+}
+
+.rot-garment span:first-child {
+  width: 28px;
+  height: 28px;
+}
+
+.rot-row {
+  min-height: 42px;
+  gap: 8px;
+  padding: 4px 0;
+  font-size: 13px;
+}
+
+.rot-row-value {
+  gap: 8px;
+  font-size: 11px;
+}
+
+.rot-fontname {
+  font-size: 20px;
+}
+
+.rot-swatch {
+  width: 28px;
+  height: 28px;
+}
+
+.rot-swatches {
+  gap: 5px;
+}
+
+.rot-input,
+.rot-input-num,
+.rot-input-sub {
+  min-height: 34px;
+  font-size: 13px;
+}
+
+.rot-cta {
+  min-height: 42px;
+  margin-top: 10px;
+  padding-inline: 14px;
+  font-size: 12px;
+}
+
+.rot-textlink {
+  margin: 10px 0 6px;
+  font-size: 13px;
+}
+
+.rot-callout {
+  margin-top: 10px;
+  padding: 9px 11px;
+  font-size: 12px;
+}
+
+.rot-ai-panel {
+  gap: 10px;
+  padding-top: 4px;
+}
+
+.rot-ai-panel label {
+  font-size: 12px;
+}
+
+.rot-ai-panel textarea {
+  min-height: 88px;
+  padding: 10px;
+  font-size: 13px;
+}
+
+.rot-ai-examples {
+  font-size: 11px;
+}
+
+@media (min-width: 901px) {
+  .rot-panel {
+    flex-basis: 360px;
+    width: 360px;
+  }
+}
