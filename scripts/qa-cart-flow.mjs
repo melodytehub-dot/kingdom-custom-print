@@ -150,6 +150,12 @@ if (await email.count()) {
     const orderText = await page.locator("main, body").first().innerText();
     check("order detail renders after checkout", orderText.includes(ref) && orderText.toLowerCase().includes(PRODUCT_NAME));
 
+    await page.goto(`${BASE}/order/success?ref=${ref}`, { waitUntil: "networkidle" });
+    const successText = await page.locator("main, body").first().innerText();
+    const successCopyIsExplicit =
+      /payment instructions|payment is confirmed/i.test(successText);
+    check("order success explains the payment state", successCopyIsExplicit, successText.replace(/\s+/g, " ").slice(0, 240));
+
     await page.goto(`${BASE}/track`, { waitUntil: "networkidle" });
     await page.locator("#track-ref").fill(ref);
     await page.getByRole("button", { name: /track order/i }).click();

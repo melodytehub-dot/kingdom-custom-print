@@ -15,18 +15,28 @@ export default async function SuccessPage({
 }) {
   const { ref } = await searchParams;
   const order = ref ? await getOrderByReference(decodeURIComponent(ref)) : null;
+  const paymentConfirmed =
+    !!order &&
+    order.status !== "pending" &&
+    order.status !== "cancelled";
 
   return (
     <div className="wrap section">
       <div className="panel panel-pad order-done">
-        <p className="eyebrow">Payment received</p>
-        <h1 className="h2">Thank you — your order is in</h1>
+        <p className="eyebrow">
+          {paymentConfirmed ? "Payment received" : "Order received"}
+        </p>
+        <h1 className="h2">
+          {paymentConfirmed ? "Thank you — your order is in" : "Your order is in the queue"}
+        </h1>
 
         {order ? (
           <>
             <p className="lede">
-              Reference <strong className="tnum">{order.reference}</strong>. Payment is
-              confirmed and your order details are below.
+              Reference <strong className="tnum">{order.reference}</strong>.{" "}
+              {paymentConfirmed
+                ? "Payment is confirmed and your order details are below."
+                : "We saved your order and will contact you with payment instructions before production."}
             </p>
             <ul className="done-list">
               {order.items.map((i, idx) => (
@@ -52,8 +62,8 @@ export default async function SuccessPage({
         ) : (
           <>
             <p className="lede">
-              Your payment went through. We could not load the order details just now —
-              contact us with the reference from your confirmation.
+              We could not load the order details just now — contact us with the
+              reference from your confirmation.
             </p>
             <Link href="/shop" className="btn">
               Keep shopping
