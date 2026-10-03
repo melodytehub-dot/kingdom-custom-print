@@ -88,9 +88,18 @@ for (const [slug, family, expectedColors] of products) {
     await productsButton.evaluate((button) => button.click());
     await page.locator(".rot-garment").first().waitFor({ state: "attached", timeout: 5000 });
     const colors = await page.locator(".rot-garment").count();
+    const panelPreview = page.locator(".rot-product img").first();
+    const renderedColors = new Set();
+    for (let colorIndex = 0; colorIndex < colors; colorIndex += 1) {
+      await page.locator(".rot-garment").nth(colorIndex).evaluate((button) => button.click());
+      await panelPreview.waitFor({ state: "visible", timeout: 5000 });
+      const src = await panelPreview.getAttribute("src");
+      if (src) renderedColors.add(src);
+    }
     const familyOk = family ? href?.includes(`/families/${family}/`) : href?.includes("/img/mockups/garment/");
-    const ok = Boolean(familyOk) && colors === expectedColors && overflow <= 1;
-    console.log(`${ok ? "PASS" : "FAIL"} ${slug} href=${href} colors=${colors}/${expectedColors} overflow=${overflow}px`);
+    const colorsOk = renderedColors.size === colors;
+    const ok = Boolean(familyOk) && colors === expectedColors && colorsOk && overflow <= 1;
+    console.log(`${ok ? "PASS" : "FAIL"} ${slug} href=${href} colors=${colors}/${expectedColors} renders=${renderedColors.size}/${colors} overflow=${overflow}px`);
     if (!ok) failures += 1;
   } catch (error) {
     failures += 1;

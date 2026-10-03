@@ -703,7 +703,9 @@ export default function Customizer({
     applyingHistory.current = true;
     setDesign(normalizeDesign(found.design));
     setSelectedId(null);
-    const m = mockupForColor(found.colorName, found.colorHex);
+    const m =
+      productMockups.find((candidate) => candidate.slug === found.colorSlug) ??
+      mockupForColor(found.colorName, found.colorHex);
     if (m) setColorCode(m.code);
     setPanel("none");
     setNotice({ tone: "ok", text: `Loaded your saved ${found.productName} design.` });

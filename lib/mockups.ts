@@ -74,6 +74,42 @@ export const TEE_MOCKUPS: TeeMockup[] = [
 
 const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, "");
 
+function rgbDistance(a: string, b: string): number {
+  const left = a.replace("#", "").match(/../g)?.map((part) => Number.parseInt(part, 16));
+  const right = b.replace("#", "").match(/../g)?.map((part) => Number.parseInt(part, 16));
+  if (!left || !right || left.length !== 3 || right.length !== 3) {
+    return Number.POSITIVE_INFINITY;
+  }
+  return left.reduce((sum, channel, index) => sum + (channel - right[index]) ** 2, 0);
+}
+
+/**
+ * Picks the closest fabric render while keeping a product's swatches visually
+ * distinct. Several blanks use vendor colour names that are not in the shared
+ * mockup library; a plain nearest-colour lookup can otherwise map two swatches
+ * to the same image.
+ */
+function bestMockupForProductColor(
+  color: { slug: string; name: string; hex: string },
+  usedCodes: Set<string>
+): TeeMockup {
+  const colorName = norm(color.name);
+  const colorSlug = norm(color.slug);
+  const sorted = TEE_MOCKUPS.map((candidate) => {
+    let score = rgbDistance(color.hex, candidate.hex);
+    if (norm(candidate.name) === colorName) score -= 1_000_000;
+    if (norm(candidate.slug) === colorSlug) score -= 900_000;
+    if (candidate.hex.toLowerCase() === color.hex.toLowerCase()) score -= 950_000;
+    return { candidate, score };
+  }).sort((a, b) => a.score - b.score);
+
+  return (
+    sorted.find(({ candidate }) => !usedCodes.has(candidate.code))?.candidate ??
+    sorted[0]?.candidate ??
+    TEE_MOCKUPS[0]
+  );
+}
+
 /** Finds the mockup that best matches a product colour by name, then by hex. */
 export function mockupForColor(name: string, hex: string): TeeMockup | undefined {
   const n = norm(name);
@@ -128,8 +164,10 @@ export function mockupsForProduct(product: ProductLike): TeeMockup[] {
                       : product.kind === "longsleeve"
                         ? "longsleeve"
                         : null;
+  const usedCodes = new Set<string>();
   return product.colors.map((color) => {
-    const base = mockupForColor(color.name, color.hex) ?? TEE_MOCKUPS[0];
+    const base = bestMockupForProductColor(color, usedCodes);
+    usedCodes.add(base.code);
     const productColor = {
       ...base,
       slug: color.slug,
