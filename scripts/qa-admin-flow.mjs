@@ -20,21 +20,28 @@ page.on("console", (m) => m.type() === "error" && !m.text().includes("favicon") 
 await page.goto(`${BASE}/admin`, { waitUntil: "networkidle" });
 check("login screen shown", await page.locator('input[type="password"]').count() > 0);
 
-await page.locator('input[type="password"]').fill("wrong-password-value");
-await page.getByRole("button", { name: /sign in/i }).first().click();
-await page.waitForTimeout(1500);
-const rejection = await page
-  .locator(".error-text, [role=alert]")
-  .first()
-  .innerText()
-  .catch(() => "");
-check(
-  "wrong password is rejected with a visible message",
-  /not correct|incorrect|invalid|not set up|too many/i.test(rejection),
-  rejection.trim()
-);
+if (!PASSWORD) {
+  check(
+    "unconfigured admin access is clearly disabled",
+    await page.locator('input[type="password"]').isDisabled() &&
+      await page.getByRole("button", { name: /sign in/i }).first().isDisabled()
+  );
+  console.log("  SKIP  sign-in checks (QA_ADMIN_PASSWORD not set)");
+} else {
+  await page.locator('input[type="password"]').fill("wrong-password-value");
+  await page.getByRole("button", { name: /sign in/i }).first().click();
+  await page.waitForTimeout(1500);
+  const rejection = await page
+    .locator(".error-text, [role=alert]")
+    .first()
+    .innerText()
+    .catch(() => "");
+  check(
+    "wrong password is rejected with a visible message",
+    /not correct|incorrect|invalid|not set up|too many/i.test(rejection),
+    rejection.trim()
+  );
 
-if (PASSWORD) {
   await page.locator('input[type="password"]').fill(PASSWORD);
   await page.getByRole("button", { name: /sign in/i }).first().click();
   await page.waitForTimeout(4000);
@@ -42,8 +49,6 @@ if (PASSWORD) {
   check("dashboard loads after sign-in", /orders|revenue|products|settings/i.test(dash));
   check("order table visible", /KCP-|order/i.test(dash));
   check("products panel reachable", /product/i.test(dash));
-} else {
-  console.log("  SKIP  sign-in checks (QA_ADMIN_PASSWORD not set)");
 }
 
 // The rejected-attempt 401 is logged by the browser as a failed request; that
