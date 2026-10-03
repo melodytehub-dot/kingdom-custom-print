@@ -10,11 +10,7 @@ export const metadata = {
     "Blank t-shirts printed to order. Filter by fit, then design yours online with text, artwork and names & numbers.",
 };
 
-const KINDS = [
-  { value: "", label: "All" },
-  { value: "tee", label: "T-Shirts" },
-  { value: "longsleeve", label: "Long Sleeve" },
-];
+const KIND_FILTERS = [{ value: "longsleeve", label: "Long Sleeve" }];
 
 export default async function ShopPage({
   searchParams,
@@ -79,17 +75,37 @@ export default async function ShopPage({
       </div>
 
       <div className="wrap shop-bar">
-        <div className="filter-chips" role="group" aria-label="Filter by product type">
-          {KINDS.map((k) => {
-            const active = activeKind === k.value;
+        <div className="filter-chips" role="group" aria-label="Filter by category or product type">
+          <Link
+            href={buildHref({ category: "", kind: "" })}
+            className={`chip${!activeCategory && !activeKind ? " is-active" : ""}`}
+            aria-current={!activeCategory && !activeKind ? "true" : undefined}
+          >
+            All
+          </Link>
+          {categories.map((category) => {
+            const active = activeCategory === category.slug && !activeKind;
             return (
               <Link
-                key={k.value || "all"}
-                href={buildHref({ kind: k.value })}
+                key={category.slug}
+                href={buildHref({ category: category.slug, kind: "" })}
                 className={`chip${active ? " is-active" : ""}`}
                 aria-current={active ? "true" : undefined}
               >
-                {k.label}
+                {category.name}
+              </Link>
+            );
+          })}
+          {KIND_FILTERS.map((kind) => {
+            const active = activeKind === kind.value && !activeCategory;
+            return (
+              <Link
+                key={kind.value}
+                href={buildHref({ category: "", kind: kind.value })}
+                className={`chip${active ? " is-active" : ""}`}
+                aria-current={active ? "true" : undefined}
+              >
+                {kind.label}
               </Link>
             );
           })}
