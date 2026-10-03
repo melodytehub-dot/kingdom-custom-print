@@ -73,7 +73,7 @@ const GROUPS: { title: string; items: { q: string; a: string }[] }[] = [
     items: [
       {
         q: "How long does production take?",
-        a: "PRODUCTION_PLACEHOLDER from artwork approval. See the shipping page for rates.",
+        a: "PRODUCTION_PLACEHOLDER. See the shipping page for rates.",
       },
       {
         q: "Can I get a rush order?",
