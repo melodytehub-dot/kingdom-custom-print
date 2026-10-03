@@ -359,9 +359,10 @@ export function ColorView({
 }) {
   const custom = value && /^#[0-9a-f]{6}$/i.test(value) ? value : "#141414";
   return (
-    <>
-      <PanelHeader eyebrow="Text Editor" title={title} onBack={onBack} />
-      <div className="rot-colorgrid">
+    <div className="rot-editor">
+      <div className="rot-editor-scroll">
+        <PanelHeader eyebrow="Text Editor" title={title} onBack={onBack} />
+        <div className="rot-colorgrid">
         {allowNone ? (
           <button
             type="button"
@@ -399,8 +400,9 @@ export function ColorView({
           </span>
           <span>Custom</span>
         </label>
+        </div>
       </div>
-    </>
+    </div>
   );
 }
 
@@ -417,24 +419,26 @@ export function FontView({
 }) {
   const list = fontsForScript(script);
   return (
-    <>
-      <PanelHeader eyebrow="Text Editor" title="Choose a Font" onBack={onBack} />
-      <ul className="rot-fontlist">
-        {list.map((f) => (
-          <li key={f.value}>
-            <button
-              type="button"
-              className={`rot-fontitem${f.value === value ? " is-active" : ""}`}
-              style={{ fontFamily: svgFontStack(f.value) }}
-              onClick={() => onPick(f.value)}
-              aria-pressed={f.value === value}
-            >
-              {f.label}
-            </button>
-          </li>
-        ))}
-      </ul>
-    </>
+    <div className="rot-editor">
+      <div className="rot-editor-scroll">
+        <PanelHeader eyebrow="Text Editor" title="Choose a Font" onBack={onBack} />
+        <ul className="rot-fontlist">
+          {list.map((f) => (
+            <li key={f.value}>
+              <button
+                type="button"
+                className={`rot-fontitem${f.value === value ? " is-active" : ""}`}
+                style={{ fontFamily: svgFontStack(f.value) }}
+                onClick={() => onPick(f.value)}
+                aria-pressed={f.value === value}
+              >
+                {f.label}
+              </button>
+            </li>
+          ))}
+        </ul>
+      </div>
+    </div>
   );
 }
 

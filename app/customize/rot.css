@@ -272,6 +272,8 @@
   display: flex;
   flex-direction: column;
   min-height: 0;
+  min-width: 0;
+  overflow: hidden;
   background: var(--bone);
 }
 
@@ -563,7 +565,9 @@
 .rot-editor-scroll {
   flex: 1;
   min-height: 0;
+  min-width: 0;
   overflow-y: auto;
+  overflow-x: hidden;
   overscroll-behavior: contain;
   padding: 10px 22px 12px;
 }
@@ -1255,9 +1259,14 @@
 .rot-fontitem {
   display: block;
   width: 100%;
-  padding: 14px 4px;
+  min-width: 0;
+  padding: 10px 4px;
   border-bottom: 1px solid var(--rot-line);
-  font-size: 28px;
+  font-size: 21px;
+  line-height: 1.15;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   text-align: left;
   color: #2c2c31;
 }
@@ -2041,6 +2050,13 @@
 /* Compact studio scale: keep the designer dense like the rest of the site. */
 .rot {
   --rot-bar-h: 60px;
+  box-sizing: border-box;
+}
+
+.rot *,
+.rot *::before,
+.rot *::after {
+  box-sizing: border-box;
 }
 
 .rot-logo {
@@ -2109,6 +2125,8 @@
 
 .rot-scroll,
 .rot-editor-scroll {
+  width: 100%;
+  max-width: 100%;
   padding: 10px 16px 22px;
 }
 
@@ -2118,12 +2136,14 @@
 
 .rot-ptitle {
   font-size: 16px;
+  overflow-wrap: anywhere;
 }
 
 .rot-phint {
   margin-top: 5px;
   font-size: 11px;
   line-height: 1.4;
+  overflow-wrap: anywhere;
 }
 
 .rot-iconbtn {
@@ -2192,8 +2212,15 @@
 .rot-input,
 .rot-input-num,
 .rot-input-sub {
+  max-width: 100%;
   min-height: 34px;
   font-size: 13px;
+}
+
+.rot-textarea,
+.rot-ai-panel textarea {
+  max-width: 100%;
+  box-sizing: border-box;
 }
 
 .rot-cta {
