@@ -32,7 +32,9 @@ for (const [slug, family, expectedColors] of products) {
   const page = await context.newPage();
   try {
     await page.goto(`${BASE}/customize/${slug}?qa=garment-family`, {
-      waitUntil: "networkidle",
+      // Next dev keeps a hot-reload connection open, so networkidle can leave
+      // this otherwise deterministic route check waiting indefinitely.
+      waitUntil: "domcontentloaded",
       timeout: 30000,
     });
     const photo = page.locator("image.rot-shirt-photo").first();

@@ -11,7 +11,11 @@
     "db:migrate": "node --env-file=.env.local scripts/migrate.mjs",
     "db:seed": "node --env-file=.env.local scripts/seed.mjs",
     "db:reset": "node --env-file=.env.local scripts/migrate.mjs --force && node --env-file=.env.local scripts/seed.mjs",
-    "qa-garment-families": "node scripts/qa-garment-families.mjs"
+    "qa-audit": "node scripts/qa-audit.mjs",
+    "qa-cart-flow": "node scripts/qa-cart-flow.mjs",
+    "qa-admin-flow": "node scripts/qa-admin-flow.mjs",
+    "qa-garment-families": "node scripts/qa-garment-families.mjs",
+    "qa-site": "npm run qa-audit && npm run qa-garment-families && npm run qa-cart-flow"
   },
   "dependencies": {
     "next": "16.3.8",
