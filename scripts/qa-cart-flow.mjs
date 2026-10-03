@@ -145,6 +145,17 @@ if (await email.count()) {
   const ref = (resultText.match(/KCP-[A-Z0-9]{6}/) ?? [])[0];
   check("checkout produces an order reference", !!ref, ref ?? resultText.slice(0, 120));
   check("no client-side errors during checkout", errors.length === 0, errors[0] ?? "");
+  if (ref) {
+    await page.goto(`${BASE}/order/${ref}`, { waitUntil: "networkidle" });
+    const orderText = await page.locator("main, body").first().innerText();
+    check("order detail renders after checkout", orderText.includes(ref) && orderText.toLowerCase().includes(PRODUCT_NAME));
+
+    await page.goto(`${BASE}/track`, { waitUntil: "networkidle" });
+    await page.locator("#track-ref").fill(ref);
+    await page.getByRole("button", { name: /track order/i }).click();
+    await page.waitForURL(new RegExp(`/order/${ref}$`), { timeout: 15000 });
+    check("track order resolves the reference", page.url().endsWith(`/order/${ref}`));
+  }
   console.log(`    order reference for cleanup: ${ref ?? "none"}`);
 }
 
