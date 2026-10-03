@@ -316,13 +316,13 @@ export default function Customizer({
   useEffect(() => {
     if (step !== "review") return;
     let live = true;
-    drawPreview(mockup.front, mockup.back, stripForCart(design))
+    drawPreview(mockup.front, mockup.back, stripForCart(design), product.printArea)
       .then((p) => live && setPreviews(p))
       .catch(() => live && setPreviews({ front: null, back: null }));
     return () => {
       live = false;
     };
-  }, [step, mockup, design]);
+  }, [step, mockup, design, product.printArea]);
 
   const patch = useCallback(
     (targetSide: GarmentSide, id: string, changes: Partial<DesignLayer>) => {
@@ -747,7 +747,7 @@ export default function Customizer({
     setBusy(true);
     try {
       const cartDesign = stripForCart(design);
-      const rendered = await drawPreview(mockup.front, mockup.back, cartDesign);
+      const rendered = await drawPreview(mockup.front, mockup.back, cartDesign, product.printArea);
       addItem({
         productId: product.id,
         productSlug: product.slug,
@@ -815,7 +815,7 @@ export default function Customizer({
     if (silhouetteH > h * 0.96) ty = -top + h * 0.02;
     const selY = selected?.y ?? null;
     if (split && selectedId && compact && selY !== null) {
-      const pa = printAreaView(side);
+      const pa = printAreaView(side, product.printArea);
       const focusY = ((pa.y + (selY / 100) * pa.h) / VIEW) * size;
       const wanted = h * 0.6 - focusY;
       const maxTy = -top + h * 0.06;
@@ -823,7 +823,7 @@ export default function Customizer({
       ty = minTy < maxTy ? clamp(wanted, minTy, maxTy) : ty;
     }
     return { size, left: (w - size) / 2, ty };
-  }, [stageBox, compact, split, selectedId, selected?.y, side, zoom]);
+  }, [stageBox, compact, split, selectedId, selected?.y, side, zoom, product.printArea]);
 
   /* ---- what the rail highlights ---- */
   const railActive =
@@ -1204,6 +1204,7 @@ export default function Customizer({
                   frontSrc={mockup.front}
                   backSrc={mockup.back}
                   side={side}
+                  printArea={product.printArea}
                   design={design}
                   selectedId={selectedId}
                   onSelect={handleSelect}

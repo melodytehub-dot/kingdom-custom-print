@@ -1,5 +1,5 @@
-import type { Design, DesignLayer, GarmentSide } from "@/lib/types";
-import { layerBox, teeArea } from "@/lib/design";
+import type { Design, DesignLayer, GarmentSide, PrintArea } from "@/lib/types";
+import { areaFor, layerBox, teeArea } from "@/lib/design";
 import { displayText, drawArcLine, fontShorthand, measureTextLayer } from "./textGeometry";
 
 /**
@@ -95,7 +95,8 @@ function drawText(ctx: CanvasRenderingContext2D, layer: Extract<DesignLayer, { t
 async function renderSide(
   side: GarmentSide,
   photo: string,
-  layers: DesignLayer[]
+  layers: DesignLayer[],
+  printArea?: PrintArea
 ): Promise<string | null> {
   if (!layers.length) return null;
 
@@ -114,7 +115,10 @@ async function renderSide(
     ctx.fillRect(0, 0, SIZE, SIZE);
   }
 
-  const frac = teeArea(side);
+  const configured = printArea ? areaFor(printArea, side) : null;
+  const frac = configured
+    ? { w: configured.w, h: configured.h, cx: 0.5, cy: side === "front" ? 0.47 : 0.45 }
+    : teeArea(side);
   const aw = SIZE * frac.w;
   const ah = SIZE * frac.h;
   const ax = SIZE * frac.cx - aw / 2;
@@ -174,11 +178,12 @@ async function renderSide(
 export async function drawPreview(
   frontSrc: string,
   backSrc: string,
-  design: Design
+  design: Design,
+  printArea?: PrintArea
 ): Promise<{ front: string | null; back: string | null }> {
   const [front, back] = await Promise.all([
-    renderSide("front", frontSrc, design.front),
-    renderSide("back", backSrc, design.back),
+    renderSide("front", frontSrc, design.front, printArea),
+    renderSide("back", backSrc, design.back, printArea),
   ]);
   return { front, back };
 }

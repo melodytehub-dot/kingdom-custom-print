@@ -15,9 +15,10 @@ import type {
   DesignLayer,
   GarmentSide,
   ImageLayer,
+  PrintArea,
   TextLayer,
 } from "@/lib/types";
-import { layerBox, teeArea } from "@/lib/design";
+import { areaFor, layerBox, teeArea } from "@/lib/design";
 import { svgFontStack } from "@/lib/fonts";
 import { arcPath, measureTextLayer } from "./textGeometry";
 
@@ -28,6 +29,7 @@ interface CanvasProps {
   frontSrc: string;
   backSrc: string;
   side: GarmentSide;
+  printArea?: PrintArea;
   design: Design;
   selectedId: string | null;
   onSelect: (id: string | null) => void;
@@ -71,8 +73,16 @@ const effBox = (base: Box, layer: DesignLayer): Box => ({
 });
 
 /** Geometry of the printable area in view units, shared with the stage. */
-export function printAreaView(side: GarmentSide) {
-  const frac = teeArea(side);
+export function printAreaView(side: GarmentSide, printArea?: PrintArea) {
+  const configured = printArea ? areaFor(printArea, side) : null;
+  const frac = configured
+    ? {
+        w: configured.w,
+        h: configured.h,
+        cx: 0.5,
+        cy: side === "front" ? 0.47 : 0.45,
+      }
+    : teeArea(side);
   const w = VIEW * frac.w;
   const h = VIEW * frac.h;
   return { w, h, x: VIEW * frac.cx - w / 2, y: VIEW * frac.cy - h / 2 };
@@ -84,6 +94,7 @@ export default function DesignCanvas({
   frontSrc,
   backSrc,
   side,
+  printArea,
   design,
   selectedId,
   onSelect,
@@ -98,7 +109,7 @@ export default function DesignCanvas({
   const [dragging, setDragging] = useState<Tool | null>(null);
   const uid = useId().replace(/:/g, "");
 
-  const pa = useMemo(() => printAreaView(side), [side]);
+  const pa = useMemo(() => printAreaView(side, printArea), [side, printArea]);
   const area = useMemo(() => ({ w: pa.w, h: pa.h }), [pa.w, pa.h]);
   const areaOrigin = useMemo(() => ({ x: pa.x, y: pa.y }), [pa.x, pa.y]);
 
