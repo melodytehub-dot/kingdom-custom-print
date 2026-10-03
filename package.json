@@ -10,7 +10,8 @@
     "typecheck": "tsc --noEmit",
     "db:migrate": "node --env-file=.env.local scripts/migrate.mjs",
     "db:seed": "node --env-file=.env.local scripts/seed.mjs",
-    "db:reset": "node --env-file=.env.local scripts/migrate.mjs --force && node --env-file=.env.local scripts/seed.mjs"
+    "db:reset": "node --env-file=.env.local scripts/migrate.mjs --force && node --env-file=.env.local scripts/seed.mjs",
+    "qa-garment-families": "node scripts/qa-garment-families.mjs"
   },
   "dependencies": {
     "next": "16.3.8",
