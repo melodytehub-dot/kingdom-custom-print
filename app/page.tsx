@@ -202,7 +202,7 @@ export default async function HomePage() {
                         alt={`${c.name} category`}
                         fill
                         sizes="(max-width: 640px) 50vw, 25vw"
-                        className={`cat-img${CATEGORY_IMAGE[c.slug] ? " cat-img-product" : ""}`}
+                        className={`cat-img${c.slug !== "t-shirts" && CATEGORY_IMAGE[c.slug] ? " cat-img-product" : ""}`}
                       />
                     </span>
                     <span className="cat-foot">
