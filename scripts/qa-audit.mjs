@@ -25,8 +25,11 @@ const ROUTES = [
   { path: "/shipping", name: "shipping" },
   { path: "/faq", name: "faq" },
   { path: "/privacy", name: "privacy" },
+  { path: "/terms", name: "terms" },
+  { path: "/track", name: "track" },
   { path: "/cart", name: "cart-empty" },
   { path: "/checkout", name: "checkout" },
+  { path: "/order/success", name: "order-success" },
   { path: "/admin", name: "admin-login" },
   { path: "/nonexistent", name: "not-found" },
 ];
