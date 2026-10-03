@@ -2,6 +2,7 @@
 
 import { useCallback, useMemo, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import Garment from "@/components/Garment";
 import ArrowRight from "@/components/icons/ArrowRight";
 import { formatUSD } from "@/lib/pricing";
@@ -54,7 +55,13 @@ export default function AdminDashboard({
   orderDetail: AdminOrderDetail | null;
 }) {
   const [tab, setTab] = useState<Tab>(initialTab);
+  const router = useRouter();
   const [signedOut, setSignedOut] = useState(false);
+
+  function selectTab(next: Tab) {
+    setTab(next);
+    router.replace(`/admin?tab=${next}`, { scroll: false });
+  }
 
   async function signOut() {
     await fetch("/api/admin/logout", { method: "POST" });
@@ -76,7 +83,7 @@ export default function AdminDashboard({
               type="button"
               className={`admin-tab${tab === t.id ? " is-active" : ""}`}
               aria-current={tab === t.id ? "page" : undefined}
-              onClick={() => setTab(t.id)}
+              onClick={() => selectTab(t.id)}
             >
               {t.label}
             </button>
@@ -100,7 +107,7 @@ export default function AdminDashboard({
         </p>
       ) : null}
 
-      {tab === "overview" ? <Overview data={data} onOpenOrder={() => setTab("orders")} /> : null}
+      {tab === "overview" ? <Overview data={data} onOpenOrder={() => selectTab("orders")} /> : null}
       {tab === "orders" ? (
         <Orders data={data} detail={orderDetail} />
       ) : null}
