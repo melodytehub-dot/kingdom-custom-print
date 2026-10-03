@@ -58,7 +58,7 @@ const STEP_ORDER: Step[] = ["design", "quantity", "review"];
 
 const STEP_LABEL: Record<Step, string> = {
   design: "Design",
-  quantity: "Quantity & sizes",
+  quantity: "Quantity",
   review: "Review",
 };
 
@@ -105,6 +105,7 @@ export default function Customizer({
   const [design, setDesign] = useState<Design>(emptyDesign);
   const [lines, setLines] = useState<Record<string, number>>(initialLines);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [panelOpen, setPanelOpen] = useState(false);
   const [drafts, setDrafts] = useState<SavedDraft[]>([]);
   const [notice, setNotice] = useState<{ tone: "ok" | "warn" | "error"; text: string } | null>(null);
   const [busy, setBusy] = useState(false);
@@ -201,6 +202,21 @@ export default function Customizer({
     return () => clearTimeout(t);
   }, [notice]);
 
+  /* ---- lock the page behind the full-screen studio on mobile ---- */
+  useEffect(() => {
+    const mq = window.matchMedia("(max-width: 900px)");
+    const apply = () => {
+      if (mq.matches) document.body.dataset.lock = "true";
+      else delete document.body.dataset.lock;
+    };
+    apply();
+    mq.addEventListener("change", apply);
+    return () => {
+      mq.removeEventListener("change", apply);
+      delete document.body.dataset.lock;
+    };
+  }, []);
+
   const patch = useCallback(
     (targetSide: GarmentSide, id: string, changes: Partial<DesignLayer>) => {
       setDesign((prev) => updateLayer(prev, targetSide, id, changes));
@@ -215,11 +231,27 @@ export default function Customizer({
     [side]
   );
 
+  const openTool = (next: Tool) => {
+    setPanelOpen((open) => !(tool === next && open));
+    setTool(next);
+  };
+
+  const handleSelect = (id: string | null) => {
+    setSelectedId(id);
+    if (id) setPanelOpen(true);
+  };
+
   const addText = () => {
     const layer = newTextLayer();
     setDesign((prev) => ({ ...prev, [side]: [...prev[side], layer] }));
     setSelectedId(layer.id);
     setNotice({ tone: "ok", text: "Text added. Edit it in the panel." });
+  };
+
+  const addTextAndOpen = () => {
+    addText();
+    setTool("text");
+    setPanelOpen(true);
   };
 
   const addArt = (item: ArtItem) => {
@@ -455,10 +487,12 @@ export default function Customizer({
       setNotice({ tone: "warn", text: "Set a quantity before reviewing." });
     }
     if (stepIndex < STEP_ORDER.length - 1) setStep(STEP_ORDER[stepIndex + 1]);
+    setPanelOpen(true);
   }
 
   function goBack() {
     if (stepIndex > 0) setStep(STEP_ORDER[stepIndex - 1]);
+    setPanelOpen(true);
   }
 
   /** Inspector shared by the Text and Layers tools. */
@@ -517,8 +551,68 @@ export default function Customizer({
 
   return (
     <div className="studio">
+      {/* Mobile app bar (ROT-style): brand, price, save, cart, primary action */}
+      <div className="studio-appbar">
+        <Link href="/" className="studio-appbar-brand" aria-label="Kingdom Custom Print — home">
+          <Image
+            src="/brand/kingdom-logo.png"
+            alt="Kingdom Custom Print"
+            width={1400}
+            height={843}
+            loading="eager"
+          />
+        </Link>
+
+        <div className="studio-appbar-actions">
+          <span className="studio-appbar-price tnum">
+            {formatUSD(quote.unitBase)}
+            <small> ea</small>
+          </span>
+          <button
+            type="button"
+            className="studio-appbar-btn"
+            onClick={saveDraft}
+            aria-label="Save design"
+          >
+            <SaveGlyph />
+            <span className="studio-appbar-btn-label">Save</span>
+          </button>
+          <Link
+            href="/cart"
+            className="studio-appbar-btn"
+            aria-label={`Cart, ${cartCount} item${cartCount === 1 ? "" : "s"}`}
+          >
+            <CartIcon />
+            {cartCount > 0 ? <span className="studio-top-badge tnum">{cartCount}</span> : null}
+          </Link>
+          {step === "review" ? (
+            <button
+              type="button"
+              className="studio-appbar-primary"
+              onClick={handleAddToCart}
+              disabled={busy}
+            >
+              {busy ? "Adding…" : addedCount > 0 ? "Add another" : "Add to cart"}
+            </button>
+          ) : (
+            <button type="button" className="studio-appbar-primary" onClick={goNext}>
+              Next
+            </button>
+          )}
+        </div>
+      </div>
+
       {/* Top bar: steps + cart */}
       <div className="studio-top">
+        <button
+          type="button"
+          className="studio-back"
+          onClick={goBack}
+          disabled={stepIndex === 0}
+          aria-label="Previous step"
+        >
+          <BackGlyph />
+        </button>
         <ol className="studio-steps">
           {STEP_ORDER.map((key, i) => {
             const active = step === key;
@@ -529,7 +623,10 @@ export default function Customizer({
                   type="button"
                   className={`studio-step${active ? " is-active" : ""}${done ? " is-done" : ""}`}
                   aria-current={active ? "step" : undefined}
-                  onClick={() => setStep(key)}
+                  onClick={() => {
+                    setStep(key);
+                    setPanelOpen(true);
+                  }}
                 >
                   <span className="studio-step-n tnum">{i + 1}</span>
                   <span className="studio-step-label">{STEP_LABEL[key]}</span>
@@ -560,7 +657,7 @@ export default function Customizer({
                 key={t.id}
                 type="button"
                 className={`studio-rail-btn${tool === t.id ? " is-active" : ""}`}
-                onClick={() => setTool(t.id)}
+                onClick={() => openTool(t.id)}
                 aria-pressed={tool === t.id}
               >
                 <span className="studio-rail-icon" aria-hidden="true">
@@ -572,8 +669,27 @@ export default function Customizer({
           </nav>
         ) : null}
 
-        {/* Contextual panel */}
-        <aside className="studio-panel" aria-label="Design controls">
+        {/* Scrim + contextual panel (bottom sheet on mobile) */}
+        {panelOpen ? (
+          <button
+            type="button"
+            className="studio-scrim"
+            aria-label="Close panel"
+            onClick={() => setPanelOpen(false)}
+          />
+        ) : null}
+        <aside className={`studio-panel${panelOpen ? " is-open" : ""}`} aria-label="Design controls">
+          <div className="studio-sheet-head">
+            <span className="studio-sheet-grip" aria-hidden="true" />
+            <button
+              type="button"
+              className="studio-sheet-close"
+              onClick={() => setPanelOpen(false)}
+              aria-label="Close panel"
+            >
+              <CloseGlyph />
+            </button>
+          </div>
           {notice ? (
             <p
               className={`cust-notice is-${notice.tone} studio-notice`}
@@ -1073,7 +1189,7 @@ export default function Customizer({
               side={side}
               design={design}
               selectedId={selectedId}
-              onSelect={setSelectedId}
+              onSelect={handleSelect}
               onChange={patch}
               onCommit={() => undefined}
               onDuplicate={(id) => {
@@ -1089,6 +1205,23 @@ export default function Customizer({
               }}
               onReorder={(id, dir) => setDesign((prev) => reorderLayer(prev, side, id, dir))}
             />
+
+            {layers.length === 0 ? (
+              <div className="stage-add" role="group" aria-label="Add to your design">
+                <button type="button" onClick={addTextAndOpen}>
+                  <TextGlyph />
+                  <span>Add text</span>
+                </button>
+                <button type="button" onClick={() => openTool("upload")}>
+                  <UploadGlyph />
+                  <span>Upload art</span>
+                </button>
+                <button type="button" onClick={() => openTool("art")}>
+                  <ArtGlyph />
+                  <span>Add art</span>
+                </button>
+              </div>
+            ) : null}
           </div>
 
           <div className="stage-zoom">
@@ -1251,6 +1384,42 @@ function LayersGlyph() {
         strokeLinecap="round"
         strokeLinejoin="round"
       />
+    </svg>
+  );
+}
+
+function SaveGlyph() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path
+        d="M5 3.5h10.5L20.5 8.5V19a1.5 1.5 0 0 1-1.5 1.5H5A1.5 1.5 0 0 1 3.5 19V5A1.5 1.5 0 0 1 5 3.5Z"
+        stroke="currentColor"
+        strokeWidth="1.6"
+        strokeLinejoin="round"
+      />
+      <path d="M7.5 3.5v5h7v-5M7.5 20.5v-5h9v5" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+function BackGlyph() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path
+        d="M15 5.5 8.5 12l6.5 6.5"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+function CloseGlyph() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path d="M6 6l12 12M18 6 6 18" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
     </svg>
   );
 }
