@@ -20,6 +20,17 @@ page.on("console", (m) => m.type() === "error" && !m.text().includes("favicon") 
 await page.goto(`${BASE}/admin`, { waitUntil: "networkidle" });
 check("login screen shown", await page.locator('input[type="password"]').count() > 0);
 
+const categoryProbe = await fetch(`${BASE}/api/admin/categories`, {
+  method: "POST",
+  headers: { "content-type": "application/json" },
+  body: JSON.stringify({ name: "Unauthorised probe" }),
+});
+check(
+  "category API remains protected",
+  categoryProbe.status === 401 || categoryProbe.status === 503,
+  `HTTP ${categoryProbe.status}`
+);
+
 if (!PASSWORD) {
   check(
     "unconfigured admin access is clearly disabled",
