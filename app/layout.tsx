@@ -26,6 +26,7 @@ import "./admin/admin.css";
 import "./content.css";
 import "./minimog.css";
 import { CartProvider } from "@/lib/cart-context";
+import { WishlistProvider } from "@/lib/wishlist-context";
 import { getCategories } from "@/lib/catalog";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
@@ -166,6 +167,7 @@ export const viewport: Viewport = {
   themeColor: "#ffffff",
   width: "device-width",
   initialScale: 1,
+  viewportFit: "cover",
 };
 
 export default async function RootLayout({
@@ -173,9 +175,7 @@ export default async function RootLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const categories = (await getCategories().catch(() => [])).filter(
-    (category) => category.slug === "t-shirts"
-  );
+  const categories = await getCategories().catch(() => []);
 
   return (
     <html lang="en" className={FONT_VARS}>
@@ -184,10 +184,12 @@ export default async function RootLayout({
           Skip to content
         </a>
         <CartProvider>
-          <Header categories={categories} />
-          <main id="main">{children}</main>
-          <Footer />
-          <MobileTabBar />
+          <WishlistProvider>
+            <Header categories={categories} />
+            <main id="main">{children}</main>
+            <Footer />
+            <MobileTabBar />
+          </WishlistProvider>
         </CartProvider>
       </body>
     </html>

@@ -4,13 +4,14 @@ import type { Category } from "@/lib/types";
 import { getSettings } from "@/lib/catalog";
 import CartButton from "./CartButton";
 import MobileNav from "./MobileNav";
+import WishlistIconBtn from "./WishlistIconBtn";
 import Search from "./icons/Search";
 
 const MAIN_NAV_LINKS = [
   { href: "/", label: "HOME" },
   { href: "/shop", label: "SHOP ALL" },
   { href: "/shop?kind=tee", label: "T-SHIRTS" },
-  { href: "/shop?kind=fleece", label: "HOODIES" },
+  { href: "/shop?kind=hoodie", label: "HOODIES" },
   { href: "/customize", label: "DESIGN STUDIO", highlight: true },
   { href: "/about", label: "HOW IT WORKS" },
   { href: "/track", label: "TRACK ORDER" },
@@ -26,18 +27,10 @@ function UserIcon() {
   );
 }
 
-function StarIcon() {
-  return (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
-    </svg>
-  );
-}
-
 export default async function Header({
-  categories,
+  categories = [],
 }: {
-  categories: Category[];
+  categories?: Category[];
 }) {
   const settings = await getSettings().catch(() => ({}));
 
@@ -87,9 +80,11 @@ export default async function Header({
             <form action="/shop" method="GET" className="mm-search-form" role="search">
               <select name="category" className="mm-search-category" aria-label="Select product category">
                 <option value="">All Categories</option>
-                <option value="t-shirts">T-Shirts</option>
-                <option value="hoodies">Hoodies</option>
-                <option value="sweatshirts">Sweatshirts</option>
+                {categories.map((c) => (
+                  <option key={c.slug} value={c.slug}>
+                    {c.name}
+                  </option>
+                ))}
               </select>
               <input
                 type="search"
@@ -110,10 +105,9 @@ export default async function Header({
               <UserIcon />
             </Link>
 
-            <Link href="/shop" className="mm-action-btn hide-sm" aria-label="Wishlist (0 items)">
-              <StarIcon />
-              <span className="mm-badge" aria-hidden="true">0</span>
-            </Link>
+            <div className="hide-sm">
+              <WishlistIconBtn />
+            </div>
 
             <CartButton />
 
@@ -122,12 +116,14 @@ export default async function Header({
             </Link>
           </div>
         </div>
+      </div>
 
-        {/* 3. DESKTOP NAVIGATION BAR */}
-        <nav className="mm-nav-bar" aria-label="Main navigation">
-          <ul className="mm-nav-list">
+      {/* 3. LOWER CATEGORY NAVIGATION BAR */}
+      <nav className="mm-nav-bar" aria-label="Category Navigation">
+        <div className="minimog-container mm-nav-inner">
+          <ul className="mm-nav-links">
             {MAIN_NAV_LINKS.map((link) => (
-              <li key={link.href} className="mm-nav-item">
+              <li key={link.href}>
                 <Link
                   href={link.href}
                   className={`mm-nav-link ${link.highlight ? "highlight" : ""}`}
@@ -137,8 +133,8 @@ export default async function Header({
               </li>
             ))}
           </ul>
-        </nav>
-      </div>
+        </div>
+      </nav>
     </header>
   );
 }
