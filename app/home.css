@@ -51,7 +51,45 @@
 
 .hero-img {
   object-fit: cover;
-  object-position: 50% 28%;
+  object-position: 50% 42%;
+}
+
+/* --------------------------------------------------------------------------
+   Editorial story
+   -------------------------------------------------------------------------- */
+
+.editorial-section {
+  background: #fff;
+}
+
+.editorial-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.15fr) minmax(320px, 0.85fr);
+  gap: clamp(30px, 6vw, 92px);
+  align-items: center;
+}
+
+.editorial-media {
+  position: relative;
+  min-height: 520px;
+  overflow: hidden;
+  background: var(--bone);
+}
+
+.editorial-copy {
+  max-width: 42ch;
+}
+
+.editorial-copy .h2 {
+  margin-top: 12px;
+}
+
+.editorial-copy .lede {
+  margin-top: 18px;
+}
+
+.editorial-copy .btn {
+  margin-top: 26px;
 }
 
 /* --------------------------------------------------------------------------
@@ -798,6 +836,26 @@
 
   .value-strip {
     display: none;
+  }
+
+  .editorial-grid {
+    grid-template-columns: 1fr;
+    gap: 28px;
+  }
+
+  .editorial-media {
+    width: 100%;
+    min-height: 0;
+    aspect-ratio: 3 / 2;
+  }
+
+  .editorial-copy {
+    max-width: none;
+    text-align: center;
+  }
+
+  .editorial-copy .lede {
+    margin-inline: auto;
   }
 
   .section {

@@ -85,7 +85,7 @@ try {
   const sizeHeadings = await page.locator(".rot-size-group-title").allTextContents();
   const sizeLabels = await page.locator(".rot-size").allTextContents();
   check("quantity panel separates adult and youth sizes", sizeHeadings.join("|") === "Adult Sizes|Youth Sizes", sizeHeadings.join(" | "));
-  check("classic tee exposes the requested size range", sizeLabels.includes("XS") && sizeLabels.includes("XL") && !sizeLabels.includes("3XL") && !sizeLabels.includes("4XL"), sizeLabels.join(" | "));
+  check("classic tee exposes the requested size range", sizeLabels.some((label) => label.startsWith("YXS")) && sizeLabels.some((label) => label.startsWith("YXL")) && !sizeLabels.some((label) => label.startsWith("3XL")) && !sizeLabels.some((label) => label.startsWith("4XL")) && !sizeLabels.some((label) => label.startsWith("5XL")), sizeLabels.join(" | "));
   check("size groups fit the mobile viewport", (await page.locator("body").evaluate((node) => node.scrollWidth - window.innerWidth)) <= 1);
 
   await page.goto(`${BASE}/customize/v-neck-tee?qa=lock`, {

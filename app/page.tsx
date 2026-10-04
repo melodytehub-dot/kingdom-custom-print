@@ -123,29 +123,29 @@ export default async function HomePage() {
           <div className="hero-copy">
             <p className="eyebrow eyebrow-red">Custom print on demand</p>
             <h1 className="display hero-title">
-              Your artwork,
+              Oversized printed
               <br />
-              printed to order.
+              t-shirts.
             </h1>
             <p className="lede hero-lede">
-              Upload a file or build the design in the browser. Pick your blank, set the size
-              run, and we print it — no minimums, one piece or a full run.
+              Create something worth wearing. Choose your blank, add your artwork, and make
+              one piece or a full run — printed to order with no minimums.
             </p>
             <div className="hero-actions">
               <Link href="/customize" className="btn btn-red btn-lg">
-                Start designing
+                Design yours
                 <ArrowRight />
               </Link>
               <Link href="/shop" className="btn btn-outline-light btn-lg">
-                Shop blanks
+                Shop the collection
               </Link>
             </div>
           </div>
 
           <div className="hero-media">
             <Image
-              src="/img/hero.jpg"
-              alt="A runner wearing a custom-printed t-shirt"
+              src="/img/hero-editorial.png"
+              alt="A person wearing a clean oversized cotton t-shirt in a bright studio"
               fill
               preload
               sizes="(max-width: 900px) 100vw, 50vw"
@@ -224,8 +224,8 @@ export default async function HomePage() {
         <div className="wrap">
           <div className="section-head">
             <div>
-              <p className="eyebrow">Featured blanks</p>
-              <h2 className="h2">Blanks we print most</h2>
+              <p className="eyebrow">Trending this week</p>
+              <h2 className="h2">Ready for your idea</h2>
             </div>
             <Link href="/shop" className="link">
               Shop all
@@ -249,6 +249,33 @@ export default async function HomePage() {
               </p>
             </div>
           )}
+        </div>
+      </section>
+
+      {/* Editorial story */}
+      <section className="section editorial-section">
+        <div className="wrap editorial-grid">
+          <div className="editorial-media">
+            <Image
+              src="/img/studio-editorial.png"
+              alt="Three people choosing folded apparel and color swatches in a print studio"
+              fill
+              sizes="(max-width: 760px) 100vw, 55vw"
+              className="cover-img"
+            />
+          </div>
+          <div className="editorial-copy">
+            <p className="eyebrow">Made for your people</p>
+            <h2 className="h2">Good ideas look better together.</h2>
+            <p className="lede">
+              From a one-off gift to a full team run, we make the process feel simple: pick
+              a blank, build your design, and see the finished piece before you order.
+            </p>
+            <Link href="/customize" className="btn btn-lg">
+              Start creating
+              <ArrowRight />
+            </Link>
+          </div>
         </div>
       </section>
 
