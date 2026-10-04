@@ -18,7 +18,8 @@ const HELP_LINKS = [
 ];
 
 export default async function Footer() {
-  const [settings, categories] = await Promise.all([getSettings(), getCategories()]);
+  const [settings, allCategories] = await Promise.all([getSettings(), getCategories()]);
+  const categories = allCategories.filter((category) => category.slug === "t-shirts");
   const year = new Date().getFullYear();
 
   return (

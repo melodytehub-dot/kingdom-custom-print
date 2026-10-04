@@ -164,7 +164,9 @@ export default async function RootLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const categories = await getCategories().catch(() => []);
+  const categories = (await getCategories().catch(() => [])).filter(
+    (category) => category.slug === "t-shirts"
+  );
 
   return (
     <html lang="en" className={FONT_VARS}>

@@ -10,7 +10,10 @@ export const metadata = {
     "Blank t-shirts printed to order. Filter by fit, then design yours online with text, artwork and names & numbers.",
 };
 
-const KIND_FILTERS = [{ value: "longsleeve", label: "Long Sleeve" }];
+const KIND_FILTERS = [
+  { value: "tee", label: "Short Sleeve" },
+  { value: "longsleeve", label: "Long Sleeve" },
+];
 
 export default async function ShopPage({
   searchParams,
@@ -18,12 +21,13 @@ export default async function ShopPage({
   searchParams: Promise<{ category?: string; kind?: string; sort?: string }>;
 }) {
   const params = await searchParams;
-  const [categories, allProducts] = await Promise.all([
+  const [allCategories, allProducts] = await Promise.all([
     getCategories(),
-    getProducts({}),
+    getProducts({ categorySlug: "t-shirts" }),
   ]);
+  const categories = allCategories.filter((category) => category.slug === "t-shirts");
 
-  const activeCategory = params.category ?? "";
+  const activeCategory = params.category === "t-shirts" ? params.category : "";
   const activeKind = params.kind ?? "";
 
   let products = allProducts;

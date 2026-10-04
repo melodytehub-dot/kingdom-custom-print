@@ -4,16 +4,31 @@ import Garment from "@/components/Garment";
 import ProductCard from "@/components/ProductCard";
 import ArrowRight from "@/components/icons/ArrowRight";
 import Check from "@/components/icons/Check";
-import { getProducts, getCategories, getSettings } from "@/lib/catalog";
+import { getProducts, getSettings } from "@/lib/catalog";
 import { formatUSD } from "@/lib/pricing";
 
 export const revalidate = 60;
 
-const CATEGORY_IMAGE: Record<string, string> = {
-  "t-shirts": "/img/cat-tees.jpg",
-  "sweatshirts": "/img/mockups/families/hoodie/WHT_fr.webp",
-  "accessories": "/img/mockups/families/cap/WHT_fr.webp",
-};
+const SHIRT_CATEGORIES = [
+  {
+    slug: "tee",
+    name: "Classic Tees",
+    description: "Timeless fits for everyday wear.",
+    image: "/img/products/crown-classic-tee-black.jpg",
+  },
+  {
+    slug: "tee",
+    name: "Oversized Tees",
+    description: "Relaxed fits with a modern look.",
+    image: "/img/products/comfort-colors-tee.jpg",
+  },
+  {
+    slug: "tee",
+    name: "Youth Tees",
+    description: "Comfort for the next generation.",
+    image: "/img/mockups/families/youth/WHT_fr.webp",
+  },
+];
 
 const STEPS = [
   {
@@ -105,13 +120,14 @@ function RotateGlyph() {
 }
 
 export default async function HomePage() {
-  const [featured, categories, settings] = await Promise.all([
-    getProducts({ featuredOnly: true, limit: 8 }),
-    getCategories(),
+  const [featured, settings] = await Promise.all([
+    getProducts({ featuredOnly: true, categorySlug: "t-shirts", limit: 8 }),
     getSettings(),
   ]);
 
-  const pool = featured.length ? featured : await getProducts({ limit: 8 });
+  const pool = featured.length
+    ? featured
+    : await getProducts({ categorySlug: "t-shirts", limit: 8 });
   const showcase = pool.slice(0, 8);
   const freeShipping = formatUSD(settings.freeShippingThreshold);
 
@@ -178,7 +194,7 @@ export default async function HomePage() {
       </section>
 
       {/* Categories */}
-      {categories.length ? (
+      {SHIRT_CATEGORIES.length ? (
         <section className="section">
           <div className="wrap">
             <div className="section-head">
@@ -193,20 +209,23 @@ export default async function HomePage() {
             </div>
 
             <ul className="cat-row">
-              {categories.map((c) => (
+              {SHIRT_CATEGORIES.map((c, index) => (
                 <li key={c.slug}>
-                  <Link href={`/shop?category=${c.slug}`} className="cat-tile">
+                  <Link href="/shop?category=t-shirts" className="cat-tile">
                     <span className="cat-media">
                       <Image
-                        src={CATEGORY_IMAGE[c.slug] ?? "/img/cat-tees.jpg"}
+                        src={c.image}
                         alt={`${c.name} category`}
                         fill
                         sizes="(max-width: 640px) 50vw, 25vw"
-                        className={`cat-img${c.slug !== "t-shirts" && CATEGORY_IMAGE[c.slug] ? " cat-img-product" : ""}`}
+                        className={`cat-img${index > 0 ? " cat-img-product" : ""}`}
                       />
                     </span>
                     <span className="cat-foot">
-                      <span className="cat-name">{c.name}</span>
+                      <span>
+                        <span className="cat-name">{c.name}</span>
+                        <span className="cat-description">{c.description}</span>
+                      </span>
                       <span className="cat-arrow" aria-hidden="true">
                         <ArrowRight />
                       </span>
