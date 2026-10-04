@@ -77,39 +77,11 @@ export const CloudUploadIcon = ({ size }: P) => (
 );
 
 export const AiArtIcon = ({ size }: P) => (
-  <svg viewBox="0 0 24 24" width={size} height={size} aria-hidden="true" focusable="false">
-    <defs>
-      <linearGradient id="ai-grad" x1="0" y1="0" x2="1" y2="1">
-        <stop offset="0" stopColor="#3b82f6" />
-        <stop offset="1" stopColor="#a855f7" />
-      </linearGradient>
-    </defs>
-    <rect
-      x="4"
-      y="6"
-      width="16"
-      height="15"
-      rx="2.4"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.7"
-    />
-    <text
-      x="12"
-      y="17.2"
-      textAnchor="middle"
-      fontSize="8.6"
-      fontWeight="800"
-      fill="url(#ai-grad)"
-      fontFamily="Inter, Arial, sans-serif"
-    >
-      AI
-    </text>
-    <path
-      d="M5.5 1.8l.6 1.5 1.5.6-1.5.6-.6 1.5-.6-1.5-1.5-.6 1.5-.6zM10.5 2.8l.4 1 1 .4-1 .4-.4 1-.4-1-1-.4 1-.4z"
-      fill="url(#ai-grad)"
-    />
-  </svg>
+  <Svg size={size}>
+    <path d="m8 3 1.2 3.8L13 8l-3.8 1.2L8 13l-1.2-3.8L3 8l3.8-1.2L8 3Z" />
+    <path d="m17.5 11 0.8 2.7L21 14.5l-2.7 0.8-.8 2.7-.8-2.7-2.7-.8 2.7-.8.8-2.7Z" />
+    <path d="m13 16 1 3" />
+  </Svg>
 );
 
 /** Plain artwork icon for clipart; the AI mark stays reserved for the generator. */

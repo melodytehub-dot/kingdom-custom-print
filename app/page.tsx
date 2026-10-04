@@ -181,7 +181,7 @@ export default async function HomePage() {
               <li key={`${c.name}-${index}`}>
                 <Link href="/shop?category=t-shirts" className="cat-tile">
                   <span className="cat-media">
-                    <Image src={c.image} alt={`${c.name} category`} fill sizes="(max-width: 640px) 82vw, 30vw" className={`cat-img${index > 0 ? " cat-img-product" : ""}`} />
+                    <Image src={c.image} alt={`${c.name} category`} fill loading="eager" sizes="(max-width: 640px) 82vw, 30vw" className={`cat-img${index > 0 ? " cat-img-product" : ""}`} />
                   </span>
                   <span className="cat-foot">
                     <span><span className="cat-name">{c.name}</span><span className="cat-description">{c.description}</span></span>
@@ -202,6 +202,7 @@ export default async function HomePage() {
               src="/img/studio-editorial.png"
               alt="Three people choosing folded apparel and color swatches in a print studio"
               fill
+              loading="eager"
               sizes="(max-width: 760px) 100vw, 55vw"
               className="cover-img"
             />
@@ -289,15 +290,15 @@ export default async function HomePage() {
       <section className="section benefits-section" aria-label="Kingdom Custom Print benefits">
         <div className="wrap benefits-grid">
           <article className="benefit-card">
-            <Image src="/img/feature-blanks.png" alt="Premium t-shirts folded by color" fill sizes="(max-width: 760px) 100vw, 33vw" className="benefit-image" />
+            <Image src="/img/feature-blanks.png" alt="Premium t-shirts folded by color" fill loading="eager" sizes="(max-width: 760px) 100vw, 33vw" className="benefit-image" />
             <div className="benefit-copy"><span className="benefit-icon"><Check size={18} /></span><h3>Premium blanks</h3><p>Comfortable t-shirts selected to hold their shape and take a clean print.</p></div>
           </article>
           <article className="benefit-card">
-            <Image src="/img/feature-studio.png" alt="Screen printing press in a local print studio" fill sizes="(max-width: 760px) 100vw, 33vw" className="benefit-image" />
+            <Image src="/img/feature-studio.png" alt="Screen printing press in a local print studio" fill loading="eager" sizes="(max-width: 760px) 100vw, 33vw" className="benefit-image" />
             <div className="benefit-copy"><span className="benefit-icon"><Check size={18} /></span><h3>Printed with care</h3><p>Every order moves from your browser to a real print workflow with care.</p></div>
           </article>
           <article className="benefit-card">
-            <Image src="/img/feature-finish.png" alt="Finished custom printed t-shirt ready to ship" fill sizes="(max-width: 760px) 100vw, 33vw" className="benefit-image" />
+            <Image src="/img/feature-finish.png" alt="Finished custom printed t-shirt ready to ship" fill loading="eager" sizes="(max-width: 760px) 100vw, 33vw" className="benefit-image" />
             <div className="benefit-copy"><span className="benefit-icon"><Check size={18} /></span><h3>Ready to wear</h3><p>Preview the front or back, then get free US shipping over {freeShipping}.</p></div>
           </article>
         </div>
