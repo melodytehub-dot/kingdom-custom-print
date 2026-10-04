@@ -141,12 +141,12 @@ export async function markOrderPaid(
 ): Promise<{ reference: string } | null> {
   const rows = await sql<{ reference: string; status: OrderStatus }[]>`
     UPDATE orders
-    SET status = 'paid',
+    SET status = CASE WHEN status = 'pending' THEN 'paid' ELSE status END,
         paid_at = now(),
         stripe_payment_intent = ${paymentIntentId},
         updated_at = now()
     WHERE stripe_session_id = ${sessionId}
-      AND status <> 'paid'
+      AND paid_at IS NULL
     RETURNING reference, status`;
 
   if (rows.length) return { reference: rows[0].reference };

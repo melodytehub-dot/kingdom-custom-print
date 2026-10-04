@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import Link from "next/link";
+import { paymentsConfigured } from "@/lib/stripe";
 import CheckoutForm from "@/components/CheckoutForm";
 import { getSettings } from "@/lib/catalog";
 
@@ -15,16 +15,8 @@ export default async function CheckoutPage() {
 
   return (
     <>
-      <nav aria-label="Breadcrumb" className="wrap">
-        <ol className="breadcrumb" style={{ paddingTop: 22 }}>
-          <li>
-            <Link href="/cart">Cart</Link>
-          </li>
-          <li aria-current="page">Checkout</li>
-        </ol>
-      </nav>
 
-      <CheckoutForm settings={settings} />
+      <CheckoutForm settings={settings} paymentsReady={paymentsConfigured()} />
     </>
   );
 }

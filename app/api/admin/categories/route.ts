@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { revalidatePath } from "next/cache";
 import { requireAdmin } from "../_guard";
 import { createCategory, deleteCategory, updateCategory, type CategoryInput } from "@/lib/catalog";
 
@@ -33,7 +34,11 @@ export async function POST(req: Request) {
   try { raw = (await req.json()) as Record<string, unknown>; } catch { return NextResponse.json({ error: "Invalid request." }, { status: 400 }); }
   const { value, error } = validate(raw);
   if (!value) return NextResponse.json({ error }, { status: 422 });
-  try { return NextResponse.json({ ok: true, id: await createCategory(value) }); }
+  try {
+    const id = await createCategory(value);
+    revalidatePath("/", "layout");
+    return NextResponse.json({ ok: true, id });
+  }
   catch (err) {
     return NextResponse.json({ error: err instanceof Error && err.message.includes("duplicate") ? "That category slug is already used." : "The category could not be saved." }, { status: 409 });
   }
@@ -50,6 +55,7 @@ export async function PUT(req: Request) {
   if (!value) return NextResponse.json({ error }, { status: 422 });
   try {
     const ok = await updateCategory(id, value);
+    if (ok) revalidatePath("/", "layout");
     return ok ? NextResponse.json({ ok: true }) : NextResponse.json({ error: "Category not found." }, { status: 404 });
   } catch (err) {
     return NextResponse.json({ error: err instanceof Error && err.message.includes("duplicate") ? "That category slug is already used." : "The category could not be saved." }, { status: 409 });
@@ -62,5 +68,6 @@ export async function DELETE(req: Request) {
   const id = Number(new URL(req.url).searchParams.get("id"));
   if (!Number.isInteger(id) || id <= 0) return NextResponse.json({ error: "Missing category id." }, { status: 422 });
   const ok = await deleteCategory(id);
+  if (ok) revalidatePath("/", "layout");
   return ok ? NextResponse.json({ ok: true }) : NextResponse.json({ error: "Category not found." }, { status: 404 });
 }

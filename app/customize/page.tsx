@@ -16,14 +16,6 @@ export default async function CustomizeStartPage() {
   return (
     <>
       <div className="wrap page-head">
-        <nav aria-label="Breadcrumb">
-          <ol className="breadcrumb">
-            <li>
-              <Link href="/">Home</Link>
-            </li>
-            <li aria-current="page">Design studio</li>
-          </ol>
-        </nav>
         <p className="eyebrow">Online designer</p>
         <h1 className="h2">Choose a blank to start designing</h1>
         <p className="lede">
@@ -35,7 +27,7 @@ export default async function CustomizeStartPage() {
 
       <section className="wrap section-tight" aria-label="Choose a blank">
         {products.length ? (
-          <ul className="product-grid">
+          <ul className="mm-product-grid">
             {products.map((p, i) => (
               <li key={p.id}>
                 <ProductCard product={p} priority={i < 4} />

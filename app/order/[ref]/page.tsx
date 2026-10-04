@@ -21,16 +21,6 @@ export default async function OrderPage({
   if (!order) {
     return (
       <>
-        <div className="wrap page-head">
-          <nav aria-label="Breadcrumb">
-            <ol className="breadcrumb">
-              <li>
-                <Link href="/">Home</Link>
-              </li>
-              <li aria-current="page">Order not found</li>
-            </ol>
-          </nav>
-        </div>
         <div className="wrap section-tight">
           <div className="state">
             <svg className="state-icon" viewBox="0 0 48 48" fill="none" aria-hidden="true">
@@ -59,16 +49,6 @@ export default async function OrderPage({
 
   return (
     <>
-      <div className="wrap page-head">
-        <nav aria-label="Breadcrumb">
-          <ol className="breadcrumb">
-            <li>
-              <Link href="/">Home</Link>
-            </li>
-            <li aria-current="page">Order {order.reference}</li>
-          </ol>
-        </nav>
-      </div>
       <div className="wrap section-tight">
         <OrderDetail order={order} />
       </div>

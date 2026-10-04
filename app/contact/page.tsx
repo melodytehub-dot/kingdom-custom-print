@@ -15,14 +15,6 @@ export default async function ContactPage() {
   return (
     <>
       <div className="wrap page-head">
-        <nav aria-label="Breadcrumb">
-          <ol className="breadcrumb">
-            <li>
-              <Link href="/">Home</Link>
-            </li>
-            <li aria-current="page">Contact</li>
-          </ol>
-        </nav>
         <p className="eyebrow">Contact</p>
         <h1 className="display">Talk to us</h1>
         <p className="lede">

@@ -61,14 +61,6 @@ export default async function AboutPage() {
   return (
     <>
       <div className="wrap page-head">
-        <nav aria-label="Breadcrumb">
-          <ol className="breadcrumb">
-            <li>
-              <Link href="/">Home</Link>
-            </li>
-            <li aria-current="page">How it works</li>
-          </ol>
-        </nav>
         <p className="eyebrow">How it works</p>
         <h1 className="display">
           From your file

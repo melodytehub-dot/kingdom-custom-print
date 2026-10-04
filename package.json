@@ -17,11 +17,14 @@
     "qa-audit": "node scripts/qa-audit.mjs",
     "qa-cart-flow": "node scripts/qa-cart-flow.mjs",
     "qa-cart-flow:hoodie": "QA_PRODUCT_SLUG=premium-pullover-hoodie QA_PRODUCT_NAME='Premium Pullover Hoodie' node scripts/qa-cart-flow.mjs",
-    "qa-admin-flow": "node scripts/qa-admin-flow.mjs",
+    "qa-admin-flow": "node --env-file-if-exists=.env.local scripts/qa-admin-flow.mjs",
     "qa-customizer-controls": "node scripts/qa-customizer-controls.mjs",
-    "qa-price-tamper": "node scripts/qa-price-tamper.mjs",
+    "qa-price-tamper": "node scripts/qa-payments.mjs",
     "qa-garment-families": "node scripts/qa-garment-families.mjs",
-    "qa-site": "npm run qa-audit && npm run qa-garment-families && npm run qa-customizer-controls && npm run qa-cart-flow && npm run qa-price-tamper"
+    "qa-site": "npm run qa-storefront && npm run qa-audit && npm run qa-garment-families && npm run qa-customizer-controls && npm run qa-cart-flow && npm run qa-payments",
+    "qa-storefront": "node scripts/qa-storefront.mjs",
+    "qa-payments": "node scripts/qa-payments.mjs",
+    "qa-order-payment-replay": "node --env-file=.env.local scripts/qa-order-payment-replay.mjs"
   },
   "dependencies": {
     "next": "16.3.8",

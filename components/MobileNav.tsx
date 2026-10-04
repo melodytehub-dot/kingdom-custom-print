@@ -42,7 +42,7 @@ export default function MobileNav({ categories }: { categories: Category[] }) {
 
       const focusable = Array.from(
         panelRef.current?.querySelectorAll<HTMLElement>(
-          'a[href], button:not([disabled]), [tabindex]:not([tabindex="-1"])'
+          'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])'
         ) ?? []
       );
       if (!focusable.length) return;
@@ -125,6 +125,11 @@ export default function MobileNav({ categories }: { categories: Category[] }) {
               </button>
             </div>
 
+            <form action="/shop" method="GET" role="search" className="mobile-search">
+              <label className="sr-only" htmlFor="mobile-search">Search apparel</label>
+              <input id="mobile-search" type="search" name="q" placeholder="Search apparel" className="input" />
+              <button className="btn" type="submit">Search</button>
+            </form>
             <nav aria-label="Mobile">
               <ul className="mobile-links">
                 {LINKS.map((l) => (

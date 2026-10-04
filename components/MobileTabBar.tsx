@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import CartIcon from "./icons/CartIcon";
 import Store from "./icons/Store";
 import Palette from "./icons/Palette";
+import { useWishlist } from "@/lib/wishlist-context";
 import { useCart } from "@/lib/cart-context";
 
 function HomeIcon() {
@@ -26,8 +27,10 @@ function StarTabIcon() {
 
 export default function MobileTabBar() {
   const pathname = usePathname();
+  const { slugs } = useWishlist();
   const { count, hydrated } = useCart();
   const showCount = hydrated && count > 0;
+  if (pathname.startsWith("/customize/") || pathname.startsWith("/admin")) return null;
 
   return (
     <nav className="mm-mobile-tabs" aria-label="Mobile Bottom Navigation">
@@ -59,12 +62,12 @@ export default function MobileTabBar() {
       </Link>
 
       <Link
-        href="/shop"
-        className="mm-mobile-tab-link"
+        href="/wishlist"
+        className={`mm-mobile-tab-link ${pathname === "/wishlist" ? "active" : ""}`}
         aria-label="Wishlist"
       >
         <StarTabIcon />
-        <span className="mm-mobile-tab-badge">0</span>
+        {slugs.length > 0 ? <span className="mm-mobile-tab-badge">{slugs.length}</span> : null}
         <span>Wishlist</span>
       </Link>
 

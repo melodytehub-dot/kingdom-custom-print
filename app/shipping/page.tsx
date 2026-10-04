@@ -15,14 +15,6 @@ export default async function ShippingPage() {
   return (
     <>
       <div className="wrap page-head">
-        <nav aria-label="Breadcrumb">
-          <ol className="breadcrumb">
-            <li>
-              <Link href="/">Home</Link>
-            </li>
-            <li aria-current="page">Shipping</li>
-          </ol>
-        </nav>
         <p className="eyebrow">Shipping</p>
         <h1 className="display">Shipping and returns</h1>
         <p className="lede">

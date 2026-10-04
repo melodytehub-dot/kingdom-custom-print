@@ -27,7 +27,7 @@ export default async function SuccessPage({
           {paymentConfirmed ? "Payment received" : "Order received"}
         </p>
         <h1 className="h2">
-          {paymentConfirmed ? "Thank you — your order is in" : "Your order is in the queue"}
+          {paymentConfirmed ? "Thank you — your order is in" : "Your payment is awaiting confirmation"}
         </h1>
 
         {order ? (
@@ -36,7 +36,7 @@ export default async function SuccessPage({
               Reference <strong className="tnum">{order.reference}</strong>.{" "}
               {paymentConfirmed
                 ? "Payment is confirmed and your order details are below."
-                : "We saved your order and will contact you with payment instructions before production."}
+                : "We are waiting for payment confirmation. Production begins only after payment is confirmed."}
             </p>
             <ul className="done-list">
               {order.items.map((i, idx) => (

@@ -52,18 +52,18 @@ try {
     waitUntil: "domcontentloaded",
     timeout: 30000,
   });
-  const cards = shopPage.locator(".pcard");
+  const cards = shopPage.locator(".mm-card");
   const cardCount = await cards.count();
   for (let i = 0; i < cardCount; i += 1) {
     await cards.nth(i).scrollIntoViewIfNeeded();
   }
-  await shopPage.waitForTimeout(500);
-  const broken = await shopPage.locator(".pcard img").evaluateAll((images) =>
+  await shopPage.waitForFunction(() => [...document.querySelectorAll(".mm-card img")].every(image => image.complete && image.naturalWidth > 0), undefined, { timeout: 15000 }).catch(() => {});
+  const broken = await shopPage.locator(".mm-card img").evaluateAll((images) =>
     images.filter((image) => !image.complete || image.naturalWidth === 0).map((image) => image.alt || image.src)
   );
   const imagesOk = cardCount > 0 && broken.length === 0;
   console.log(`${imagesOk ? "PASS" : "FAIL"} storefront product images — ${cardCount} cards, ${broken.length} broken`);
-  if (!imagesOk) failures += 1;
+  if (!imagesOk) { failures += 1; console.log("Broken image details:", broken); }
 } catch (error) {
   failures += 1;
   console.log(`FAIL storefront product images ${(error instanceof Error ? error.message : String(error)).split("\n")[0]}`);

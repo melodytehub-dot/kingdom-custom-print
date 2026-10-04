@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { revalidatePath } from "next/cache";
 import { requireAdmin } from "../_guard";
 import {
   createProduct,
@@ -158,6 +159,7 @@ export async function POST(req: Request) {
 
   try {
     const id = await createProduct(value);
+    revalidatePath("/", "layout");
     return NextResponse.json({ ok: true, id });
   } catch (err) {
     const message =
@@ -190,6 +192,7 @@ export async function PUT(req: Request) {
   try {
     const ok = await updateProduct(id, value);
     if (!ok) return NextResponse.json({ error: "Product not found." }, { status: 404 });
+    revalidatePath("/", "layout");
     return NextResponse.json({ ok: true });
   } catch (err) {
     const message =
@@ -224,6 +227,7 @@ export async function PATCH(req: Request) {
         : false;
 
   if (!ok) return NextResponse.json({ error: "Product not found." }, { status: 404 });
+  revalidatePath("/", "layout");
   return NextResponse.json({ ok: true });
 }
 
@@ -238,5 +242,6 @@ export async function DELETE(req: Request) {
 
   const ok = await deleteProduct(id);
   if (!ok) return NextResponse.json({ error: "Product not found." }, { status: 404 });
+  revalidatePath("/", "layout");
   return NextResponse.json({ ok: true });
 }

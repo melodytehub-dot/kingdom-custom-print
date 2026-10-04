@@ -39,8 +39,8 @@ function validate(fields: Fields): Errors {
   return e;
 }
 
-export default function CheckoutForm({ settings }: { settings: SiteSettings }) {
-  const { items, hydrated, subtotal, clear } = useCart();
+export default function CheckoutForm({ settings, paymentsReady }: { settings: SiteSettings; paymentsReady: boolean }) {
+  const { items, hydrated, subtotal } = useCart();
 
   const [fields, setFields] = useState<Fields>({
     email: "",
@@ -57,7 +57,6 @@ export default function CheckoutForm({ settings }: { settings: SiteSettings }) {
   const [errors, setErrors] = useState<Errors>({});
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
-  const [done, setDone] = useState<{ reference: string; mode: string } | null>(null);
 
   const shipping = useMemo(() => {
     if (subtotal <= 0) return 0;
@@ -83,6 +82,10 @@ export default function CheckoutForm({ settings }: { settings: SiteSettings }) {
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     setFormError(null);
+    if (!paymentsReady) {
+      setFormError("Card checkout is temporarily unavailable. Your cart is saved.");
+      return;
+    }
 
     const found = validate(fields);
     setErrors(found);
@@ -118,10 +121,7 @@ export default function CheckoutForm({ settings }: { settings: SiteSettings }) {
         return;
       }
 
-      if (data.reference) {
-        clear();
-        setDone({ reference: data.reference, mode: data.mode ?? "invoice" });
-      }
+      setFormError("We could not start secure card payment. Your cart is still saved. Please try again.");
     } catch {
       setFormError("Network error. Check your connection and try again.");
     } finally {
@@ -135,29 +135,6 @@ export default function CheckoutForm({ settings }: { settings: SiteSettings }) {
         <p className="muted" role="status">
           Loading checkout…
         </p>
-      </div>
-    );
-  }
-
-  if (done) {
-    return (
-      <div className="wrap section">
-        <div className="panel panel-pad order-done">
-          <h1 className="h2">Order received</h1>
-          <p className="lede">
-            Your reference is <strong className="tnum">{done.reference}</strong>. Keep it
-            for any questions about this order.
-          </p>
-          {done.mode === "invoice" ? (
-            <p className="small muted">
-              Card checkout is not switched on yet. We will contact you at{" "}
-              {fields.email} to arrange payment before anything goes to print.
-            </p>
-          ) : null}
-          <Link href={`/order/${done.reference}`} className="btn">
-            View order details
-          </Link>
-        </div>
       </div>
     );
   }
@@ -180,6 +157,7 @@ export default function CheckoutForm({ settings }: { settings: SiteSettings }) {
     <form className="wrap section-tight checkout" onSubmit={onSubmit} noValidate>
       <div className="checkout-main">
         <h1 className="h2">Checkout</h1>
+        {!paymentsReady ? <p className="banner-note" role="status">Card checkout is temporarily unavailable. Your design stays saved in your cart. Please check back soon.</p> : null}
 
         {formError ? (
           <p className="banner-note is-error" role="alert">
@@ -356,8 +334,8 @@ export default function CheckoutForm({ settings }: { settings: SiteSettings }) {
             </div>
           </dl>
 
-          <button type="submit" className="btn btn-lg btn-block" disabled={submitting}>
-            {submitting ? "Starting checkout…" : "Continue to payment"}
+          <button type="submit" className="btn btn-lg btn-block" disabled={submitting || !paymentsReady}>
+            {submitting ? "Starting checkout…" : !paymentsReady ? "Card checkout unavailable" : "Continue to payment"}
             {!submitting ? <ArrowRight /> : null}
           </button>
 

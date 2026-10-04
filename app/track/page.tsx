@@ -12,14 +12,6 @@ export default function TrackPage() {
   return (
     <>
       <div className="wrap page-head">
-        <nav aria-label="Breadcrumb">
-          <ol className="breadcrumb">
-            <li>
-              <Link href="/">Home</Link>
-            </li>
-            <li aria-current="page">Track order</li>
-          </ol>
-        </nav>
         <p className="eyebrow">Order status</p>
         <h1 className="h2">Track your order</h1>
         <p className="lede">

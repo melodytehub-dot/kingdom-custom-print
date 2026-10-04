@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { createOrder, attachStripeSession } from "@/lib/orders";
-import { siteUrl, stripeClient } from "@/lib/stripe";
+import { siteUrl, stripeClient, paymentsConfigured } from "@/lib/stripe";
 import { getProductById } from "@/lib/catalog";
 import { quoteProduct } from "@/lib/pricing";
 import { FONTS } from "@/lib/fonts";
@@ -33,7 +33,9 @@ interface Body {
  * tampered request cannot set its own price or print an unavailable color or
  * size. Anything the cart asks for that the product no longer offers is dropped.
  */
-async function sanitise(items: CartItem[]): Promise<CartItem[]> {
+type PricedCartItem = CartItem & { sizeSurcharges: Record<string, number> };
+
+async function sanitise(items: CartItem[]): Promise<PricedCartItem[]> {
   const requested = items
     .filter(
       (i) =>
@@ -45,7 +47,7 @@ async function sanitise(items: CartItem[]): Promise<CartItem[]> {
     )
     .slice(0, 30);
 
-  const priced: CartItem[] = [];
+  const priced: PricedCartItem[] = [];
   for (const item of requested) {
     const product = await getProductById(item.productId);
     if (!product || !product.active) continue;
@@ -86,6 +88,7 @@ async function sanitise(items: CartItem[]): Promise<CartItem[]> {
       productKind: product.kind,
       colorName,
       colorHex,
+      sizeSurcharges: Object.fromEntries(product.sizes.map((size) => [size.label, size.surcharge])),
       unitPrice: quote.unitBase,
       total: quote.total,
       quantity: lines.reduce((n, l) => n + l.qty, 0),
@@ -218,6 +221,14 @@ function clampNum(v: unknown, min: number, max: number, fallback: number): numbe
 }
 
 export async function POST(req: Request) {
+  if (!paymentsConfigured()) {
+    return NextResponse.json(
+      { error: "Card checkout is temporarily unavailable. Your design is saved in your cart; please try again later." },
+      { status: 503 }
+    );
+  }
+  const stripe = stripeClient();
+  if (!stripe) return NextResponse.json({ error: "Card checkout is temporarily unavailable." }, { status: 503 });
   let body: Body;
   try {
     body = (await req.json()) as Body;
@@ -240,7 +251,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Check the highlighted fields.", fieldErrors }, { status: 422 });
   }
 
-  let items: CartItem[];
+  let items: PricedCartItem[];
   try {
     items = await sanitise(Array.isArray(body.items) ? body.items : []);
   } catch {
@@ -254,6 +265,10 @@ export async function POST(req: Request) {
       { error: "Your cart is empty, or those items are no longer available." },
       { status: 400 }
     );
+  }
+
+  if (items.reduce((count, item) => count + item.lines.length, 0) > 100) {
+    return NextResponse.json({ error: "Please split this size run into smaller orders, or contact us for a bulk order." }, { status: 422 });
   }
 
   try {
@@ -271,35 +286,25 @@ export async function POST(req: Request) {
       items,
     });
 
-    const stripe = stripeClient();
-    if (!stripe) {
-      // Without Stripe keys the order is recorded and paid manually.
-      // The confirmation page explains the next step rather than failing silently.
-      return NextResponse.json({
-        reference: order.reference,
-        total: order.total,
-        mode: "invoice",
-      });
-    }
-
     const base = siteUrl();
     const session = await stripe.checkout.sessions.create({
       mode: "payment",
+      payment_method_types: ["card"],
       customer_email: email,
       client_reference_id: order.reference,
       metadata: { orderReference: order.reference },
-      line_items: items.map((i) => ({
-        quantity: i.quantity,
+      line_items: items.flatMap((i) => i.lines.map((line) => ({
+        quantity: line.qty,
         price_data: {
           currency: "usd",
-          unit_amount: Math.round(i.unitPrice * 100),
+          unit_amount: Math.round((i.unitPrice + (i.sizeSurcharges[line.label] ?? 0)) * 100),
           product_data: {
-            name: `${i.productName}${i.colorName ? ` — ${i.colorName}` : ""}`,
+            name: `${i.productName} (${line.label})${i.colorName ? ` - ${i.colorName}` : ""}`,
             description: buildDescription(i),
             metadata: { productSlug: i.productSlug },
           },
         },
-      })),
+      }))),
       shipping_options: [
         {
           shipping_rate_data: {

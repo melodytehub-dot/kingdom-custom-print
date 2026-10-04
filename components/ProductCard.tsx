@@ -1,5 +1,6 @@
 "use client";
 
+import { useWishlist } from "@/lib/wishlist-context";
 import { useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
@@ -8,14 +9,6 @@ import { formatUSD, lowestPrintedUnit } from "@/lib/pricing";
 import { hasDedicatedMockupFamily, mockupsForProduct } from "@/lib/mockups";
 import type { Product } from "@/lib/types";
 
-function StarRating() {
-  return (
-    <div style={{ display: "inline-flex", alignItems: "center", gap: "2px", color: "#f5a623", fontSize: "12px" }}>
-      <span>★</span><span>★</span><span>★</span><span>★</span><span>★</span>
-      <span style={{ color: "#888", fontSize: "11px", marginLeft: "4px" }}>(5.0)</span>
-    </div>
-  );
-}
 
 function StarActionIcon() {
   return (
@@ -41,6 +34,8 @@ export default function ProductCard({
   product: Product;
   priority?: boolean;
 }) {
+  const { has, toggle } = useWishlist();
+  const saved = has(product.slug);
   const [selectedColorIdx, setSelectedColorIdx] = useState(0);
   const selectedColor = product.colors[selectedColorIdx] ?? product.colors[0];
   const baseHex = selectedColor?.hex ?? product.colors[0]?.hex ?? "#141414";
@@ -59,7 +54,7 @@ export default function ProductCard({
     <article className="mm-card">
       {/* 1. Thumbnail Media with Dual-Image Hover Swap */}
       <div className="mm-card-media">
-        <Link href={`/product/${product.slug}`} tabIndex={-1} aria-label={product.name}>
+        <Link prefetch={false} href={`/product/${product.slug}`} tabIndex={-1} aria-label={product.name}>
           {frontImgUrl ? (
             <>
               <Image
@@ -86,32 +81,20 @@ export default function ProductCard({
           )}
         </Link>
 
-        {/* Badges */}
-        <div className="mm-card-badges">
-          {wasPrice ? (
-            <span className="mm-flag-badge mm-flag-sale">
-              Sale -{Math.round(((wasPrice - product.basePrice) / wasPrice) * 100)}%
-            </span>
-          ) : null}
-          {product.featured ? <span className="mm-flag-badge mm-flag-hot">Hot</span> : null}
-          <span className="mm-flag-badge mm-flag-custom">POD Blank</span>
-        </div>
-
         {/* Floating Quick Action Buttons */}
         <div className="mm-card-actions-stack">
           <button
             type="button"
             className="mm-quick-btn"
-            title="Add to Wishlist"
-            aria-label="Add to Wishlist"
-            onClick={(e) => {
-              e.preventDefault();
-              alert(`Added "${product.name}" to your wishlist!`);
-            }}
+            title={saved ? "Remove from wishlist" : "Save to wishlist"}
+            aria-label={`${saved ? "Remove" : "Save"} ${product.name} ${saved ? "from" : "to"} wishlist`}
+            aria-pressed={saved}
+            onClick={() => toggle(product.slug)}
           >
             <StarActionIcon />
           </button>
           <Link
+            prefetch={false}
             href={`/product/${product.slug}`}
             className="mm-quick-btn"
             title="Quick View"
@@ -121,10 +104,7 @@ export default function ProductCard({
           </Link>
         </div>
 
-        {/* Slide-Up Bottom CTA Button */}
-        <Link href={`/customize/${product.slug}`} className="mm-card-bottom-btn">
-          Customize This Blank
-        </Link>
+
       </div>
 
       {/* 2. Card Body Details */}
@@ -135,18 +115,17 @@ export default function ProductCard({
         </span>
 
         <h3 className="mm-card-title">
-          <Link href={`/product/${product.slug}`}>{product.name}</Link>
+          <Link prefetch={false} href={`/product/${product.slug}`}>{product.name}</Link>
         </h3>
 
-        <StarRating />
 
         <div className="mm-card-price-row">
-          <span className="tnum">{formatUSD(currentPrice)}</span>
+          <span className="tnum"><small>From </small>{formatUSD(currentPrice)}</span>
           {wasPrice ? <span className="mm-price-del tnum">{formatUSD(wasPrice)}</span> : null}
         </div>
 
         {/* Color Swatch Dots */}
-        {product.colors.length > 1 ? (
+        {product.colors.length > 0 ? (
           <div className="mm-card-swatches" aria-label="Available colors">
             {product.colors.slice(0, 6).map((c, idx) => (
               <button
@@ -156,16 +135,20 @@ export default function ProductCard({
                 style={{ backgroundColor: c.hex }}
                 title={c.name}
                 aria-label={`Select ${c.name}`}
+                aria-pressed={selectedColorIdx === idx}
                 onClick={() => setSelectedColorIdx(idx)}
               />
             ))}
             {product.colors.length > 6 ? (
-              <span style={{ fontSize: "11px", color: "#888", marginLeft: "2px" }}>
+              <span style={{ fontSize: "11px", color: "#666", marginLeft: "2px" }}>
                 +{product.colors.length - 6}
               </span>
             ) : null}
           </div>
         ) : null}
+        <Link prefetch={false} href={`/customize/${product.slug}?color=${encodeURIComponent(selectedColor?.slug ?? "")}`} className="mm-card-bottom-btn">
+          Customize <span aria-hidden="true">↗</span>
+        </Link>
       </div>
     </article>
   );

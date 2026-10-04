@@ -28,6 +28,7 @@ const ROUTES = [
   { path: "/terms", name: "terms" },
   { path: "/track", name: "track" },
   { path: "/cart", name: "cart-empty" },
+  { path: "/wishlist", name: "wishlist" },
   { path: "/checkout", name: "checkout" },
   { path: "/order/success", name: "order-success" },
   { path: "/admin", name: "admin-login" },
@@ -155,7 +156,7 @@ const run = async () => {
 
       try {
         await page.goto(`${BASE}${route.path}`, {
-          waitUntil: "networkidle",
+          waitUntil: "load",
           timeout: 30000,
         });
         await page.waitForTimeout(350);
@@ -208,6 +209,8 @@ const run = async () => {
   for (const f of findings) byLevel[f.level] = (byLevel[f.level] ?? 0) + 1;
   console.log(JSON.stringify(byLevel, null, 2));
   console.log(`screenshots: ${OUT}`);
+  fs.writeFileSync(`${OUT}/findings.json`, JSON.stringify(findings, null, 2));
+  if (findings.some(f => ["OVERFLOW", "CLIPPED", "NO-NAME", "JS-ERROR", "CONSOLE", "LOAD-FAIL"].includes(f.level))) process.exitCode = 1;
   if (findings.length) {
     console.log("\nFirst 30 findings:");
     findings.slice(0, 30).forEach((f) => console.log(`  ${f.level} ${f.vp}/${f.route}: ${f.msg}`));

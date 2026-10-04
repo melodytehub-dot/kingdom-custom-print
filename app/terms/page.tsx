@@ -18,14 +18,6 @@ export default async function TermsPage() {
   return (
     <>
       <div className="wrap page-head">
-        <nav aria-label="Breadcrumb">
-          <ol className="breadcrumb">
-            <li>
-              <Link href="/">Home</Link>
-            </li>
-            <li aria-current="page">Terms</li>
-          </ol>
-        </nav>
         <p className="eyebrow">Legal</p>
         <h1 className="display">Terms and conditions</h1>
         <p className="lede">Last updated {updated}</p>

@@ -40,32 +40,6 @@ export default async function ProductPage({ params }: Params) {
   return (
     <div className="mm-pdp-page" style={{ paddingBottom: "80px" }}>
       <div className="minimog-container" style={{ paddingTop: "20px" }}>
-        <nav aria-label="Breadcrumb" style={{ marginBottom: "16px", fontSize: "13px", color: "var(--minimog-muted)" }}>
-          <ol style={{ display: "flex", gap: "8px", listStyle: "none", padding: 0, margin: 0 }}>
-            <li>
-              <Link href="/" style={{ color: "var(--minimog-text)" }}>Home</Link>
-            </li>
-            <li>/</li>
-            <li>
-              <Link href="/shop" style={{ color: "var(--minimog-text)" }}>Shop</Link>
-            </li>
-            {product.categorySlug ? (
-              <>
-                <li>/</li>
-                <li>
-                  <Link href={`/shop?category=${product.categorySlug}`} style={{ color: "var(--minimog-text)" }}>
-                    {product.categoryName}
-                  </Link>
-                </li>
-              </>
-            ) : null}
-            <li>/</li>
-            <li aria-current="page" style={{ color: "var(--minimog-black)", fontWeight: 500 }}>{product.name}</li>
-          </ol>
-        </nav>
-      </div>
-
-      <div className="minimog-container" style={{ paddingTop: "20px" }}>
         <ProductDetail product={product} />
         <p className="pdp-from small muted" style={{ marginTop: "14px" }}>
           Blank priced from {formatUSD(product.basePrice)} before custom decoration.

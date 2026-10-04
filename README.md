@@ -35,8 +35,8 @@ The site runs at http://localhost:3000 and the admin at `/admin`.
 | `STRIPE_WEBHOOK_SECRET` | for card payments | Verifies `/api/webhook` events |
 | `NEXT_PUBLIC_SITE_URL` | recommended | Absolute base URL for Stripe redirects |
 
-Without the Stripe keys, checkout still records the order and shows the
-reference so payment can be arranged manually. Nothing is charged.
+Without the Stripe secret key and webhook signing secret, checkout is disabled.
+The customer cart stays saved and the API creates no unpaid manual-payment order.
 
 ## Scripts
 
@@ -77,7 +77,7 @@ so a tampered cart cannot change what is charged.
 
 ## Administration
 
-`/admin` uses a single shared password and a signed, httpOnly session cookie
+`/admin` uses a single shared password and a random, database-backed httpOnly session cookie
 valid for 12 hours, with repeated failed attempts throttled. From there you can
 review and update orders, manage products and variants, edit site settings
 (shipping rates, production time, contact details) and browse customers.
@@ -90,11 +90,13 @@ settings, then run `npm run db:migrate` and `npm run db:seed` against the
 production database before the first live order.
 
 Point a Stripe webhook at `https://<your-domain>/api/webhook` and subscribe it
-to `checkout.session.completed` and `checkout.session.expired`.
+to `checkout.session.completed`, `checkout.session.async_payment_succeeded`, and `checkout.session.expired`. Only verified paid sessions confirm payment.
 
 ## Before going live
 
-- Replace the placeholder logo with the client's final artwork.
 - Fill in the real contact email, phone and address in admin settings; the
   contact and footer pages render them once set.
-- Confirm the logo on `public/brand/kingdom-logo.svg` matches the supplied file.
+- The storefront uses the Kingdom Custom Print logo at `public/brand/kingdom-logo.png`.
+- Card checkout requires both `STRIPE_SECRET_KEY` and `STRIPE_WEBHOOK_SECRET`. Missing configuration disables payment and preserves the customer cart; no manual-payment order is created.
+- Local admin access uses the generated `ADMIN_PASSWORD` in the git-ignored `.env.local`; configure a separate password in the deployment environment.
+- Run `npm run qa-storefront` and `npm run qa-payments` for the storefront and payment contract regression checks. The payment contract tests use mock transports and make no real charges.

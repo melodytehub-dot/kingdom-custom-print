@@ -1,49 +1,58 @@
 import Link from "next/link";
 import ProductCard from "@/components/ProductCard";
+import { lowestPrintedUnit } from "@/lib/pricing";
+import ShopSort from "@/components/ShopSort";
 import { getProducts, getCategories } from "@/lib/catalog";
 
 export const revalidate = 60;
 
 export const metadata = {
-  title: "Shop custom printed t-shirts",
+  title: "Shop custom printed apparel",
   description:
-    "Blank t-shirts printed to order. Filter by fit, then design yours online with text, artwork and names & numbers.",
+    "Apparel and accessories printed to order. Filter by fit, then design yours online with text, artwork and names & numbers.",
 };
 
 const KIND_FILTERS = [
   { value: "tee", label: "Short Sleeve" },
   { value: "longsleeve", label: "Long Sleeve" },
+  { value: "fleece", label: "Hoodies & Fleece" },
 ];
 
 export default async function ShopPage({
   searchParams,
 }: {
-  searchParams: Promise<{ category?: string; kind?: string; sort?: string }>;
+  searchParams: Promise<{ category?: string; kind?: string; sort?: string; q?: string }>;
 }) {
   const params = await searchParams;
   const [allCategories, allProducts] = await Promise.all([
     getCategories(),
-    getProducts({ categorySlug: "t-shirts" }),
+    getProducts(),
   ]);
-  const categories = allCategories.filter((category) => category.slug === "t-shirts");
+  const categories = allCategories;
 
-  const activeCategory = params.category === "t-shirts" ? params.category : "";
+  const activeCategory = params.category ?? "";
   const activeKind = params.kind ?? "";
 
+  const query = (params.q ?? "").trim().slice(0, 200);
   let products = allProducts;
+  if (query) {
+    const words = query.toLowerCase().split(/\s+/);
+    products = products.filter((p) => words.every((word) => `${p.name} ${p.styleCode} ${p.blurb} ${p.categoryName} ${p.material}`.toLowerCase().includes(word)));
+  }
   if (activeCategory) products = products.filter((p) => p.categorySlug === activeCategory);
-  if (activeKind) products = products.filter((p) => p.kind === activeKind);
+  if (activeKind) products = products.filter((p) => activeKind === "fleece" ? p.kind === "hoodie" || p.kind === "crew" : p.kind === activeKind);
 
   const sort = params.sort ?? "featured";
   products = [...products].sort((a, b) => {
-    if (sort === "price-asc") return a.basePrice - b.basePrice;
-    if (sort === "price-desc") return b.basePrice - a.basePrice;
+    if (sort === "price-asc") return (lowestPrintedUnit(a) ?? a.basePrice) - (lowestPrintedUnit(b) ?? b.basePrice);
+    if (sort === "price-desc") return (lowestPrintedUnit(b) ?? b.basePrice) - (lowestPrintedUnit(a) ?? a.basePrice);
     if (sort === "name") return a.name.localeCompare(b.name);
     return Number(b.featured) - Number(a.featured) || a.sortOrder - b.sortOrder;
   });
 
   const buildHref = (next: { category?: string; kind?: string; sort?: string }) => {
     const q = new URLSearchParams();
+    if (query) q.set("q", query);
     const category = next.category ?? activeCategory;
     const kind = next.kind ?? activeKind;
     const s = next.sort ?? sort;
@@ -55,25 +64,16 @@ export default async function ShopPage({
   };
 
   const activeCategoryName = categories.find((c) => c.slug === activeCategory)?.name;
-  const hasFilters = Boolean(activeCategory || activeKind);
+  const hasFilters = Boolean(activeCategory || activeKind || query);
 
   return (
     <div className="mm-shop-page" style={{ paddingBottom: "80px" }}>
       <div className="minimog-container" style={{ paddingTop: "30px", marginBottom: "30px" }}>
-        <nav aria-label="Breadcrumb" style={{ marginBottom: "14px", fontSize: "13px", color: "var(--minimog-muted)" }}>
-          <ol style={{ display: "flex", gap: "8px", listStyle: "none", padding: 0, margin: 0 }}>
-            <li>
-              <Link href="/" style={{ color: "var(--minimog-text)" }}>Home</Link>
-            </li>
-            <li>/</li>
-            <li aria-current="page" style={{ color: "var(--minimog-black)", fontWeight: 500 }}>Shop Catalog</li>
-          </ol>
-        </nav>
         <span className="mm-hero-tag" style={{ marginBottom: "12px" }}>
           {activeCategoryName ?? "ALL BLANKS & APPAREL"}
         </span>
         <h1 style={{ fontSize: "36px", letterSpacing: "1px", margin: "6px 0 12px" }}>
-          {activeCategoryName ? `SHOP ${activeCategoryName.toUpperCase()}` : "SHOP PRINT-ON-DEMAND BLANKS"}
+          {query ? `Results for “${query}”` : activeCategoryName ? `SHOP ${activeCategoryName.toUpperCase()}` : "FIND YOUR NEXT FAVORITE"}
         </h1>
         <p style={{ color: "var(--minimog-text)", maxWidth: "600px", margin: 0 }}>
           Choose your favorite blank garment, examine available color runs and print specs, then open the online studio to customize.
@@ -148,7 +148,7 @@ export default async function ShopPage({
             })}
           </div>
 
-          <SortControl current={sort} build={buildHref} />
+          <ShopSort current={sort} />
         </div>
       </div>
 
@@ -193,54 +193,6 @@ export default async function ShopPage({
           </div>
         )}
       </section>
-    </div>
-  );
-}
-
-function SortControl({
-  current,
-  build,
-}: {
-  current: string;
-  build: (next: { sort: string }) => string;
-}) {
-  const options = [
-    { value: "featured", label: "Featured" },
-    { value: "price-asc", label: "Price: low to high" },
-    { value: "price-desc", label: "Price: high to low" },
-    { value: "name", label: "Name A–Z" },
-  ];
-
-  return (
-    <div className="sort-control">
-      <span className="label sort-label" id="sort-label">
-        Sort by
-      </span>
-      <div className="sort-menu">
-        <button
-          type="button"
-          className="sort-toggle"
-          aria-haspopup="true"
-          aria-label={`Sort by ${options.find((o) => o.value === current)?.label ?? "featured"}`}
-        >
-          {options.find((o) => o.value === current)?.label ?? "Featured"}
-          <svg width="9" height="6" viewBox="0 0 12 8" aria-hidden="true">
-            <path fill="none" stroke="currentColor" strokeWidth="1.6" d="M1 1.5 6 6.5l5-5" />
-          </svg>
-        </button>
-        <ul className="sort-list" aria-labelledby="sort-label">
-          {options.map((o) => (
-            <li key={o.value}>
-              <Link
-                href={build({ sort: o.value })}
-                aria-current={o.value === current ? "true" : undefined}
-              >
-                {o.label}
-              </Link>
-            </li>
-          ))}
-        </ul>
-      </div>
     </div>
   );
 }

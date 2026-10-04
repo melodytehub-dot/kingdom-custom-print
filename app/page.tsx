@@ -1,6 +1,6 @@
 import Link from "next/link";
 import Image from "next/image";
-import ProductCard from "@/components/ProductCard";
+import HomeProducts from "@/components/HomeProducts";
 import ArrowRight from "@/components/icons/ArrowRight";
 import Truck from "@/components/icons/Truck";
 import Shield from "@/components/icons/Shield";
@@ -10,36 +10,9 @@ import { getProducts } from "@/lib/catalog";
 export const revalidate = 60;
 
 const POD_CATEGORIES = [
-  {
-    name: "MUGS",
-    slug: "t-shirts",
-    img: "/img/products/crown-classic-tee-white.jpg",
-  },
-  {
-    name: "PHONE CASES",
-    slug: "t-shirts",
-    img: "/img/products/crown-classic-tee-black.jpg",
-  },
-  {
-    name: "APPAREL",
-    slug: "t-shirts",
-    img: "/img/products/comfort-colors-tee.jpg",
-  },
-  {
-    name: "HOODIES",
-    slug: "t-shirts",
-    img: "/img/products/comfort-colors-tee.jpg",
-  },
-  {
-    name: "DOORMATS",
-    slug: "t-shirts",
-    img: "/img/products/crown-classic-tee-maroon.jpg",
-  },
-  {
-    name: "BLANKETS",
-    slug: "t-shirts",
-    img: "/img/products/crown-classic-tee-ash.jpg",
-  },
+  { name: "T-SHIRTS", href: "/shop?kind=tee", img: "/img/products/crown-classic-tee-white.jpg" },
+  { name: "LONG SLEEVES", href: "/shop?kind=longsleeve", img: "/img/products/long-sleeve-tee.jpg" },
+  { name: "HOODIES & FLEECE", href: "/shop?kind=fleece", img: "/img/mockups/families/hoodie/BLK_fr.webp" },
 ];
 
 const INSTA_IMAGES = [
@@ -52,8 +25,7 @@ const INSTA_IMAGES = [
 ];
 
 export default async function HomePage() {
-  const products = await getProducts({ categorySlug: "t-shirts", limit: 8 }).catch(() => []);
-  const showcase = products.slice(0, 8);
+  const products = await getProducts().catch(() => []);
 
   return (
     <div className="mm-home-wrapper">
@@ -66,13 +38,12 @@ export default async function HomePage() {
             <div className="mm-hero-content">
               <span className="mm-hero-tag">PRINT ON DEMAND STUDIO</span>
               <h1 className="mm-hero-title">
-                OVERSIZED PRINTED
+                YOUR IDEAS.
                 <br />
-                T-SHIRT
+                MADE TO WEAR.
               </h1>
               <p className="mm-hero-desc">
-                From millions of things designed and sold by artists. Or build your own
-                custom apparel online in seconds with zero minimum order quantities.
+                Custom apparel for your everyday, your brand, or your team. Design it online. Make it yours.
               </p>
               <div className="mm-hero-actions">
                 <Link href="/shop" className="mm-btn mm-btn-black">
@@ -90,58 +61,33 @@ export default async function HomePage() {
                   src="/img/hero-editorial.png"
                   alt="A person wearing an oversized custom printed t-shirt"
                   fill
-                  priority
+                  loading="eager"
+                  fetchPriority="high"
                   sizes="(max-width: 768px) 100vw, 520px"
                   style={{ objectFit: "cover" }}
                 />
               </div>
 
-              <div className="mm-hero-badge-floating">
-                <div className="mm-badge-circle">
-                  ✓
-                </div>
-                <div className="mm-badge-text">
-                  <strong>100% Combed Cotton</strong>
-                  <span>High-Definition DTG Printing</span>
-                </div>
-              </div>
+
             </div>
           </div>
         </div>
       </section>
 
       {/* ------------------------------------------------------------------
-          2. TRENDING THIS WEEK (Product Grid)
+          2. MAKE IT YOURS (Product Grid)
           ------------------------------------------------------------------ */}
       <section className="mm-section">
         <div className="minimog-container">
           <div className="mm-section-head">
-            <h2 className="mm-section-title">TRENDING THIS WEEK</h2>
+            <h2 className="mm-section-title">MAKE IT YOURS</h2>
             <p className="mm-section-sub">
-              Explore our best-selling print-on-demand blanks and creator graphics, crafted for comfort and style.
+              Find your fit. Choose a color. Create something only you could make.
             </p>
-            <div className="mm-tabs">
-              <button type="button" className="mm-tab-btn active">ALL DESIGNS</button>
-              <button type="button" className="mm-tab-btn">CLASSIC TEES</button>
-              <button type="button" className="mm-tab-btn">OVERSIZED TEES</button>
-              <button type="button" className="mm-tab-btn">HOODIES & FLEECE</button>
-              <button type="button" className="mm-tab-btn">NEW ARRIVALS</button>
-            </div>
+
           </div>
 
-          {showcase.length ? (
-            <ul className="mm-product-grid">
-              {showcase.map((p, i) => (
-                <li key={p.id}>
-                  <ProductCard product={p} priority={i < 4} />
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <div style={{ textAlign: "center", padding: "40px" }}>
-              <p>No products found in the catalog.</p>
-            </div>
-          )}
+          <HomeProducts products={products} />
 
           <div style={{ textAlign: "center", marginTop: "50px" }}>
             <Link href="/shop" className="mm-btn mm-btn-outline" style={{ padding: "0 45px" }}>
@@ -161,13 +107,13 @@ export default async function HomePage() {
               href="/shop"
               className="mm-banner-box"
               style={{
-                backgroundImage: "url('/img/studio-editorial.png')",
                 backgroundColor: "#111",
               }}
             >
+              <Image src="/img/studio-editorial.png" alt="" fill sizes="(max-width: 768px) 100vw, 620px" className="mm-banner-photo" />
               <div className="mm-banner-content">
                 <h3 className="mm-banner-title">PRINT ON DEMAND</h3>
-                <p className="mm-banner-sub">From millions of things designed and sold by artists.</p>
+                <p className="mm-banner-sub">Your artwork, printed on the apparel you love.</p>
                 <span className="mm-banner-cta">
                   SHOP NOW <ArrowRight size={14} />
                 </span>
@@ -178,10 +124,10 @@ export default async function HomePage() {
               href="/customize"
               className="mm-banner-box"
               style={{
-                backgroundImage: "url('/img/hero-editorial.png')",
                 backgroundColor: "#222",
               }}
             >
+              <Image src="/img/hero-editorial.png" alt="" fill sizes="(max-width: 768px) 100vw, 620px" className="mm-banner-photo" />
               <div className="mm-banner-content">
                 <h3 className="mm-banner-title">CROSSFIT & TEAMS</h3>
                 <p className="mm-banner-sub">Affiliate gear, custom uniforms and event apparel.</p>
@@ -208,7 +154,7 @@ export default async function HomePage() {
 
           <div className="mm-categories-grid">
             {POD_CATEGORIES.map((cat, idx) => (
-              <Link key={`${cat.name}-${idx}`} href={`/shop?category=${cat.slug}`} className="mm-category-item">
+              <Link key={`${cat.name}-${idx}`} href={cat.href} className="mm-category-item">
                 <div className="mm-category-thumb">
                   <Image
                     src={cat.img}
@@ -321,7 +267,7 @@ export default async function HomePage() {
                 Precision DTG Print
               </h3>
               <p style={{ color: "#666", fontSize: "14px", lineHeight: "1.6", margin: 0 }}>
-                Printed with certified eco-friendly, water-based inks that penetrate fibers for durable, wash-resistant vibrance.
+                We prepare your artwork for printing and produce your garments to order.
               </p>
             </div>
 
@@ -333,7 +279,7 @@ export default async function HomePage() {
                 Delivered With Tracking
               </h3>
               <p style={{ color: "#666", fontSize: "14px", lineHeight: "1.6", margin: 0 }}>
-                Carefully packaged and dispatched with full online tracking from our print facility right to your door.
+                Use your order reference to check progress as your garments move through production and shipping.
               </p>
             </div>
           </div>
@@ -353,7 +299,7 @@ export default async function HomePage() {
         <div className="minimog-container">
           <div style={{ textAlign: "center", marginBottom: "40px" }}>
             <h2 style={{ fontSize: "30px", letterSpacing: "1px", margin: 0 }}>
-              PRODUCT ARTWORK IS CREATED BY TALENTED ARTISTS FROM ALL AROUND THE WORLD.
+              YOUR PROJECT. OUR ATTENTION TO DETAIL.
             </h2>
           </div>
 
@@ -363,9 +309,9 @@ export default async function HomePage() {
                 <Truck size={24} />
               </div>
               <div className="mm-feature-body">
-                <h3>Free Shipping</h3>
+                <h3>Clear delivery options</h3>
                 <p>
-                  Get complimentary ground shipping on every order over $100. Don&apos;t love it? Send it back, on us.
+                  Review shipping at checkout and follow your order from production to delivery.
                 </p>
               </div>
             </div>
@@ -377,7 +323,7 @@ export default async function HomePage() {
               <div className="mm-feature-body">
                 <h3>Locally Owned</h3>
                 <p>
-                  Join Minimog Rewards to earn gift cards and enjoy exclusive member benefits on custom runs.
+                  Custom apparel for businesses, creative projects, events, and teams. Talk to us about your next run.
                 </p>
               </div>
             </div>
@@ -387,9 +333,9 @@ export default async function HomePage() {
                 <Shield size={24} />
               </div>
               <div className="mm-feature-body">
-                <h3>Money Back Guarantee</h3>
+                <h3>Here to help</h3>
                 <p>
-                  We believe getting dressed should be the easiest part of your day with 100% satisfaction assurance.
+                  Questions about a garment or your artwork? Our team can help you plan your print.
                 </p>
               </div>
             </div>
@@ -404,27 +350,27 @@ export default async function HomePage() {
         <div className="minimog-container">
           <div className="mm-section-head" style={{ marginBottom: "20px" }}>
             <h2 className="mm-section-title" style={{ fontSize: "28px" }}>
-              FOLLOW US ON INSTAGRAM
+              COLOR YOUR NEXT PROJECT
             </h2>
             <p className="mm-section-sub">
-              Tag @minimog_print to be featured in our creator community spotlight.
+              Explore garment colors and build a look that feels like you.
             </p>
           </div>
 
           <div className="mm-insta-grid">
             {INSTA_IMAGES.map((img, i) => (
-              <a key={`insta-${i}`} href="https://instagram.com" target="_blank" rel="noopener noreferrer" className="mm-insta-item">
+              <Link key={`insta-${i}`} href="/shop" className="mm-insta-item">
                 <Image
                   src={img}
-                  alt={`Minimog creator showcase ${i + 1}`}
+                  alt={`Kingdom Custom Print garment inspiration ${i + 1}`}
                   fill
                   sizes="(max-width: 768px) 33vw, 200px"
                   style={{ objectFit: "cover" }}
                 />
                 <div className="mm-insta-overlay">
-                  <span></span>
+                  <span>Explore ↗</span>
                 </div>
-              </a>
+              </Link>
             ))}
           </div>
         </div>
@@ -436,25 +382,11 @@ export default async function HomePage() {
       <section className="mm-newsletter-section">
         <div className="minimog-container">
           <div className="mm-newsletter-box">
-            <h2 className="mm-newsletter-title">SUBSCRIBE</h2>
+            <h2 className="mm-newsletter-title">LET’S MAKE SOMETHING GREAT</h2>
             <p className="mm-newsletter-sub">
-              Our conversation is just getting started. Subscribe to receive 15% off your first custom apparel order.
+              Planning apparel for your business or team? Tell us about your project and we’ll help you get started.
             </p>
-            <form
-              action="/contact"
-              method="GET"
-              className="mm-newsletter-form"
-            >
-              <input
-                type="email"
-                placeholder="Enter your email address *"
-                required
-                className="mm-newsletter-input"
-              />
-              <button type="submit" className="mm-newsletter-btn">
-                SUBMIT
-              </button>
-            </form>
+            <Link href="/contact" className="mm-btn mm-btn-black">Talk to our team</Link>
           </div>
         </div>
       </section>

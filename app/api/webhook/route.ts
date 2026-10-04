@@ -33,8 +33,10 @@ export async function POST(req: Request) {
   }
 
   switch (event.type) {
-    case "checkout.session.completed": {
+    case "checkout.session.completed":
+    case "checkout.session.async_payment_succeeded": {
       const session = event.data.object;
+      if (session.payment_status !== "paid") break;
       await markOrderPaid(
         session.id,
         typeof session.payment_intent === "string"

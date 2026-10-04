@@ -109,7 +109,14 @@ const hasForm = await page.locator("form, input[type=email]").count();
 check("checkout form renders", hasForm > 0);
 
 const email = page.locator('input[name="email"], input[type="email"]').first();
-if (await email.count()) {
+const paymentUnavailable = await page.getByRole("button", { name: "Card checkout unavailable" }).count();
+if (paymentUnavailable) {
+  check("checkout is disabled until Stripe is configured", await page.getByRole("button", { name: "Card checkout unavailable" }).isDisabled());
+  const gate = await fetch(`${BASE}/api/checkout`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ items: [] }) });
+  check("API rejects unconfigured payments", gate.status === 503);
+  await page.goto(`${BASE}/cart`, { waitUntil: "networkidle" });
+  check("cart stays saved while payments are unavailable", (await page.locator("main").innerText()).toLowerCase().includes(PRODUCT_NAME));
+} else if (await email.count()) {
   // Type each field the way a customer would; the dev server needs a moment to
   // compile the checkout route on the first request.
   const typeInto = async (sel, text) => {
@@ -153,7 +160,7 @@ if (await email.count()) {
     await page.goto(`${BASE}/order/success?ref=${ref}`, { waitUntil: "networkidle" });
     const successText = await page.locator("main, body").first().innerText();
     const successCopyIsExplicit =
-      /payment instructions|payment is confirmed/i.test(successText);
+      /waiting for payment confirmation|payment is confirmed/i.test(successText);
     check("order success explains the payment state", successCopyIsExplicit, successText.replace(/\s+/g, " ").slice(0, 240));
 
     await page.goto(`${BASE}/track`, { waitUntil: "networkidle" });

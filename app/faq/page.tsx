@@ -97,14 +97,6 @@ export default async function FaqPage() {
   return (
     <>
       <div className="wrap page-head">
-        <nav aria-label="Breadcrumb">
-          <ol className="breadcrumb">
-            <li>
-              <Link href="/">Home</Link>
-            </li>
-            <li aria-current="page">FAQ</li>
-          </ol>
-        </nav>
         <p className="eyebrow">FAQ</p>
         <h1 className="display">Questions, answered</h1>
         <p className="lede">

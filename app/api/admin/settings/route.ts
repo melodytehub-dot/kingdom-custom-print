@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { revalidatePath } from "next/cache";
 import { requireAdmin } from "../_guard";
 import { getSettings, saveSettings, type SiteSettings } from "@/lib/catalog";
 
@@ -43,5 +44,6 @@ export async function PUT(req: Request) {
     productionDays: str(body.productionDays ?? current.productionDays, 120),
   });
 
+  revalidatePath("/", "layout");
   return NextResponse.json({ ok: true });
 }

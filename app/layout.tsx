@@ -25,10 +25,12 @@ import "./cart/cart.css";
 import "./admin/admin.css";
 import "./content.css";
 import "./minimog.css";
+import "./refinements.css";
 import { CartProvider } from "@/lib/cart-context";
 import { getCategories } from "@/lib/catalog";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
+import { WishlistProvider } from "@/lib/wishlist-context";
 import MobileTabBar from "@/components/MobileTabBar";
 
 const outfit = Outfit({
@@ -38,6 +40,7 @@ const outfit = Outfit({
 });
 
 const inter = Inter({
+  preload: false,
   subsets: ["latin"],
   display: "swap",
   variable: "--font-inter",
@@ -51,12 +54,14 @@ const anton = Anton({
 });
 
 const oswald = Oswald({
+  preload: false,
   subsets: ["latin"],
   display: "swap",
   variable: "--font-oswald",
 });
 
 const bebas = Bebas_Neue({
+  preload: false,
   subsets: ["latin"],
   weight: "400",
   display: "swap",
@@ -64,6 +69,7 @@ const bebas = Bebas_Neue({
 });
 
 const archivo = Archivo_Black({
+  preload: false,
   subsets: ["latin"],
   weight: "400",
   display: "swap",
@@ -71,12 +77,14 @@ const archivo = Archivo_Black({
 });
 
 const playfair = Playfair_Display({
+  preload: false,
   subsets: ["latin"],
   display: "swap",
   variable: "--font-playfair",
 });
 
 const pacifico = Pacifico({
+  preload: false,
   subsets: ["latin"],
   weight: "400",
   display: "swap",
@@ -84,6 +92,7 @@ const pacifico = Pacifico({
 });
 
 const lobster = Lobster({
+  preload: false,
   subsets: ["latin"],
   weight: "400",
   display: "swap",
@@ -91,30 +100,35 @@ const lobster = Lobster({
 });
 
 const montserrat = Montserrat({
+  preload: false,
   subsets: ["latin"],
   display: "swap",
   variable: "--font-montserrat",
 });
 
 const raleway = Raleway({
+  preload: false,
   subsets: ["latin"],
   display: "swap",
   variable: "--font-raleway",
 });
 
 const robotoCondensed = Roboto_Condensed({
+  preload: false,
   subsets: ["latin"],
   display: "swap",
   variable: "--font-roboto-condensed",
 });
 
 const merriweather = Merriweather({
+  preload: false,
   subsets: ["latin"],
   display: "swap",
   variable: "--font-merriweather",
 });
 
 const permanentMarker = Permanent_Marker({
+  preload: false,
   subsets: ["latin"],
   weight: "400",
   display: "swap",
@@ -166,6 +180,7 @@ export const viewport: Viewport = {
   themeColor: "#ffffff",
   width: "device-width",
   initialScale: 1,
+  viewportFit: "cover",
 };
 
 export default async function RootLayout({
@@ -173,9 +188,7 @@ export default async function RootLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const categories = (await getCategories().catch(() => [])).filter(
-    (category) => category.slug === "t-shirts"
-  );
+  const categories = await getCategories().catch(() => []);
 
   return (
     <html lang="en" className={FONT_VARS}>
@@ -184,10 +197,12 @@ export default async function RootLayout({
           Skip to content
         </a>
         <CartProvider>
+          <WishlistProvider>
           <Header categories={categories} />
           <main id="main">{children}</main>
           <Footer />
           <MobileTabBar />
+          </WishlistProvider>
         </CartProvider>
       </body>
     </html>
