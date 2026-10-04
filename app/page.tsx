@@ -288,9 +288,18 @@ export default async function HomePage() {
       {/* Benefits */}
       <section className="section benefits-section" aria-label="Kingdom Custom Print benefits">
         <div className="wrap benefits-grid">
-          <div className="benefit-card"><span className="benefit-icon"><Check size={18} /></span><h3>Free shipping</h3><p>Complimentary US shipping on orders over {freeShipping}.</p></div>
-          <div className="benefit-card"><span className="benefit-icon"><Check size={18} /></span><h3>Made for your idea</h3><p>Upload art, add text and preview the front or back before checkout.</p></div>
-          <div className="benefit-card"><span className="benefit-icon"><Check size={18} /></span><h3>Printed to order</h3><p>Every t-shirt is made after you order, with no minimum quantity.</p></div>
+          <article className="benefit-card">
+            <Image src="/img/feature-blanks.png" alt="Premium t-shirts folded by color" fill sizes="(max-width: 760px) 100vw, 33vw" className="benefit-image" />
+            <div className="benefit-copy"><span className="benefit-icon"><Check size={18} /></span><h3>Premium blanks</h3><p>Comfortable t-shirts selected to hold their shape and take a clean print.</p></div>
+          </article>
+          <article className="benefit-card">
+            <Image src="/img/feature-studio.png" alt="Screen printing press in a local print studio" fill sizes="(max-width: 760px) 100vw, 33vw" className="benefit-image" />
+            <div className="benefit-copy"><span className="benefit-icon"><Check size={18} /></span><h3>Printed with care</h3><p>Every order moves from your browser to a real print workflow with care.</p></div>
+          </article>
+          <article className="benefit-card">
+            <Image src="/img/feature-finish.png" alt="Finished custom printed t-shirt ready to ship" fill sizes="(max-width: 760px) 100vw, 33vw" className="benefit-image" />
+            <div className="benefit-copy"><span className="benefit-icon"><Check size={18} /></span><h3>Ready to wear</h3><p>Preview the front or back, then get free US shipping over {freeShipping}.</p></div>
+          </article>
         </div>
       </section>
 

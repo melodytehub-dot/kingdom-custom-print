@@ -4,14 +4,14 @@
    ========================================================================== */
 
 .rot {
-  --rot-accent: var(--red);
-  --rot-accent-2: var(--red);
-  --rot-accent-soft: rgba(200, 16, 46, 0.08);
+  --rot-accent: #111111;
+  --rot-accent-2: #111111;
+  --rot-accent-soft: rgba(17, 17, 17, 0.07);
   --rot-line: var(--line);
   --rot-text: var(--ink-2);
   --rot-muted: var(--muted);
-  --rot-radius: var(--r);
-  --rot-bar-h: 76px;
+  --rot-radius: 0;
+  --rot-bar-h: 68px;
 
   position: fixed;
   inset: 0;
@@ -68,7 +68,7 @@
   padding-top: env(safe-area-inset-top);
   background: #fff;
   border-bottom: 1px solid var(--line);
-  box-shadow: var(--shadow-sm);
+  box-shadow: none;
 }
 
 .rot-logo {
@@ -118,7 +118,7 @@
 }
 
 .rot-next:hover:not(:disabled) {
-  background: var(--red-dark);
+  background: #333;
 }
 
 .rot-next:disabled {
@@ -216,7 +216,7 @@
   width: 33.3334%;
   height: 4px;
   background: var(--rot-accent);
-  box-shadow: 0 3px 12px rgba(200, 16, 46, 0.45);
+  box-shadow: none;
   transform: translateX(calc(var(--step, 0) * 100%));
   transition: transform 0.25s ease;
 }
@@ -674,9 +674,9 @@
 }
 
 .rot-side-thumb.is-active {
-  border-color: var(--red);
-  color: var(--red);
-  box-shadow: 0 0 0 1px var(--red);
+  border-color: var(--rot-accent);
+  color: var(--rot-accent);
+  box-shadow: 0 0 0 1px var(--rot-accent);
 }
 
 .rot-stage-chip {
@@ -693,8 +693,8 @@
 }
 
 .rot-stage-chip:hover {
-  border-color: var(--red);
-  color: var(--red);
+  border-color: var(--rot-accent);
+  color: var(--rot-accent);
 }
 
 .rot-rotate-compact {
@@ -739,12 +739,12 @@
   font-weight: 400;
   letter-spacing: 0.05em;
   text-decoration: none;
-  box-shadow: 0 6px 18px rgba(200, 16, 46, 0.25);
+  box-shadow: 0 6px 18px rgba(17, 17, 17, 0.16);
   transition: background 0.15s ease, opacity 0.15s ease;
 }
 
 .rot-cta:hover:not(:disabled) {
-  background: var(--red-dark);
+  background: #333;
 }
 
 .rot-cta:disabled {
@@ -1189,11 +1189,11 @@
   background: var(--rot-accent);
   border-color: var(--rot-accent);
   color: #fff;
-  box-shadow: 0 4px 14px rgba(200, 16, 46, 0.3);
+  box-shadow: 0 4px 14px rgba(17, 17, 17, 0.14);
 }
 
 .rot-actbtn.is-solid.is-on {
-  background: var(--red-dark);
+  background: #333;
 }
 
 .rot-actpair {

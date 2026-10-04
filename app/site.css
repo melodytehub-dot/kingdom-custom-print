@@ -314,14 +314,21 @@
 
 .mobile-panel {
   position: fixed;
-  inset: 0;
+  inset: 0 auto 0 0;
+  width: min(88vw, 380px);
   background: var(--paper);
   z-index: 100;
   display: flex;
   flex-direction: column;
   overflow-y: auto;
   overscroll-behavior: contain;
-  animation: fade-in 200ms var(--ease);
+  box-shadow: 18px 0 42px rgba(17, 17, 17, 0.16);
+  animation: slide-in 240ms var(--ease);
+}
+
+@keyframes slide-in {
+  from { transform: translateX(-102%); }
+  to { transform: translateX(0); }
 }
 
 .mobile-panel-head {
@@ -351,10 +358,12 @@
   align-items: center;
   justify-content: space-between;
   padding: 16px var(--gutter);
-  font-family: var(--font-display);
-  font-size: 1.7rem;
+  font-family: var(--font-body);
+  font-size: 15px;
+  font-weight: 500;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
-  line-height: 1;
+  line-height: 1.2;
   border-bottom: 1px solid var(--line);
 }
 
