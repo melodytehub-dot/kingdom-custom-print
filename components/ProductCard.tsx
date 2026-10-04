@@ -3,6 +3,7 @@ import Image from "next/image";
 import Garment from "./Garment";
 import { formatUSD, largestBreakQty, lowestPrintedUnit } from "@/lib/pricing";
 import { hasDedicatedMockupFamily, mockupsForProduct } from "@/lib/mockups";
+import { sizeSummary } from "@/lib/sizes";
 import type { Product } from "@/lib/types";
 
 function ColorDots({ colors }: { colors: Product["colors"] }) {
@@ -21,7 +22,7 @@ function ColorDots({ colors }: { colors: Product["colors"] }) {
 
 function sizeRange(product: Product): string | null {
   if (product.sizes.length < 2) return null;
-  return `${product.sizes[0].label} – ${product.sizes[product.sizes.length - 1].label}`;
+  return sizeSummary(product.sizes);
 }
 
 export default function ProductCard({

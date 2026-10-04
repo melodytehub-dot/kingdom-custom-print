@@ -1722,6 +1722,24 @@
   margin-top: 16px;
 }
 
+.rot-size-group {
+  margin-top: 18px;
+}
+
+.rot-size-group-title {
+  margin: 0 0 8px;
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: #2c2c31;
+}
+
+.rot-size-group .rot-sizes {
+  grid-template-columns: repeat(auto-fit, minmax(132px, 1fr));
+  gap: 8px;
+  margin-top: 0;
+}
+
 .rot-size {
   display: flex;
   align-items: center;

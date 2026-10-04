@@ -6,7 +6,8 @@ import Link from "next/link";
 import Garment from "@/components/Garment";
 import ArrowRight from "@/components/icons/ArrowRight";
 import { formatUSD, lowestPrintedUnit, quoteProduct, resolveBreak } from "@/lib/pricing";
-import { hasDedicatedMockupFamily, mockupsForProduct } from "@/lib/mockups";
+import { mockupsForProduct } from "@/lib/mockups";
+import { sizeSummary } from "@/lib/sizes";
 import type { Product, ProductColor } from "@/lib/types";
 
 export default function ProductDetail({ product }: { product: Product }) {
@@ -28,11 +29,10 @@ export default function ProductDetail({ product }: { product: Product }) {
     [colorSlug, product.colors, firstColor]
   );
 
-  const dedicatedMockups = useMemo(
-    () => (hasDedicatedMockupFamily(product) ? mockupsForProduct(product) : []),
-    [product]
-  );
-  const activeGenerated = dedicatedMockups.find((m) => m.slug === color?.slug) ?? dedicatedMockups[0];
+  // Every catalogue colour has a generated fallback. Real product photography
+  // remains the first choice when its alt text identifies the selected colour.
+  const generatedMockups = useMemo(() => mockupsForProduct(product), [product]);
+  const activeGenerated = generatedMockups.find((m) => m.slug === color?.slug) ?? generatedMockups[0];
 
   function pickColor(c: ProductColor) {
     setColorSlug(c.slug);
@@ -74,9 +74,16 @@ export default function ProductDetail({ product }: { product: Product }) {
     [product]
   );
 
-  const activeImage = activeGenerated
+  const selectedProductImage = product.images[imageIdx] ?? product.images[0];
+  const selectedImageMatchesColor = Boolean(
+    selectedProductImage &&
+      color &&
+      selectedProductImage.alt.toLowerCase().includes(color.name.toLowerCase())
+  );
+  const usingGeneratedColor = Boolean(activeGenerated && !selectedImageMatchesColor);
+  const activeImage = activeGenerated && !selectedImageMatchesColor
     ? { url: activeGenerated.front, alt: `${product.name} in ${activeGenerated.name}` }
-    : product.images[imageIdx] ?? product.images[0];
+    : selectedProductImage;
   const canCustomize = totalQty > 0;
 
   function setQty(label: string, value: number) {
@@ -104,7 +111,7 @@ export default function ProductDetail({ product }: { product: Product }) {
           </p>
         ) : null}
 
-        {!activeGenerated && product.images.length > 1 ? (
+        {!usingGeneratedColor && product.images.length > 1 ? (
           <ul className="pdp-thumbs">
             {product.images.map((img, i) => (
               <li key={img.id}>
@@ -321,7 +328,7 @@ export default function ProductDetail({ product }: { product: Product }) {
           </li>
           <li>
             <span className="spec-k">Sizes</span>
-            <span className="wrap-anywhere">{product.sizes.map((s) => s.label).join(", ")}</span>
+            <span className="wrap-anywhere">{sizeSummary(product.sizes)}</span>
           </li>
           <li>
             <span className="spec-k">Decoration</span>

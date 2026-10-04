@@ -5,6 +5,7 @@ import Image from "next/image";
 import type { ReactNode } from "react";
 import type { DesignLayer, GarmentSide, Product, RosterEntry, TextLayer } from "@/lib/types";
 import { newImageLayer, newTextLayer } from "@/lib/design";
+import { sizeDisplayLabel, splitSizeGroups } from "@/lib/sizes";
 import type { SavedDraft } from "@/lib/design";
 import { PERSONALIZATION_FEE, formatUSD, type PriceQuote } from "@/lib/pricing";
 import { TEE_MOCKUPS, type TeeMockup } from "@/lib/mockups";
@@ -737,6 +738,12 @@ export function QuantityPanel({
   onFill: (label: string) => void;
   onEditRoster: () => void;
 }) {
+  const groups = splitSizeGroups(product.sizes);
+  const sizeGroups = [
+    { key: "adult", title: "Adult Sizes", sizes: groups.adult },
+    { key: "youth", title: "Youth Sizes", sizes: groups.youth },
+  ].filter((group) => group.sizes.length > 0);
+
   return (
     <div className="rot-scroll">
       <PanelHeader
@@ -752,48 +759,56 @@ export function QuantityPanel({
           </button>
         </p>
       ) : null}
-      <div className="rot-sizes">
-        {product.sizes.map((s) => {
-          const qty = lines[s.label] ?? 0;
-          return (
-            <div key={s.label} className={`rot-size${qty > 0 ? " has-qty" : ""}`}>
-              <label htmlFor={`q-${s.label}`}>
-                {s.label}
-                {s.surcharge > 0 ? <small>+{formatUSD(s.surcharge)}</small> : null}
-              </label>
-              <div className="rot-stepper">
-                <button
-                  type="button"
-                  onClick={() => onQty(s.label, qty - 1)}
-                  disabled={qty <= 0 || rosterLocked}
-                  aria-label={`Decrease ${s.label}`}
-                >
-                  <MinusGlyph size={18} />
-                </button>
-                <input
-                  id={`q-${s.label}`}
-                  type="number"
-                  inputMode="numeric"
-                  min={0}
-                  max={999}
-                  value={qty}
-                  disabled={rosterLocked}
-                  onChange={(e) => onQty(s.label, Number(e.target.value))}
-                  aria-label={`${s.label} quantity`}
-                />
-                <button
-                  type="button"
-                  onClick={() => onQty(s.label, qty + 1)}
-                  disabled={rosterLocked}
-                  aria-label={`Increase ${s.label}`}
-                >
-                  <PlusGlyph size={18} />
-                </button>
-              </div>
-            </div>
-          );
-        })}
-      </div>
+      {sizeGroups.map((group) => (
+        <section className="rot-size-group" key={group.key} aria-labelledby={`size-group-${group.key}`}>
+          <h3 className="rot-size-group-title" id={`size-group-${group.key}`}>
+            {group.title}
+          </h3>
+          <div className="rot-sizes">
+            {group.sizes.map((s) => {
+              const qty = lines[s.label] ?? 0;
+              const display = sizeDisplayLabel(s.label);
+              return (
+                <div key={s.label} className={`rot-size${qty > 0 ? " has-qty" : ""}`}>
+                  <label htmlFor={`q-${s.label}`}>
+                    {display}
+                    {s.surcharge > 0 ? <small>+{formatUSD(s.surcharge)}</small> : null}
+                  </label>
+                  <div className="rot-stepper">
+                    <button
+                      type="button"
+                      onClick={() => onQty(s.label, qty - 1)}
+                      disabled={qty <= 0 || rosterLocked}
+                      aria-label={`Decrease ${group.title.replace(" Sizes", "")} ${display}`}
+                    >
+                      <MinusGlyph size={18} />
+                    </button>
+                    <input
+                      id={`q-${s.label}`}
+                      type="number"
+                      inputMode="numeric"
+                      min={0}
+                      max={999}
+                      value={qty}
+                      disabled={rosterLocked}
+                      onChange={(e) => onQty(s.label, Number(e.target.value))}
+                      aria-label={`${group.title.replace(" Sizes", "")} ${display} quantity`}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => onQty(s.label, qty + 1)}
+                      disabled={rosterLocked}
+                      aria-label={`Increase ${group.title.replace(" Sizes", "")} ${display}`}
+                    >
+                      <PlusGlyph size={18} />
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </section>
+      ))}
 
       {!rosterLocked ? (
         <div className="rot-quick">

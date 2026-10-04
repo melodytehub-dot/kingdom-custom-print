@@ -344,7 +344,15 @@ export default function Customizer({
       setSelectedId(id);
       if (id) {
         const layer = design[side].find((l) => l.id === id);
-        if (layer) setPanel(layer.type === "text" ? "text" : "image");
+        if (layer) {
+          // Selecting artwork is the mobile equivalent of opening Edit. A
+          // locked layer from an older saved draft must not trap the customer
+          // in a disabled editor with no obvious way to continue.
+          if (layer.locked) {
+            setDesign((prev) => updateLayer(prev, side, id, { locked: false }));
+          }
+          setPanel(layer.type === "text" ? "text" : "image");
+        }
       } else {
         setPanel((p) => (SPLIT_PANELS.includes(p) ? "none" : p));
       }
@@ -360,6 +368,12 @@ export default function Customizer({
   const editLayer = (id: string) => {
     const layer = design[side].find((l) => l.id === id);
     if (!layer) return;
+    // Opening the editor is an explicit request to edit. Older saved drafts
+    // can contain a locked layer, so unlock it at this boundary instead of
+    // opening a panel whose controls are all disabled.
+    if (layer.locked) {
+      setDesign((prev) => updateLayer(prev, side, id, { locked: false }));
+    }
     setSelectedId(id);
     setPanel(layer.type === "text" ? "text" : "image");
     setFocusToken((n) => n + 1);

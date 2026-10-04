@@ -115,6 +115,11 @@ const YOUTH_SIZES = [
   { label: "YXL", surcharge: 2 },
 ];
 
+// The core RT2000-style blank is available in both runs. Prefixing stored
+// youth labels keeps the size keys unique while the UI displays XS–XL under a
+// separate Youth Sizes heading.
+const CLASSIC_COMBO_SIZES = [...ADULT_SIZES.slice(0, 5), ...YOUTH_SIZES];
+
 /* Quantity breaks: amount subtracted from the unit price as the run grows. */
 const TEE_BREAKS = [
   { min_qty: 1, off: 0 },
@@ -153,7 +158,7 @@ const baseProducts = [
     featured: true,
     sort: 1,
     colors: CLASSIC_COLORS,
-    sizes: ADULT_SIZES,
+    sizes: CLASSIC_COMBO_SIZES,
     breaks: TEE_BREAKS,
     images: [
       { url: "/img/products/crown-classic-tee-white.jpg", alt: "Crown Classic Tee in White" },

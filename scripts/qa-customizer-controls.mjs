@@ -75,6 +75,32 @@ try {
   const canvas = page.locator(".rot-canvas-svg").first();
   const label = await canvas.getAttribute("aria-label");
   check("local AI assistant adds editable layers", /4 design element/.test(label ?? ""), label ?? "no canvas label");
+
+  await page.goto(`${BASE}/customize/crown-classic-tee?qa=size-groups`, {
+    waitUntil: "commit",
+    timeout: 30000,
+  });
+  await page.locator("image.rot-shirt-photo").first().waitFor({ state: "attached", timeout: 15000 });
+  await page.locator("button.rot-step").filter({ hasText: "Quantity" }).first().evaluate((button) => button.click());
+  const sizeHeadings = await page.locator(".rot-size-group-title").allTextContents();
+  const sizeLabels = await page.locator(".rot-size").allTextContents();
+  check("quantity panel separates adult and youth sizes", sizeHeadings.join("|") === "Adult Sizes|Youth Sizes", sizeHeadings.join(" | "));
+  check("classic tee exposes the requested size range", sizeLabels.includes("XS") && sizeLabels.includes("XL") && !sizeLabels.includes("3XL") && !sizeLabels.includes("4XL"), sizeLabels.join(" | "));
+  check("size groups fit the mobile viewport", (await page.locator("body").evaluate((node) => node.scrollWidth - window.innerWidth)) <= 1);
+
+  await page.goto(`${BASE}/customize/v-neck-tee?qa=lock`, {
+    waitUntil: "commit",
+    timeout: 30000,
+  });
+  await page.locator("image.rot-shirt-photo").first().waitFor({ state: "attached", timeout: 15000 });
+  await page.locator("button.rot-tool").filter({ hasText: "Add Art" }).first().evaluate((button) => button.click());
+  await page.locator(".rot-artgrid button").first().evaluate((button) => button.click());
+  await page.locator('button[aria-label="Lock"]').click();
+  await page.locator('button[aria-label="Close"]').click();
+  const canvasBox = await page.locator(".rot-canvas-svg").boundingBox();
+  if (canvasBox) await page.mouse.click(canvasBox.x + canvasBox.width / 2, canvasBox.y + canvasBox.height / 2);
+  await page.waitForTimeout(100);
+  check("selecting a locked artwork reopens it editable", (await page.locator('button[aria-label="Lock"]').count()) === 1 && (await page.locator('button[aria-label="Unlock"]').count()) === 0);
   check("customizer controls produce no browser errors", errors.length === 0, errors.slice(0, 2).join(" | "));
 } catch (error) {
   failures += 1;
