@@ -58,77 +58,111 @@ export default async function ShopPage({
   const hasFilters = Boolean(activeCategory || activeKind);
 
   return (
-    <>
-      <div className="wrap page-head">
-        <nav aria-label="Breadcrumb">
-          <ol className="breadcrumb">
+    <div className="mm-shop-page" style={{ paddingBottom: "80px" }}>
+      <div className="minimog-container" style={{ paddingTop: "30px", marginBottom: "30px" }}>
+        <nav aria-label="Breadcrumb" style={{ marginBottom: "14px", fontSize: "13px", color: "var(--minimog-muted)" }}>
+          <ol style={{ display: "flex", gap: "8px", listStyle: "none", padding: 0, margin: 0 }}>
             <li>
-              <Link href="/">Home</Link>
+              <Link href="/" style={{ color: "var(--minimog-text)" }}>Home</Link>
             </li>
-            <li aria-current="page">Shop</li>
+            <li>/</li>
+            <li aria-current="page" style={{ color: "var(--minimog-black)", fontWeight: 500 }}>Shop Catalog</li>
           </ol>
         </nav>
-        <p className="eyebrow">{activeCategoryName ?? "All blanks"}</p>
-        <h1 className="h2">
-          {activeCategoryName ?? "Shop all blanks"}
+        <span className="mm-hero-tag" style={{ marginBottom: "12px" }}>
+          {activeCategoryName ?? "ALL BLANKS & APPAREL"}
+        </span>
+        <h1 style={{ fontSize: "36px", letterSpacing: "1px", margin: "6px 0 12px" }}>
+          {activeCategoryName ? `SHOP ${activeCategoryName.toUpperCase()}` : "SHOP PRINT-ON-DEMAND BLANKS"}
         </h1>
-        <p className="lede">
-          Every blank lists its fabric weight and printable area. Pick one to see the size
-          run, then customize it online.
+        <p style={{ color: "var(--minimog-text)", maxWidth: "600px", margin: 0 }}>
+          Choose your favorite blank garment, examine available color runs and print specs, then open the online studio to customize.
         </p>
       </div>
 
-      <div className="wrap shop-bar">
-        <div className="filter-chips" role="group" aria-label="Filter by category or product type">
-          <Link
-            href={buildHref({ category: "", kind: "" })}
-            className={`chip${!activeCategory && !activeKind ? " is-active" : ""}`}
-            aria-current={!activeCategory && !activeKind ? "true" : undefined}
-          >
-            All
-          </Link>
-          {categories.map((category) => {
-            const active = activeCategory === category.slug && !activeKind;
-            return (
-              <Link
-                key={category.slug}
-                href={buildHref({ category: category.slug, kind: "" })}
-                className={`chip${active ? " is-active" : ""}`}
-                aria-current={active ? "true" : undefined}
-              >
-                {category.name}
-              </Link>
-            );
-          })}
-          {KIND_FILTERS.map((kind) => {
-            const active = activeKind === kind.value && !activeCategory;
-            return (
-              <Link
-                key={kind.value}
-                href={buildHref({ category: "", kind: kind.value })}
-                className={`chip${active ? " is-active" : ""}`}
-                aria-current={active ? "true" : undefined}
-              >
-                {kind.label}
-              </Link>
-            );
-          })}
-        </div>
+      <div className="minimog-container" style={{ marginBottom: "30px" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "16px", paddingBottom: "20px", borderBottom: "1px solid var(--minimog-border)" }}>
+          <div className="filter-chips" role="group" aria-label="Filter by category or product type" style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+            <Link
+              href={buildHref({ category: "", kind: "" })}
+              className={`chip${!activeCategory && !activeKind ? " is-active" : ""}`}
+              style={{
+                padding: "8px 18px",
+                fontSize: "13px",
+                fontWeight: 600,
+                textTransform: "uppercase",
+                background: !activeCategory && !activeKind ? "var(--minimog-black)" : "var(--minimog-bg-grey)",
+                color: !activeCategory && !activeKind ? "#fff" : "var(--minimog-black)",
+                borderRadius: 0,
+                textDecoration: "none"
+              }}
+              aria-current={!activeCategory && !activeKind ? "true" : undefined}
+            >
+              All Blanks
+            </Link>
+            {categories.map((category) => {
+              const active = activeCategory === category.slug && !activeKind;
+              return (
+                <Link
+                  key={category.slug}
+                  href={buildHref({ category: category.slug, kind: "" })}
+                  className={`chip${active ? " is-active" : ""}`}
+                  style={{
+                    padding: "8px 18px",
+                    fontSize: "13px",
+                    fontWeight: 600,
+                    textTransform: "uppercase",
+                    background: active ? "var(--minimog-black)" : "var(--minimog-bg-grey)",
+                    color: active ? "#fff" : "var(--minimog-black)",
+                    borderRadius: 0,
+                    textDecoration: "none"
+                  }}
+                  aria-current={active ? "true" : undefined}
+                >
+                  {category.name}
+                </Link>
+              );
+            })}
+            {KIND_FILTERS.map((kind) => {
+              const active = activeKind === kind.value && !activeCategory;
+              return (
+                <Link
+                  key={kind.value}
+                  href={buildHref({ category: "", kind: kind.value })}
+                  className={`chip${active ? " is-active" : ""}`}
+                  style={{
+                    padding: "8px 18px",
+                    fontSize: "13px",
+                    fontWeight: 600,
+                    textTransform: "uppercase",
+                    background: active ? "var(--minimog-black)" : "var(--minimog-bg-grey)",
+                    color: active ? "#fff" : "var(--minimog-black)",
+                    borderRadius: 0,
+                    textDecoration: "none"
+                  }}
+                  aria-current={active ? "true" : undefined}
+                >
+                  {kind.label}
+                </Link>
+              );
+            })}
+          </div>
 
-        <SortControl current={sort} build={buildHref} />
+          <SortControl current={sort} build={buildHref} />
+        </div>
       </div>
 
       {hasFilters ? (
-        <div className="wrap">
-          <Link href="/shop" className="link clear-filters">
-            Clear filters
+        <div className="minimog-container" style={{ marginBottom: "20px" }}>
+          <Link href="/shop" style={{ fontSize: "13px", color: "var(--minimog-primary)", fontWeight: 600 }}>
+            ✕ Clear all filters
           </Link>
         </div>
       ) : null}
 
-      <section className="wrap section-tight" aria-label="Products">
+      <section className="minimog-container" aria-label="Products">
         {products.length ? (
-          <ul className="product-grid">
+          <ul className="mm-product-grid">
             {products.map((p, i) => (
               <li key={p.id}>
                 <ProductCard product={p} priority={i < 4} />
@@ -159,7 +193,7 @@ export default async function ShopPage({
           </div>
         )}
       </section>
-    </>
+    </div>
   );
 }
 

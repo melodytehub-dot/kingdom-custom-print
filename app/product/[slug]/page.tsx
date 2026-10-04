@@ -38,71 +38,71 @@ export default async function ProductPage({ params }: Params) {
     .slice(0, 4);
 
   return (
-    <>
-      <div className="wrap page-head">
-        <nav aria-label="Breadcrumb">
-          <ol className="breadcrumb">
+    <div className="mm-pdp-page" style={{ paddingBottom: "80px" }}>
+      <div className="minimog-container" style={{ paddingTop: "20px" }}>
+        <nav aria-label="Breadcrumb" style={{ marginBottom: "16px", fontSize: "13px", color: "var(--minimog-muted)" }}>
+          <ol style={{ display: "flex", gap: "8px", listStyle: "none", padding: 0, margin: 0 }}>
             <li>
-              <Link href="/">Home</Link>
+              <Link href="/" style={{ color: "var(--minimog-text)" }}>Home</Link>
             </li>
+            <li>/</li>
             <li>
-              <Link href="/shop">Shop</Link>
+              <Link href="/shop" style={{ color: "var(--minimog-text)" }}>Shop</Link>
             </li>
             {product.categorySlug ? (
-              <li>
-                <Link href={`/shop?category=${product.categorySlug}`}>
-                  {product.categoryName}
-                </Link>
-              </li>
+              <>
+                <li>/</li>
+                <li>
+                  <Link href={`/shop?category=${product.categorySlug}`} style={{ color: "var(--minimog-text)" }}>
+                    {product.categoryName}
+                  </Link>
+                </li>
+              </>
             ) : null}
-            <li aria-current="page">{product.name}</li>
+            <li>/</li>
+            <li aria-current="page" style={{ color: "var(--minimog-black)", fontWeight: 500 }}>{product.name}</li>
           </ol>
         </nav>
       </div>
 
-      <div className="wrap">
+      <div className="minimog-container" style={{ paddingTop: "20px" }}>
         <ProductDetail product={product} />
-        <p className="pdp-from small muted">
-          Blank priced from {formatUSD(product.basePrice)} before printing.
+        <p className="pdp-from small muted" style={{ marginTop: "14px" }}>
+          Blank priced from {formatUSD(product.basePrice)} before custom decoration.
         </p>
       </div>
 
       {product.description ? (
-        <section className="section-tight pdp-detail">
-          <div className="wrap">
-            <hr className="rule" />
-            <div className="pdp-detail-grid">
-              <h2 className="h3">About this blank</h2>
-              <div className="pdp-prose">
-                <p>{product.description}</p>
-              </div>
+        <section className="minimog-container" style={{ paddingBlock: "50px", borderTop: "1px solid var(--minimog-border)", marginTop: "40px" }}>
+          <div style={{ maxWidth: "800px" }}>
+            <h2 style={{ fontSize: "24px", marginBottom: "14px", fontFamily: "var(--font-body)", fontWeight: 700 }}>About this garment blank</h2>
+            <div style={{ color: "var(--minimog-text)", lineHeight: "1.7", fontSize: "15px" }}>
+              <p>{product.description}</p>
             </div>
           </div>
         </section>
       ) : null}
 
       {related.length ? (
-        <section className="section-tight">
-          <div className="wrap">
-            <div className="section-head">
-              <div>
-                <p className="eyebrow">Also printed</p>
-                <h2 className="h2">Related blanks</h2>
-              </div>
-              <Link href="/shop" className="link">
-                Shop all
-              </Link>
+        <section className="minimog-container" style={{ paddingBlock: "60px", borderTop: "1px solid var(--minimog-border)" }}>
+          <div className="mm-section-head" style={{ textAlign: "left", display: "flex", justifyContent: "space-between", alignItems: "flex-end", marginBottom: "30px" }}>
+            <div>
+              <span className="mm-card-cat">SIMILAR FIT & STYLES</span>
+              <h2 className="mm-section-title" style={{ margin: "4px 0 0" }}>RELATED BLANKS</h2>
             </div>
-            <ul className="product-grid">
-              {related.map((p, i) => (
-                <li key={p.id}>
-                  <ProductCard product={p} priority={i < 2} />
-                </li>
-              ))}
-            </ul>
+            <Link href="/shop" className="mm-btn mm-btn-outline" style={{ height: "38px", padding: "0 20px" }}>
+              Shop all blanks
+            </Link>
           </div>
+          <ul className="mm-product-grid">
+            {related.map((p, i) => (
+              <li key={p.id}>
+                <ProductCard product={p} priority={i < 2} />
+              </li>
+            ))}
+          </ul>
         </section>
       ) : null}
-    </>
+    </div>
   );
 }

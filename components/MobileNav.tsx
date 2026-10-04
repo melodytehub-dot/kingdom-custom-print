@@ -73,7 +73,7 @@ export default function MobileNav({ categories }: { categories: Category[] }) {
       <button
         ref={toggleRef}
         type="button"
-        className="burger"
+        className="burger mm-hamburger"
         aria-expanded={open}
         aria-controls="mobile-menu"
         onClick={() => setOpen((v) => !v)}
@@ -94,24 +94,26 @@ export default function MobileNav({ categories }: { categories: Category[] }) {
                 id="mobile-menu"
                 ref={panelRef}
                 className="mobile-panel"
-            role="dialog"
-            aria-modal="true"
-            aria-label="Site menu"
-          >
-            <div className="mobile-panel-head">
-              <Image
-                src="/brand/kingdom-logo.png"
-                alt="Kingdom Custom Print"
-                width={1400}
-                height={843}
-                className="mobile-logo"
-              />
-              <button
-                type="button"
-                className="icon-btn"
-                onClick={() => setOpen(false)}
-                aria-label="Close menu"
+                role="dialog"
+                aria-modal="true"
+                aria-label="Site menu"
               >
+                <div className="mobile-panel-head">
+                  <Link href="/" className="mm-logo" onClick={() => setOpen(false)} aria-label="Kingdom Custom Print">
+                    <Image
+                      src="/brand/kingdom-logo.png"
+                      alt="Kingdom Custom Print"
+                      width={160}
+                      height={46}
+                      style={{ height: "38px", width: "auto", objectFit: "contain" }}
+                    />
+                  </Link>
+                  <button
+                    type="button"
+                    className="icon-btn"
+                    onClick={() => setOpen(false)}
+                    aria-label="Close menu"
+                  >
                 <svg width="20" height="20" viewBox="0 0 18 18" aria-hidden="true">
                   <path
                     d="M3 3l12 12M15 3L3 15"

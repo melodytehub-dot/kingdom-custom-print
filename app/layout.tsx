@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import {
   Anton,
+  Outfit,
   Inter,
   Oswald,
   Bebas_Neue,
@@ -29,6 +30,12 @@ import { getCategories } from "@/lib/catalog";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import MobileTabBar from "@/components/MobileTabBar";
+
+const outfit = Outfit({
+  subsets: ["latin"],
+  display: "swap",
+  variable: "--font-outfit",
+});
 
 const inter = Inter({
   subsets: ["latin"],
@@ -115,6 +122,7 @@ const permanentMarker = Permanent_Marker({
 });
 
 const FONT_VARS = [
+  outfit.variable,
   inter.variable,
   anton.variable,
   oswald.variable,

@@ -3,27 +3,34 @@
 import Link from "next/link";
 import CartIcon from "./icons/CartIcon";
 import { useCart } from "@/lib/cart-context";
+import { formatUSD } from "@/lib/pricing";
 
 export default function CartButton() {
-  const { count, hydrated } = useCart();
+  const { count, subtotal, hydrated } = useCart();
   const showCount = hydrated && count > 0;
 
   return (
     <Link
       href="/cart"
-      className="cart-btn"
+      className="mm-header-cart-wrap"
       aria-label={
         hydrated && count > 0
-          ? `Cart, ${count} item${count === 1 ? "" : "s"}`
-          : "Cart, empty"
+          ? `Shopping cart with ${count} item${count === 1 ? "" : "s"}, subtotal ${formatUSD(subtotal)}`
+          : "Shopping cart, 0 items"
       }
     >
-      <CartIcon />
-      {showCount ? (
-        <span className="cart-count tnum" aria-hidden="true">
-          {count > 99 ? "99+" : count}
+      <div className="mm-action-btn">
+        <CartIcon />
+        <span className="mm-badge" aria-hidden="true">
+          {showCount ? (count > 99 ? "99+" : count) : "0"}
         </span>
-      ) : null}
+      </div>
+      <div className="mm-cart-info hide-sm">
+        <span className="mm-cart-label">Cart</span>
+        <span className="mm-cart-total tnum">
+          {hydrated ? formatUSD(subtotal) : "$0.00"}
+        </span>
+      </div>
     </Link>
   );
 }
