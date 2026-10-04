@@ -595,7 +595,9 @@
   }
 
   .header-search {
-    display: none;
+    display: inline-flex;
+    width: 36px;
+    height: 36px;
   }
 
   .brand {
