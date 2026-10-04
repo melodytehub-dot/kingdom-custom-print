@@ -59,6 +59,29 @@
   flex: none;
 }
 
+.brand-wordmark {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 7px;
+  white-space: nowrap;
+}
+
+.brand-wordmark-main {
+  font-family: var(--font-display);
+  font-size: 25px;
+  line-height: 1;
+  letter-spacing: 0.015em;
+  text-transform: uppercase;
+}
+
+.brand-wordmark-sub {
+  color: var(--red);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
 .brand-logo {
   height: 60px;
   width: auto;
@@ -387,7 +410,7 @@
 
 .mobile-tabbar ul {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   min-height: var(--tabbar-h);
 }
 
@@ -544,6 +567,22 @@
 }
 
 @media (max-width: 760px) {
+  .announce {
+    display: none;
+  }
+
+  .site-header {
+    position: sticky;
+    top: 0;
+    box-shadow: 0 1px 0 rgba(17, 17, 16, 0.04);
+  }
+
+  .header-inner {
+    min-height: 58px;
+    gap: 12px;
+    padding-inline: 15px;
+  }
+
   .header-cta {
     display: none;
   }
@@ -552,8 +591,21 @@
     display: none;
   }
 
-  .brand-logo {
-    height: 44px;
+  .brand {
+    margin-right: auto;
+  }
+
+  .brand-wordmark {
+    gap: 5px;
+  }
+
+  .brand-wordmark-main {
+    font-size: 21px;
+  }
+
+  .brand-wordmark-sub {
+    font-size: 8px;
+    letter-spacing: 0.1em;
   }
 
   .footer-top {

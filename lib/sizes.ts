@@ -8,6 +8,10 @@ export function sizeGroup(label: string): SizeGroup {
 }
 
 export function sizeDisplayLabel(label: string): string {
+  return label;
+}
+
+export function sizeSummaryLabel(label: string): string {
   return sizeGroup(label) === "youth" ? label.slice(1) : label;
 }
 
@@ -26,8 +30,8 @@ export function sizeSummary(sizes: ProductSize[]): string {
   ] as const)
     .filter(([, values]) => values.length > 0)
     .map(([title, values]) => {
-      const first = sizeDisplayLabel(values[0].label);
-      const last = sizeDisplayLabel(values[values.length - 1].label);
+      const first = sizeSummaryLabel(values[0].label);
+      const last = sizeSummaryLabel(values[values.length - 1].label);
       return `${title} ${first}${first === last ? "" : `–${last}`}`;
     })
     .join(" · ");

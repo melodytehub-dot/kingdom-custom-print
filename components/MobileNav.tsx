@@ -3,7 +3,6 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
-import Image from "next/image";
 import { usePathname } from "next/navigation";
 import type { Category } from "@/lib/types";
 import ArrowRight from "./icons/ArrowRight";
@@ -98,13 +97,10 @@ export default function MobileNav({ categories }: { categories: Category[] }) {
             aria-label="Site menu"
           >
             <div className="mobile-panel-head">
-              <Image
-                src="/brand/kingdom-logo.png"
-                alt=""
-                width={1400}
-                height={843}
-                className="mobile-logo"
-              />
+              <span className="brand-wordmark" aria-hidden="true">
+                <span className="brand-wordmark-main">Kingdom</span>
+                <span className="brand-wordmark-sub">Custom Print</span>
+              </span>
               <button
                 type="button"
                 className="icon-btn"

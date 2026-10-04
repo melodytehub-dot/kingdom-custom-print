@@ -1,5 +1,4 @@
 import Link from "next/link";
-import Image from "next/image";
 import type { Category } from "@/lib/types";
 import { getSettings } from "@/lib/catalog";
 import CartButton from "./CartButton";
@@ -36,14 +35,10 @@ export default async function Header({
           <MobileNav categories={categories} />
 
           <Link href="/" className="brand" aria-label="Kingdom Custom Print — home">
-            <Image
-              src="/brand/kingdom-logo.png"
-              alt="Kingdom Custom Print"
-              width={1400}
-              height={843}
-              loading="eager"
-              className="brand-logo"
-            />
+            <span className="brand-wordmark" aria-hidden="true">
+              <span className="brand-wordmark-main">Kingdom</span>
+              <span className="brand-wordmark-sub">Custom Print</span>
+            </span>
           </Link>
 
           <nav className="primary-nav" aria-label="Primary">
