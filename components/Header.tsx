@@ -8,6 +8,7 @@ import Search from "./icons/Search";
 import ChevronDown from "./icons/ChevronDown";
 
 const NAV_LINKS = [
+  { href: "/", label: "Home" },
   { href: "/customize", label: "Design" },
   { href: "/about", label: "About" },
   { href: "/contact", label: "Contact" },
@@ -25,8 +26,16 @@ export default async function Header({
       {settings.announcement ? (
         <div className="announce">
           <p className="wrap announce-inner">
+            <span className="announce-links">
+              <Link href="/faq">Help</Link>
+              <Link href="/track">Track order</Link>
+            </span>
             <span className="announce-dot" aria-hidden="true" />
-            {settings.announcement}
+            <span className="announce-message">{settings.announcement}</span>
+            <span className="announce-links announce-links-right">
+              <Link href="/contact">Contact</Link>
+              <Link href="/shop">Shop t-shirts</Link>
+            </span>
           </p>
         </div>
       ) : null}

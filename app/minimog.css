@@ -23,11 +23,40 @@ body {
 }
 
 .announce-inner {
-  min-height: 30px;
+  min-height: 40px;
   padding-block: 6px;
   font-size: 10px;
   letter-spacing: 0.04em;
   text-transform: none;
+}
+
+.announce-links {
+  display: inline-flex;
+  align-items: center;
+  gap: 14px;
+  margin-right: auto;
+}
+
+.announce-links-right {
+  margin-right: 0;
+  margin-left: auto;
+}
+
+.announce-links a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 32px;
+  padding-inline: 8px;
+  color: rgba(255, 255, 255, 0.76);
+  text-decoration: none;
+}
+
+.announce-links a:hover {
+  color: #fff;
+}
+
+.announce-message {
+  white-space: nowrap;
 }
 
 .announce-dot {
@@ -417,6 +446,14 @@ body {
 }
 
 @media (max-width: 760px) {
+  .announce-links {
+    display: none;
+  }
+
+  .announce-inner {
+    justify-content: center;
+  }
+
   .header-inner {
     min-height: 62px;
     gap: 9px;

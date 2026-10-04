@@ -9,6 +9,7 @@ import type { Category } from "@/lib/types";
 import ArrowRight from "./icons/ArrowRight";
 
 const LINKS = [
+  { href: "/", label: "Home" },
   { href: "/shop", label: "Shop" },
   { href: "/customize", label: "Design" },
   { href: "/about", label: "About" },
