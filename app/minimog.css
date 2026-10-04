@@ -1,0 +1,390 @@
+/* --------------------------------------------------------------------------
+   Minimog-inspired storefront layer
+   The design studio keeps its own .rot system; this layer is for the public
+   shopping flow and gives every page the same quiet fashion-commerce rhythm.
+   -------------------------------------------------------------------------- */
+
+:root {
+  --fashion-black: #111111;
+  --fashion-muted: #707070;
+  --fashion-line: #e8e8e8;
+  --fashion-soft: #f7f7f5;
+  --fashion-red: #b8122d;
+}
+
+body {
+  background: #fff;
+  color: var(--fashion-black);
+}
+
+.announce {
+  background: var(--fashion-black);
+  color: #fff;
+}
+
+.announce-inner {
+  min-height: 30px;
+  padding-block: 6px;
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  text-transform: none;
+}
+
+.announce-dot {
+  width: 5px;
+  height: 5px;
+  background: #fff;
+}
+
+.site-header {
+  background: rgba(255, 255, 255, 0.98);
+  border-bottom-color: var(--fashion-line);
+  box-shadow: none;
+}
+
+.header-inner {
+  min-height: 72px;
+  gap: 24px;
+}
+
+.brand-logo {
+  width: 116px;
+  height: 60px;
+}
+
+.nav-link,
+.nav-menu summary {
+  padding: 9px 12px;
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  text-transform: none;
+}
+
+.header-actions {
+  gap: 4px;
+}
+
+.icon-btn,
+.cart-btn {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+}
+
+.icon-btn:hover,
+.cart-btn:hover {
+  background: var(--fashion-soft);
+  color: var(--fashion-black);
+}
+
+.header-cta,
+.btn-red {
+  background: var(--fashion-black);
+  border-color: var(--fashion-black);
+  color: #fff;
+}
+
+.header-cta:hover,
+.btn-red:hover:not(:disabled) {
+  background: #333;
+  border-color: #333;
+}
+
+.eyebrow {
+  color: var(--fashion-muted);
+  font-size: 10px;
+  letter-spacing: 0.14em;
+}
+
+.eyebrow-red {
+  color: var(--fashion-red);
+}
+
+.section,
+.section-tight {
+  padding-block: clamp(48px, 6vw, 92px);
+}
+
+.section-head {
+  margin-bottom: 28px;
+}
+
+.section-head .h2,
+.page-head .h2 {
+  margin-top: 8px;
+}
+
+.h2 {
+  font-size: clamp(2rem, 4vw, 3.2rem);
+  letter-spacing: -0.02em;
+}
+
+.btn {
+  min-height: 44px;
+  padding-inline: 22px;
+  border-radius: 0;
+  font-size: 12px;
+  letter-spacing: 0.03em;
+  text-transform: none;
+}
+
+.btn-outline-light {
+  border-color: #888;
+  color: var(--fashion-black);
+}
+
+.btn-outline-light:hover:not(:disabled) {
+  background: var(--fashion-black);
+  border-color: var(--fashion-black);
+  color: #fff;
+}
+
+.link,
+.link-inline {
+  color: var(--fashion-black);
+  text-decoration-color: #c8c8c8;
+}
+
+.link:hover,
+.link-inline:hover {
+  color: var(--fashion-red);
+}
+
+/* Homepage */
+.hero {
+  background: #fff;
+  color: var(--fashion-black);
+}
+
+.hero-grid {
+  gap: clamp(36px, 6vw, 92px);
+  padding-block: clamp(48px, 7vw, 100px);
+}
+
+.hero-title {
+  color: var(--fashion-black);
+  max-width: 9ch;
+}
+
+.hero-lede {
+  color: #4d4d4d;
+}
+
+.hero-media {
+  border-radius: 0;
+  background: var(--fashion-soft);
+}
+
+.value-strip,
+.featured-section {
+  background: var(--fashion-soft);
+  border-color: var(--fashion-line);
+}
+
+.value-item + .value-item {
+  border-color: var(--fashion-line);
+}
+
+.cat-media,
+.pcard-media,
+.editorial-media,
+.bulk-media {
+  border-radius: 0;
+  background: var(--fashion-soft);
+}
+
+.cat-foot {
+  margin-top: 12px;
+}
+
+.cat-name {
+  font-size: 13px;
+  letter-spacing: 0.01em;
+  text-transform: none;
+}
+
+.cat-arrow {
+  width: 28px;
+  height: 28px;
+  border-radius: 0;
+}
+
+.pcard {
+  border: 0;
+  border-radius: 0;
+  background: #fff;
+  box-shadow: none;
+}
+
+.pcard:hover {
+  border-color: transparent;
+  box-shadow: none;
+  transform: none;
+}
+
+.pcard-media {
+  border-radius: 0;
+}
+
+.pcard-img,
+.pcard-garment {
+  transition: transform 360ms ease;
+}
+
+.pcard:hover .pcard-img,
+.pcard:hover .pcard-garment {
+  transform: scale(1.035);
+}
+
+.pcard-body {
+  padding: 14px 0 0;
+  gap: 6px;
+}
+
+.pcard-cat,
+.pcard-style {
+  color: #8b8b8b;
+  font-size: 10px;
+  letter-spacing: 0.08em;
+}
+
+.pcard-title {
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.pcard-price > span:first-child {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.studio-section,
+.process-section,
+.quality-section,
+.bulk-section {
+  background: #fff;
+}
+
+.closer {
+  border-radius: 0;
+}
+
+/* Catalog and product detail */
+.page-head {
+  padding-block: clamp(34px, 5vw, 70px) 28px;
+}
+
+.page-head > .lede {
+  max-width: 56ch;
+}
+
+.shop-bar {
+  border-bottom-color: var(--fashion-line);
+}
+
+.chip {
+  border-color: #d4d4d4;
+  border-radius: 0;
+  background: #fff;
+  font-size: 12px;
+}
+
+.chip.is-active {
+  background: var(--fashion-black);
+  border-color: var(--fashion-black);
+}
+
+.sort-toggle {
+  border-color: #d4d4d4;
+  border-radius: 0;
+}
+
+.pdp-media {
+  border: 0;
+  border-radius: 0;
+  background: var(--fashion-soft);
+}
+
+.pdp-title {
+  font-size: clamp(2rem, 4vw, 3.2rem);
+}
+
+.swatch {
+  border-radius: 50%;
+}
+
+/* Cart, checkout, and content pages */
+.cart-row,
+.field-group,
+.panel,
+.state {
+  border-color: var(--fashion-line);
+  border-radius: 0;
+  box-shadow: none;
+}
+
+.cart-thumb {
+  border-radius: 0;
+  background: var(--fashion-soft);
+}
+
+.footer {
+  background: var(--fashion-soft);
+  border-top-color: var(--fashion-line);
+}
+
+.footer-heading {
+  color: var(--fashion-black);
+  letter-spacing: 0.08em;
+}
+
+@media (max-width: 760px) {
+  .header-inner {
+    min-height: 62px;
+    gap: 9px;
+  }
+
+  .brand-logo {
+    width: 96px;
+    height: 52px;
+  }
+
+  .header-search {
+    display: inline-flex;
+  }
+
+  .hero-grid {
+    padding-block: 0;
+  }
+
+  .hero-media {
+    min-height: 320px;
+  }
+
+  .hero-copy {
+    padding: 30px 18px 38px;
+  }
+
+  .hero-title {
+    max-width: 12ch;
+    margin-inline: auto;
+  }
+
+  .hero-actions .btn {
+    min-height: 46px;
+  }
+
+  .page-head {
+    padding-block: 28px 20px;
+  }
+
+  .page-head .h2 {
+    font-size: 2.2rem;
+  }
+
+  .mobile-tabbar {
+    background: rgba(255, 255, 255, 0.98);
+    border-top-color: var(--fashion-line);
+  }
+}

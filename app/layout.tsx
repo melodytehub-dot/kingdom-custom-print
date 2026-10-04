@@ -23,6 +23,7 @@ import "./customize/rot.css";
 import "./cart/cart.css";
 import "./admin/admin.css";
 import "./content.css";
+import "./minimog.css";
 import { CartProvider } from "@/lib/cart-context";
 import { getCategories } from "@/lib/catalog";
 import Header from "@/components/Header";
