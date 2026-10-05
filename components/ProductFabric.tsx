@@ -26,9 +26,12 @@ function recoverBrightFabricEdges(pixels: Uint8ClampedArray, alpha: Uint8Clamped
         continue;
       }
       if (alpha[y * width + x] > 20) continue;
-      if (hi - lo >= 35 || (pixels[pixel] + pixels[pixel + 1] + pixels[pixel + 2]) / 3 < 205) continue;
-      const left = Math.max(0, x - radius), right = Math.min(width - 1, x + radius);
-      const top = Math.max(0, y - radius), bottom = Math.min(height - 1, y + radius);
+      const luminance = (pixels[pixel] + pixels[pixel + 1] + pixels[pixel + 2]) / 3;
+      const brightTrim = hi - lo < 35 && luminance >= 205;
+      if (!brightTrim) continue;
+      const edgeRadius = radius;
+      const left = Math.max(0, x - edgeRadius), right = Math.min(width - 1, x + edgeRadius);
+      const top = Math.max(0, y - edgeRadius), bottom = Math.min(height - 1, y + edgeRadius);
       const nearby = integral[(bottom + 1) * stride + right + 1] - integral[top * stride + right + 1] - integral[(bottom + 1) * stride + left] + integral[top * stride + left];
       if (nearby > 0) alpha[y * width + x] = 255;
     }
