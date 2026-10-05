@@ -9,20 +9,19 @@ for family in registrations:
  matte=cv.imread(str(root/f'public/img/catalog-models/{family}-mask.png'),cv.IMREAD_UNCHANGED)[:,:,3]
  h,w=photo.shape[:2];pw=w//3; paths=[]
  for side in range(3):
-  image=photo[:,side*pw:(side+1)*pw];prior=matte[:,side*pw:(side+1)*pw];t=registrations[family][side]
-  affine=np.float32([[t['sx'],0,pw/2*(1-t['sx'])+t['dx']],[0,t['sy'],t['dy']]])
-  prior=cv.warpAffine(prior,affine,(pw,h))>127
-  near=cv.dilate(prior.astype(np.uint8),np.ones((61,61),np.uint8))>0
-  rgb=image.astype(float);lo=rgb.min(axis=2);hi=rgb.max(axis=2);lum=rgb.mean(axis=2)
-  background=np.maximum(rgb[:,4].mean(axis=1),rgb[:,-5].mean(axis=1))[:,None]
-  seeds=np.full((h,pw),cv.GC_PR_BGD,np.uint8)
-  seeds[prior]=cv.GC_PR_FGD
-  seeds[near&(hi-lo<30)&(lum>background+12)]=cv.GC_FGD
-  seeds[prior&(hi-lo<25)&(lum>80)]=cv.GC_FGD
-  seeds[(~near)|(hi-lo>40)|(lum<80)]=cv.GC_BGD
-  bg=np.zeros((1,65),np.float64);fg=np.zeros((1,65),np.float64)
-  cv.grabCut(image,seeds,None,bg,fg,5,cv.GC_INIT_WITH_MASK)
-  selected=np.where((seeds==cv.GC_FGD)|(seeds==cv.GC_PR_FGD),255,0).astype(np.uint8)
+  image=photo[:,side*pw:(side+1)*pw]
+  # The mask panels were generated from these exact photo panels, so applying
+  # an additional registration transform shrinks the garment and exposes the
+  # original white trim beneath dark color overlays.
+  prior=matte[:,side*pw:(side+1)*pw]>127
+  # The generated garment alpha already includes bright trims and cuffs.
+  # Keep that silhouette intact; GrabCut incorrectly classifies those light
+  # fabric edges as background and makes dark colorways leak white pixels.
+  selected=cv.morphologyEx(prior.astype(np.uint8)*255,cv.MORPH_CLOSE,np.ones((3,3),np.uint8))
+  rgb=image.astype(float); hi=rgb.max(axis=2); lo=rgb.min(axis=2); lum=rgb.mean(axis=2)
+  bright_trim=(hi-lo<35)&(lum>205)
+  edge=cv.dilate((selected>0).astype(np.uint8),np.ones((31,31),np.uint8))>0
+  selected=np.where((selected>0)|(edge&bright_trim),255,0).astype(np.uint8)
   contours,hierarchy=cv.findContours(selected,cv.RETR_CCOMP,cv.CHAIN_APPROX_SIMPLE)
   pieces=[]
   for i,contour in enumerate(contours):

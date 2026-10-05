@@ -7,6 +7,7 @@ const errors=[];page.on('pageerror',e=>errors.push(e.message));
 let colors=0;
 try {
  await page.goto(`${base}/shop`,{waitUntil:'load',timeout:60000});
+ await page.locator('.mm-card-title a').nth(18).waitFor({ timeout: 60000 });
  const slugs=await page.locator('.mm-card-title a').evaluateAll(links=>links.map(a=>new URL(a.href).pathname.split('/').pop()));
  assert.ok(slugs.length>=19);
  for(const slug of slugs){

@@ -1,18 +1,55 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import contours from "@/lib/photo-contours.json";
 
 type Fabric = { width: number; height: number; pixels: Uint8ClampedArray; alpha: Uint8ClampedArray };
 const fabrics = new Map<string, Promise<Fabric>>();
+
+function recoverBrightFabricEdges(pixels: Uint8ClampedArray, alpha: Uint8ClampedArray, width: number, height: number) {
+  const stride = width + 1;
+  const integral = new Uint32Array(stride * (height + 1));
+  for (let y = 0; y < height; y++) {
+    let row = 0;
+    for (let x = 0; x < width; x++) {
+      row += alpha[y * width + x] > 20 ? 1 : 0;
+      integral[(y + 1) * stride + x + 1] = integral[y * stride + x + 1] + row;
+    }
+  }
+  const radius = 24;
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      const pixel = (y * width + x) * 4;
+      const hi = Math.max(pixels[pixel], pixels[pixel + 1], pixels[pixel + 2]);
+      const lo = Math.min(pixels[pixel], pixels[pixel + 1], pixels[pixel + 2]);
+      if (y < height * 0.12) {
+        if (hi - lo >= 35) alpha[y * width + x] = 0;
+        continue;
+      }
+      if (alpha[y * width + x] > 20) continue;
+      if (hi - lo >= 35 || (pixels[pixel] + pixels[pixel + 1] + pixels[pixel + 2]) / 3 < 205) continue;
+      const left = Math.max(0, x - radius), right = Math.min(width - 1, x + radius);
+      const top = Math.max(0, y - radius), bottom = Math.min(height - 1, y + radius);
+      const nearby = integral[(bottom + 1) * stride + right + 1] - integral[top * stride + right + 1] - integral[(bottom + 1) * stride + left] + integral[top * stride + left];
+      if (nearby > 0) alpha[y * width + x] = 255;
+    }
+  }
+}
 
 /** Native vector outlines register the visible fabric to the unmodified photo. */
 function loadFabric(family: string): Promise<Fabric> {
   const cached = fabrics.get(family);
   if (cached) return cached;
   const pending = new Promise<Fabric>((resolve, reject) => {
-    const photo = new window.Image();
-    photo.onload = () => {
+    const load = (src: string) => new Promise<HTMLImageElement>((done, fail) => {
+      const image = new window.Image();
+      image.onload = () => done(image);
+      image.onerror = () => fail(new Error("Photo unavailable"));
+      image.src = src;
+    });
+    Promise.all([
+      load(`/_next/image?url=${encodeURIComponent(`/img/catalog-models/${family}.png`)}&w=1920&q=75`),
+      load(`/_next/image?url=${encodeURIComponent(`/img/catalog-models/${family}-mask.png`)}&w=1920&q=75`),
+    ]).then(([photo, matte]) => {
       const canvas = document.createElement("canvas");
       canvas.width = photo.naturalWidth; canvas.height = photo.naturalHeight;
       const ctx = canvas.getContext("2d", { willReadFrequently: true });
@@ -20,21 +57,13 @@ function loadFabric(family: string): Promise<Fabric> {
       ctx.drawImage(photo, 0, 0);
       const pixels = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
       ctx.clearRect(0, 0, canvas.width, canvas.height);
-      ctx.scale(canvas.width / 2172, canvas.height / 724);
-      ctx.fillStyle = "#fff";
-      for (let panel = 0; panel < 3; panel++) {
-        ctx.save();
-        ctx.translate(panel * 724, 0);
-        ctx.fill(new Path2D(contours[family as keyof typeof contours][panel]), "evenodd");
-        ctx.restore();
-      }
+      ctx.drawImage(matte, 0, 0, canvas.width, canvas.height);
       const mask = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
       const alpha = new Uint8ClampedArray(canvas.width * canvas.height);
       for (let p = 0; p < alpha.length; p++) alpha[p] = mask[p * 4 + 3];
+      recoverBrightFabricEdges(pixels, alpha, canvas.width, canvas.height);
       resolve({ width: canvas.width, height: canvas.height, pixels, alpha });
-    };
-    photo.onerror = () => reject(new Error("Photo unavailable"));
-    photo.src = `/_next/image?url=${encodeURIComponent(`/img/catalog-models/${family}.png`)}&w=1920&q=75`;
+    }).catch(reject);
   });
   fabrics.set(family, pending);
   pending.catch(() => fabrics.delete(family));
