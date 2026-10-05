@@ -51,9 +51,12 @@ try {
   assert.match(await page.locator('.mm-card-bottom-btn').first().getAttribute('href'), /\?color=/);
   const save = page.getByRole('button', { name: /save .* to wishlist/i }).first();
   await save.click();
+  await page.getByRole('button', { name: /remove .* from wishlist/i }).first().waitFor();
   await page.goto(`${base}/wishlist`, { waitUntil: "load" });
+  await page.locator('.mm-card').first().waitFor();
   assert.equal(await page.locator('.mm-card').count(), 1);
   await page.reload({ waitUntil: "load" });
+  await page.locator('.mm-card').first().waitFor();
   assert.equal(await page.locator('.mm-card').count(), 1);
   await page.getByRole('button', { name: /remove .* from wishlist/i }).click();
   await page.getByRole('heading', { name: 'Your next idea starts here' }).waitFor();

@@ -174,11 +174,7 @@ export function mockupsForProduct(product: ProductLike): TeeMockup[] {
       name: color.name,
       hex: color.hex,
     };
-    if (!family) return productColor;
-    return {
-      ...productColor,
-      front: `/img/mockups/families/${family}/${base.code}_fr.webp`,
-      back: `/img/mockups/families/${family}/${base.code}_bk.webp`,
-    };
+    const preview = (view: "front" | "back") => `/api/garment-preview?family=${family ?? "tee"}&color=${color.hex.replace("#", "")}&view=${view}`;
+    return { ...productColor, front: preview("front"), back: preview("back") };
   });
 }

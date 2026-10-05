@@ -96,7 +96,7 @@ for (const [slug, family, expectedColors] of products) {
       const src = await panelPreview.getAttribute("src");
       if (src) renderedColors.add(src);
     }
-    const familyOk = family ? href?.includes(`/families/${family}/`) : href?.includes("/img/mockups/garment/");
+    const familyOk = href?.includes(`/api/garment-preview?family=${family ?? "tee"}&`);
     const colorsOk = renderedColors.size === colors;
     const ok = Boolean(familyOk) && colors === expectedColors && colorsOk && overflow <= 1;
     console.log(`${ok ? "PASS" : "FAIL"} ${slug} href=${href} colors=${colors}/${expectedColors} renders=${renderedColors.size}/${colors} overflow=${overflow}px`);

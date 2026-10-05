@@ -21,10 +21,11 @@
     "qa-customizer-controls": "node scripts/qa-customizer-controls.mjs",
     "qa-price-tamper": "node scripts/qa-payments.mjs",
     "qa-garment-families": "node scripts/qa-garment-families.mjs",
-    "qa-site": "npm run qa-storefront && npm run qa-audit && npm run qa-garment-families && npm run qa-customizer-controls && npm run qa-cart-flow && npm run qa-payments",
+    "qa-site": "npm run qa-storefront && npm run qa-product-gallery && npm run qa-audit && npm run qa-garment-families && npm run qa-customizer-controls && npm run qa-cart-flow && npm run qa-payments",
     "qa-storefront": "node scripts/qa-storefront.mjs",
     "qa-payments": "node scripts/qa-payments.mjs",
-    "qa-order-payment-replay": "node --env-file=.env.local scripts/qa-order-payment-replay.mjs"
+    "qa-order-payment-replay": "node --env-file=.env.local scripts/qa-order-payment-replay.mjs",
+    "qa-product-gallery": "node scripts/qa-product-gallery.mjs"
   },
   "dependencies": {
     "next": "16.3.8",

@@ -4,6 +4,9 @@ const nextConfig: NextConfig = {
   reactStrictMode: true,
   devIndicators: false,
   poweredByHeader: false,
+  outputFileTracingIncludes: {
+    "/api/garment-preview": ["./public/img/mockups/garment/WHT_*.webp", "./public/img/mockups/families/*/WHT_*.webp", "./public/img/catalog-models/*-mask.png"],
+  },
   images: {
     formats: ["image/avif", "image/webp"],
     remotePatterns: [

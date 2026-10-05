@@ -1,21 +1,23 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { Suspense, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import Garment from "@/components/Garment";
+import ProductPhotography from "./ProductPhotography";
+import ProductColorQuery from "./ProductColorQuery";
+import { PRODUCT_VIEWS, type ProductView } from "@/lib/product-presentation";
 import ArrowRight from "@/components/icons/ArrowRight";
 import { formatUSD, lowestPrintedUnit, quoteProduct, resolveBreak } from "@/lib/pricing";
-import { mockupsForProduct } from "@/lib/mockups";
 import { sizeSummary } from "@/lib/sizes";
 import type { Product, ProductColor } from "@/lib/types";
 
-export default function ProductDetail({ product }: { product: Product }) {
+export default function ProductDetail({ product, initialColor = "" }: { product: Product; initialColor?: string }) {
   const router = useRouter();
   const firstColor = product.colors[0];
 
-  const [colorSlug, setColorSlug] = useState(firstColor?.slug ?? "");
-  const [imageIdx, setImageIdx] = useState(0);
+  const [colorSlug, setColorSlug] = useState(product.colors.find(c => c.slug === initialColor)?.slug ?? firstColor?.slug ?? "");
+  const [view, setView] = useState<ProductView>("front");
+  const colorSlugs = useMemo(() => product.colors.map(c => c.slug), [product.colors]);
   const [lines, setLines] = useState<Record<string, number>>(() => {
     const seed: Record<string, number> = {};
     for (const s of product.sizes) seed[s.label] = 0;
@@ -29,17 +31,8 @@ export default function ProductDetail({ product }: { product: Product }) {
     [colorSlug, product.colors, firstColor]
   );
 
-  // Every catalogue colour has a generated fallback. Real product photography
-  // remains the first choice when its alt text identifies the selected colour.
-  const generatedMockups = useMemo(() => mockupsForProduct(product), [product]);
-  const activeGenerated = generatedMockups.find((m) => m.slug === color?.slug) ?? generatedMockups[0];
-
   function pickColor(c: ProductColor) {
     setColorSlug(c.slug);
-    const i = product.images.findIndex((img) =>
-      img.alt.toLowerCase().includes(c.name.toLowerCase())
-    );
-    if (i >= 0) setImageIdx(i);
   }
 
   const sizeLines = useMemo(
@@ -74,16 +67,6 @@ export default function ProductDetail({ product }: { product: Product }) {
     [product]
   );
 
-  const selectedProductImage = product.images[imageIdx] ?? product.images[0];
-  const selectedImageMatchesColor = Boolean(
-    selectedProductImage &&
-      color &&
-      selectedProductImage.alt.toLowerCase().includes(color.name.toLowerCase())
-  );
-  const usingGeneratedColor = Boolean(activeGenerated && !selectedImageMatchesColor);
-  const activeImage = activeGenerated && !selectedImageMatchesColor
-    ? { url: activeGenerated.front, alt: `${product.name} in ${activeGenerated.name}` }
-    : selectedProductImage;
   const canCustomize = totalQty > 0;
 
   function setQty(label: string, value: number) {
@@ -93,42 +76,27 @@ export default function ProductDetail({ product }: { product: Product }) {
 
   return (
     <div className="pdp">
+      <Suspense fallback={null}><ProductColorQuery allowed={colorSlugs} onColor={setColorSlug} /></Suspense>
       <div className="pdp-media">
-        {activeImage ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={activeImage.url} alt={activeImage.alt || product.name} />
-        ) : (
-          <Garment
-            kind={product.kind}
-            color={color?.hex ?? "#141414"}
-            title={`${product.name} in ${color?.name ?? "black"}`}
-          />
-        )}
-
-        {product.compareAt ? (
-          <p className="pdp-save">
-            Save {formatUSD(product.compareAt - product.basePrice)} per garment
-          </p>
-        ) : null}
-
-        {!usingGeneratedColor && product.images.length > 1 ? (
-          <ul className="pdp-thumbs">
-            {product.images.map((img, i) => (
-              <li key={img.id}>
-                <button
-                  type="button"
-                  className={`pdp-thumb${i === imageIdx ? " is-active" : ""}`}
-                  onClick={() => setImageIdx(i)}
-                  aria-label={img.alt || `View ${i + 1}`}
-                  aria-pressed={i === imageIdx}
-                >
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={img.url} alt="" />
-                </button>
-              </li>
-            ))}
-          </ul>
-        ) : null}
+        <div className="pdp-photo-stage">
+          <ProductPhotography product={product} color={color} view={view} priority />
+          <button type="button" className="pdp-gallery-arrow pdp-gallery-prev" aria-label="Previous product view"
+            onClick={() => setView(PRODUCT_VIEWS[(PRODUCT_VIEWS.indexOf(view) + 2) % 3])}>‹</button>
+          <button type="button" className="pdp-gallery-arrow pdp-gallery-next" aria-label="Next product view"
+            onClick={() => setView(PRODUCT_VIEWS[(PRODUCT_VIEWS.indexOf(view) + 1) % 3])}>›</button>
+        </div>
+        <p className="pdp-view-caption" aria-live="polite">{color?.name} · {view} view</p>
+        <ul className="pdp-thumbs" aria-label="Product views">
+          {PRODUCT_VIEWS.map(angle => (
+            <li key={angle}>
+              <button type="button" className={`pdp-thumb${angle === view ? " is-active" : ""}`}
+                onClick={() => setView(angle)} aria-label={`View ${angle}`} aria-pressed={angle === view}>
+                <ProductPhotography product={product} color={color} view={angle} decorative />
+                <span>{angle}</span>
+              </button>
+            </li>
+          ))}
+        </ul>
       </div>
 
       <div className="pdp-panel">

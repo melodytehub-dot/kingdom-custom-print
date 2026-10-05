@@ -40,7 +40,7 @@ export default async function ProductPage({ params }: Params) {
   return (
     <div className="mm-pdp-page" style={{ paddingBottom: "80px" }}>
       <div className="minimog-container" style={{ paddingTop: "20px" }}>
-        <ProductDetail product={product} />
+        <ProductDetail key={product.slug} product={product} />
         <p className="pdp-from small muted" style={{ marginTop: "14px" }}>
           Blank priced from {formatUSD(product.basePrice)} before custom decoration.
         </p>

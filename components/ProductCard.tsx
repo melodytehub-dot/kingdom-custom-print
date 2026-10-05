@@ -3,10 +3,9 @@
 import { useWishlist } from "@/lib/wishlist-context";
 import { useState } from "react";
 import Link from "next/link";
-import Image from "next/image";
+import ProductPhotography from "./ProductPhotography";
 import Garment from "./Garment";
 import { formatUSD, lowestPrintedUnit } from "@/lib/pricing";
-import { hasDedicatedMockupFamily, mockupsForProduct } from "@/lib/mockups";
 import type { Product } from "@/lib/types";
 
 
@@ -40,12 +39,6 @@ export default function ProductCard({
   const selectedColor = product.colors[selectedColorIdx] ?? product.colors[0];
   const baseHex = selectedColor?.hex ?? product.colors[0]?.hex ?? "#141414";
 
-  const allMockups = hasDedicatedMockupFamily(product) ? mockupsForProduct(product) : [];
-  const currentMockup = allMockups.find((m) => m.slug === selectedColor?.slug) ?? allMockups[0];
-
-  const frontImgUrl = currentMockup?.front ?? product.images[0]?.url;
-  const backImgUrl = currentMockup?.back ?? product.images[1]?.url ?? frontImgUrl;
-
   const wasPrice = product.compareAt;
   const fromUnit = lowestPrintedUnit(product);
   const currentPrice = fromUnit !== null ? fromUnit : product.basePrice;
@@ -54,31 +47,13 @@ export default function ProductCard({
     <article className="mm-card">
       {/* 1. Thumbnail Media with Dual-Image Hover Swap */}
       <div className="mm-card-media">
-        <Link prefetch={false} href={`/product/${product.slug}`} tabIndex={-1} aria-label={product.name}>
-          {frontImgUrl ? (
+        <Link prefetch={false} href={`/product/${product.slug}?color=${encodeURIComponent(selectedColor?.slug ?? "")}`} tabIndex={-1} aria-label={product.name}>
+          {selectedColor ? (
             <>
-              <Image
-                src={frontImgUrl}
-                alt={`${product.name} front view`}
-                fill
-                sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 280px"
-                loading={priority ? "eager" : "lazy"}
-                className="mm-card-img-primary"
-              />
-              {backImgUrl && backImgUrl !== frontImgUrl ? (
-                <Image
-                  src={backImgUrl}
-                  alt={`${product.name} back view`}
-                  fill
-                  sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 280px"
-                  loading="lazy"
-                  className="mm-card-img-secondary"
-                />
-              ) : null}
+              <ProductPhotography product={product} color={selectedColor} priority={priority} className="mm-card-img-primary" />
+              <ProductPhotography product={product} color={selectedColor} view="back" className="mm-card-img-secondary" />
             </>
-          ) : (
-            <Garment kind={product.kind} color={baseHex} className="mm-card-img-primary" />
-          )}
+          ) : <Garment kind={product.kind} color={baseHex} className="mm-card-img-primary" />}
         </Link>
 
         {/* Floating Quick Action Buttons */}
@@ -95,7 +70,7 @@ export default function ProductCard({
           </button>
           <Link
             prefetch={false}
-            href={`/product/${product.slug}`}
+            href={`/product/${product.slug}?color=${encodeURIComponent(selectedColor?.slug ?? "")}`}
             className="mm-quick-btn"
             title="Quick View"
             aria-label="Quick View"
@@ -115,7 +90,7 @@ export default function ProductCard({
         </span>
 
         <h3 className="mm-card-title">
-          <Link prefetch={false} href={`/product/${product.slug}`}>{product.name}</Link>
+          <Link prefetch={false} href={`/product/${product.slug}?color=${encodeURIComponent(selectedColor?.slug ?? "")}`}>{product.name}</Link>
         </h3>
 
 

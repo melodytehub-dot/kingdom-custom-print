@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
+import ProductPhotography from "../ProductPhotography";
 import DesignCanvas, { VIEW, printAreaView } from "./DesignCanvas";
 import {
   ArtPanel,
@@ -152,7 +153,9 @@ export default function Customizer({
 
   const [step, setStep] = useState<Step>("design");
   const [panel, setPanel] = useState<Panel>("none");
-  const [side, setSide] = useState<GarmentSide>("front");
+  const [side, setActiveSide] = useState<GarmentSide>("front");
+  const [profileView, setProfileView] = useState(false);
+  const setSide = useCallback((view: GarmentSide | ((previous: GarmentSide) => GarmentSide)) => { setActiveSide(view); setProfileView(false); }, []);
   const [colorCode, setColorCode] = useState(() => {
     const match =
       productMockups.find((m) => m.slug === initialColor || m.code === initialColor) ?? productMockups[0] ?? TEE_MOCKUPS[0];
@@ -233,7 +236,7 @@ export default function Customizer({
         if (parsed?.design?.front && parsed?.design?.back) {
           setDesign(normalizeDesign(parsed.design));
         }
-        if (parsed?.colorCode && productMockups.some((m) => m.code === parsed.colorCode)) {
+        if (!initialColor && parsed?.colorCode && productMockups.some((m) => m.code === parsed.colorCode)) {
           setColorCode(parsed.colorCode);
         }
         if (Array.isArray(parsed?.roster)) setRoster(parsed.roster);
@@ -1171,19 +1174,25 @@ export default function Customizer({
                     <button
                       key={view}
                       type="button"
-                      className={`rot-side-thumb${side === view ? " is-active" : ""}`}
+                      className={`rot-side-thumb${!profileView && side === view ? " is-active" : ""}`}
                       onClick={() => {
                         setSide(view);
                         setSelectedId(null);
                         setPanel((p) => (SPLIT_PANELS.includes(p) ? "none" : p));
                       }}
-                      aria-pressed={side === view}
+                      aria-pressed={!profileView && side === view}
                     >
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img src={view === "front" ? mockup.front : mockup.back} alt="" />
                       <span>{view}</span>
                     </button>
                   ))}
+                  <button type="button" className={`rot-side-thumb${profileView ? " is-active" : ""}`}
+                    aria-pressed={profileView} aria-label="Side profile"
+                    onClick={() => { setProfileView(true); setSelectedId(null); setPanel("none"); }}>
+                    <span className="rot-profile-thumb"><ProductPhotography product={product} color={product.colors.find(c => c.slug === mockup.slug)} view="side" isolated decorative /></span>
+                    <span>side</span>
+                  </button>
                 </div>
                 <button type="button" className="rot-stage-chip" onClick={() => setZoom((z) => (z > 1 ? 1 : 1.12))}>
                   {zoom > 1 ? "Fit" : "Zoom"}
@@ -1215,7 +1224,7 @@ export default function Customizer({
                   transform: `translateY(${fit.ty}px)`,
                 }}
               >
-                <DesignCanvas
+                {profileView ? <div className="rot-profile-preview"><ProductPhotography product={product} color={product.colors.find(c => c.slug === mockup.slug)} view="side" isolated /><p>Side profile</p></div> : <DesignCanvas
                   key={`${mockup.code}-${side}`}
                   frontSrc={mockup.front}
                   backSrc={mockup.back}
@@ -1228,11 +1237,11 @@ export default function Customizer({
                   onCommit={() => undefined}
                   onDelete={deleteLayer}
                   onEdit={editLayer}
-                />
+                />}
               </div>
             ) : null}
 
-            {layers.length === 0 && panel === "none" && step === "design" ? (
+            {!profileView && layers.length === 0 && panel === "none" && step === "design" ? (
               <div className="rot-quickadd" role="group" aria-label="Add to your design">
                 <button type="button" onClick={addText}>
                   <TextBoxIcon size={26} />
@@ -1267,7 +1276,7 @@ export default function Customizer({
                 key={t.id}
                 type="button"
                 className={`rot-tool${railActive === t.id ? " is-active" : ""}`}
-                onClick={t.onClick}
+                onClick={() => { setProfileView(false); t.onClick(); }}
                 disabled={step !== "design"}
               >
                 <span className="rot-tool-icon">{t.icon}</span>
