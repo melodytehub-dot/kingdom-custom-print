@@ -10,6 +10,7 @@ export const revalidate = 60;
 
 interface Params {
   params: Promise<{ slug: string }>;
+  searchParams: Promise<{ color?: string | string[] }>;
 }
 
 export async function generateMetadata({ params }: Params): Promise<Metadata> {
@@ -26,8 +27,10 @@ export async function generateMetadata({ params }: Params): Promise<Metadata> {
   };
 }
 
-export default async function ProductPage({ params }: Params) {
+export default async function ProductPage({ params, searchParams }: Params) {
   const { slug } = await params;
+  const query = await searchParams;
+  const initialColor = typeof query.color === "string" ? query.color : "";
   const product = await getProductBySlug(slug);
   if (!product) notFound();
 
@@ -40,7 +43,7 @@ export default async function ProductPage({ params }: Params) {
   return (
     <div className="mm-pdp-page" style={{ paddingBottom: "80px" }}>
       <div className="minimog-container" style={{ paddingTop: "20px" }}>
-        <ProductDetail key={product.slug} product={product} />
+        <ProductDetail key={`${product.slug}-${initialColor}`} product={product} initialColor={initialColor} />
         <p className="pdp-from small muted" style={{ marginTop: "14px" }}>
           Blank priced from {formatUSD(product.basePrice)} before custom decoration.
         </p>

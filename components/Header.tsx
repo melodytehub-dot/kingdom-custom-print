@@ -12,20 +12,8 @@ const MAIN_NAV_LINKS = [
   { href: "/shop?kind=tee", label: "T-SHIRTS" },
   { href: "/shop?kind=hoodie", label: "HOODIES" },
   { href: "/customize", label: "DESIGN STUDIO", highlight: true },
-  { href: "/about", label: "HOW IT WORKS" },
-  { href: "/track", label: "TRACK ORDER" },
   { href: "/contact", label: "CONTACT" },
 ];
-
-function UserIcon() {
-  return (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
-      <circle cx="12" cy="7" r="4" />
-    </svg>
-  );
-}
-
 
 export default async function Header({
   categories,
@@ -75,10 +63,6 @@ export default async function Header({
 
           {/* Right Header Actions */}
           <div className="mm-header-actions">
-            <Link href="/admin" className="mm-action-btn hide-sm" aria-label="Admin sign in">
-              <UserIcon />
-            </Link>
-
             <WishlistLink />
 
             <CartButton />

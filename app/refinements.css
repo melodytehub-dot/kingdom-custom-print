@@ -91,7 +91,7 @@ a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible
 .mm-category-thumb { border-radius: 0; background: #f4f4f4; }
 .mm-category-thumb img { object-fit: contain !important; }
 .mm-category-name { font-size: 13px; }
-.mm-footer-grid { gap: 32px; }
+.mm-footer-grid { grid-template-columns: 1.5fr repeat(3, minmax(0, 1fr)); gap: 32px; }
 .mm-footer-col h2 { font-family: var(--font-body); font-weight: 600; font-size: 13px; }
 .mm-footer-col li a { display: inline-flex; align-items: center; min-height: 30px; }
 .mm-footer-studio { display: inline-flex; margin-top: 12px; min-height: 44px; align-items: center; color: #171717; font-weight: 600; }
@@ -183,6 +183,14 @@ a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible
 .mm-footer-col a { overflow-wrap: anywhere; }
 
 main#main { min-height: calc(100svh - var(--header-h)); }
+.page-transition { animation: page-enter 280ms var(--ease) both; }
+@keyframes page-enter {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .page-transition { animation: none; }
+}
 .mm-banner-photo { object-fit: cover; z-index: 0; }
 .mm-banner-box::before { z-index: 1; }
 .mm-footer-col h2 { margin-bottom: 20px; letter-spacing: 1px; }

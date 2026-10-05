@@ -32,7 +32,6 @@ export default async function Footer() {
           <div className="mm-footer-col">
             <h2>COMPANY</h2>
             <ul>
-              <li><Link href="/about">About Us</Link></li>
               <li><Link href="/contact">Contact</Link></li>
               <li><Link href="/shipping">Shipping & Return</Link></li>
               <li><Link href="/faq">FAQ</Link></li>
@@ -44,8 +43,6 @@ export default async function Footer() {
           <div className="mm-footer-col">
             <h2>INFORMATION</h2>
             <ul>
-              <li><Link href="/admin">Admin Dashboard</Link></li>
-              <li><Link href="/track">Track Order</Link></li>
               <li><Link href="/cart">My Cart</Link></li>
               <li><Link href="/wishlist">Wishlist</Link></li>
               <li><Link href="/checkout">Checkout</Link></li>
@@ -59,24 +56,11 @@ export default async function Footer() {
               <li><Link href="/contact">Customer Service</Link></li>
               {settings.contactEmail ? <li><a href={`mailto:${settings.contactEmail}`}>{settings.contactEmail}</a></li> : null}
               {settings.contactPhone ? <li><a href={`tel:${settings.contactPhone.replace(/[^+0-9]/g, "")}`}>{settings.contactPhone}</a></li> : null}
-              <li><Link href="/track">Track Your Order</Link></li>
-              <li><Link href="/about">Wholesale & Teams</Link></li>
               <li><Link href="/contact">Printing Enquiries</Link></li>
               <li><Link href="/terms">Terms of Service</Link></li>
             </ul>
           </div>
 
-          {/* Column 5: SHOP CATEGORIES */}
-          <div className="mm-footer-col">
-            <h2>SHOP CATEGORIES</h2>
-            <ul>
-              <li><Link href="/shop?kind=tee">Classic T-Shirts</Link></li>
-              <li><Link href="/shop?kind=longsleeve">Long Sleeve T-Shirts</Link></li>
-              <li><Link href="/shop?kind=hoodie">Pullover Hoodies</Link></li>
-              <li><Link href="/shop?kind=crew">Crewneck Sweatshirts</Link></li>
-              <li><Link href="/customize">Customizer Studio</Link></li>
-            </ul>
-          </div>
         </div>
 
         {/* Bottom Bar */}

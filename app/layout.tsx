@@ -32,6 +32,7 @@ import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import { WishlistProvider } from "@/lib/wishlist-context";
 import MobileTabBar from "@/components/MobileTabBar";
+import PageTransition from "@/components/PageTransition";
 
 const outfit = Outfit({
   subsets: ["latin"],
@@ -199,7 +200,7 @@ export default async function RootLayout({
         <CartProvider>
           <WishlistProvider>
           <Header categories={categories} />
-          <main id="main">{children}</main>
+          <main id="main"><PageTransition>{children}</PageTransition></main>
           <Footer />
           <MobileTabBar />
           </WishlistProvider>

@@ -73,9 +73,6 @@ export default async function ContactPage() {
                 <Link href="/faq">Frequently asked questions</Link>
               </li>
               <li>
-                <Link href="/about">How custom printing works</Link>
-              </li>
-              <li>
                 <Link href="/shipping">Shipping and returns</Link>
               </li>
             </ul>

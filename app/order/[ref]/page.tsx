@@ -34,12 +34,7 @@ export default async function OrderPage({
               KCP-XXXXXX.
             </p>
             <div className="state-actions">
-              <Link href="/track" className="btn">
-                Try another reference
-              </Link>
-              <Link href="/contact" className="btn btn-ghost">
-                Contact us
-              </Link>
+              <Link href="/contact" className="btn">Contact us</Link>
             </div>
           </div>
         </div>
