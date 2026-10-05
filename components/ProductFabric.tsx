@@ -15,7 +15,7 @@ function recoverBrightFabricEdges(pixels: Uint8ClampedArray, alpha: Uint8Clamped
       integral[(y + 1) * stride + x + 1] = integral[y * stride + x + 1] + row;
     }
   }
-  const radius = 24;
+  const radius = 12;
   for (let y = 0; y < height; y++) {
     for (let x = 0; x < width; x++) {
       const pixel = (y * width + x) * 4;
@@ -27,7 +27,7 @@ function recoverBrightFabricEdges(pixels: Uint8ClampedArray, alpha: Uint8Clamped
       }
       if (alpha[y * width + x] > 20) continue;
       const luminance = (pixels[pixel] + pixels[pixel + 1] + pixels[pixel + 2]) / 3;
-      const brightTrim = hi - lo < 35 && luminance >= 205;
+      const brightTrim = hi - lo < 35 && luminance >= 235;
       if (!brightTrim) continue;
       const edgeRadius = radius;
       const left = Math.max(0, x - edgeRadius), right = Math.min(width - 1, x + edgeRadius);
