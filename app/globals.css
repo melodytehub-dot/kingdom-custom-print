@@ -85,6 +85,13 @@ body[data-lock] {
   overflow: hidden;
 }
 
+/* The customizer owns the full viewport; keep the storefront chrome out of its workspace. */
+body[data-lock] .mm-header-wrapper,
+body[data-lock] .mm-footer,
+body[data-lock] .mm-mobile-tabs {
+  display: none;
+}
+
 h1,
 h2,
 h3,
