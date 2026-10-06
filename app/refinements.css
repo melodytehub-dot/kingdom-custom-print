@@ -219,6 +219,36 @@ main#main { min-height: calc(100svh - var(--header-h)); }
 .rot-side-thumb .rot-profile-thumb, .rot-side-thumb .product-photography { display: block; }
 .rot-profile-preview { width: 100%; height: 100%; position: relative; }
 .rot-profile-preview p { position: absolute; bottom: 2%; left: 0; right: 0; text-align: center; font-size: 13px; }
+.mm-category-strip {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  max-width: 940px;
+  gap: 12px;
+  padding-block: 20px;
+}
+.mm-category-link {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 0;
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 0;
+  color: #171717;
+}
+.mm-category-art {
+  display: block;
+  width: 100%;
+  aspect-ratio: 1;
+  background-image: url('/img/category-atlas.png');
+  background-size: 200% 200%;
+  background-repeat: no-repeat;
+}
+.mm-category-link:hover { color: var(--red); }
+@media (max-width: 768px) {
+  .mm-category-strip { gap: 6px; padding-block: 12px; }
+  .mm-category-link { font-size: 11px; min-height: 92px; }
+}
 @media (max-width: 400px) {
   .pdp-thumb { width: 72px; }
   .pdp-thumb .product-photography { width: 64px; height: 64px; }

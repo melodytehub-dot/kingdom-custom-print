@@ -27,7 +27,7 @@ import "./content.css";
 import "./minimog.css";
 import "./refinements.css";
 import { CartProvider } from "@/lib/cart-context";
-import { getCategories } from "@/lib/catalog";
+import { DEFAULT_SETTINGS, getCategories, getSettings } from "@/lib/catalog";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import { WishlistProvider } from "@/lib/wishlist-context";
@@ -189,7 +189,10 @@ export default async function RootLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const categories = await getCategories().catch(() => []);
+  const [categories, settings] = await Promise.all([
+    getCategories().catch(() => []),
+    getSettings().catch(() => DEFAULT_SETTINGS),
+  ]);
 
   return (
     <html lang="en" className={FONT_VARS}>
@@ -199,7 +202,7 @@ export default async function RootLayout({
         </a>
         <CartProvider>
           <WishlistProvider>
-          <Header categories={categories} />
+          <Header categories={categories} announcement={settings.announcement} />
           <main id="main"><PageTransition>{children}</PageTransition></main>
           <Footer />
           <MobileTabBar />

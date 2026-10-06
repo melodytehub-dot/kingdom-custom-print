@@ -33,6 +33,30 @@
   flex: none;
 }
 
+.mm-announcement {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  min-height: 34px;
+  padding: 6px 16px;
+  background: #111;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  line-height: 1.35;
+  text-align: center;
+}
+
+.mm-announcement-dot {
+  width: 7px;
+  height: 7px;
+  flex: none;
+  border-radius: 50%;
+  background: #da3f3f;
+}
+
 /* --------------------------------------------------------------------------
    Header
    -------------------------------------------------------------------------- */

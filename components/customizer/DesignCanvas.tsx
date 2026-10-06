@@ -32,6 +32,8 @@ interface CanvasProps {
   printArea?: PrintArea;
   design: Design;
   selectedId: string | null;
+  compact?: boolean;
+  renderSize?: number;
   onSelect: (id: string | null) => void;
   onChange: (side: GarmentSide, id: string, patch: Partial<DesignLayer>) => void;
   onCommit: () => void;
@@ -48,6 +50,7 @@ interface Box {
 }
 
 interface DragState {
+  pointerId: number;
   id: string;
   tool: Tool;
   edge: Edge | null;
@@ -97,6 +100,8 @@ export default function DesignCanvas({
   printArea,
   design,
   selectedId,
+  compact = false,
+  renderSize = VIEW,
   onSelect,
   onChange,
   onCommit,
@@ -136,6 +141,14 @@ export default function DesignCanvas({
     if (event.button !== 0 && event.pointerType === "mouse") return;
     event.preventDefault();
     event.stopPropagation();
+    if (dragRef.current) return;
+
+    // Opening the mobile editor resizes the stage. Select first, then drag in
+    // the settled coordinate system on the next gesture.
+    if (compact && selectedId !== layer.id) {
+      onSelect(layer.id);
+      return;
+    }
 
     const pt = toView(event.clientX, event.clientY);
     if (!pt) return;
@@ -149,6 +162,7 @@ export default function DesignCanvas({
     };
 
     dragRef.current = {
+      pointerId: event.pointerId,
       id: layer.id,
       tool: nextTool,
       edge,
@@ -164,6 +178,7 @@ export default function DesignCanvas({
       base: layerBox(layer, area),
       rotation: layer.rotation,
     };
+    event.currentTarget.setPointerCapture(event.pointerId);
     setDragging(nextTool);
   };
 
@@ -172,7 +187,8 @@ export default function DesignCanvas({
 
     const onMove = (e: PointerEvent) => {
       const s = dragRef.current;
-      if (!s) return;
+      if (!s || e.pointerId !== s.pointerId) return;
+      e.preventDefault();
       const pt = toView(e.clientX, e.clientY);
       if (!pt) return;
 
@@ -222,13 +238,14 @@ export default function DesignCanvas({
       onChange(side, s.id, { rotation: Math.round(e.shiftKey ? Math.round(deg / 15) * 15 : deg) });
     };
 
-    const onUp = () => {
+    const onUp = (e: PointerEvent) => {
+      if (e.pointerId !== dragRef.current?.pointerId) return;
       dragRef.current = null;
       setDragging(null);
       onCommit();
     };
 
-    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointermove", onMove, { passive: false });
     window.addEventListener("pointerup", onUp);
     window.addEventListener("pointercancel", onUp);
     return () => {
@@ -294,7 +311,7 @@ export default function DesignCanvas({
         className="rot-canvas-svg"
         role="img"
         aria-label={`${side} preview with ${layers.length} design element${layers.length === 1 ? "" : "s"}`}
-        onPointerDown={() => onSelect(null)}
+        onPointerDown={() => { if (!dragRef.current) onSelect(null); }}
       >
         <defs>
           {levels.map((lv) => (
@@ -365,13 +382,15 @@ export default function DesignCanvas({
         </g>
 
         <g>
-          {layers.map((layer) => (
+          {[...layers.filter((layer) => layer.id !== selectedId), ...layers.filter((layer) => layer.id === selectedId)].map((layer) => (
             <LayerOverlay
               key={layer.id}
               layer={layer}
               area={area}
               areaOrigin={areaOrigin}
               selected={layer.id === selectedId}
+              compact={compact}
+              handleScale={compact ? (44 * VIEW) / (68 * Math.max(renderSize, 1)) : 1}
               onPointerDown={startDrag}
               onDelete={onDelete}
               onEdit={onEdit}
@@ -493,6 +512,8 @@ function LayerOverlay({
   area,
   areaOrigin,
   selected,
+  compact,
+  handleScale,
   onPointerDown,
   onDelete,
   onEdit,
@@ -501,6 +522,8 @@ function LayerOverlay({
   area: { w: number; h: number };
   areaOrigin: { x: number; y: number };
   selected: boolean;
+  compact: boolean;
+  handleScale: number;
   onPointerDown: (e: ReactPointerEvent, layer: DesignLayer, tool: Tool, edge?: Edge | null) => void;
   onDelete: (id: string) => void;
   onEdit: (id: string) => void;
@@ -540,7 +563,7 @@ function LayerOverlay({
             pointerEvents="none"
           />
 
-          <ControlButton
+          {!compact ? <ControlButton
             x={-halfW - GAP}
             y={-halfH - GAP}
             label="Delete"
@@ -551,10 +574,11 @@ function LayerOverlay({
             }}
           >
             <TrashIcon />
-          </ControlButton>
+          </ControlButton> : null}
 
           {!layer.locked ? (
             <>
+              {!compact ? <>
               <ControlButton
                 x={0}
                 y={-halfH - GAP}
@@ -606,10 +630,12 @@ function LayerOverlay({
                   </text>
                 </ControlButton>
               ) : null}
+              </> : null}
 
               <ControlButton
-                x={halfW + GAP}
-                y={halfH + GAP}
+                x={halfW + GAP * handleScale}
+                y={halfH + GAP * handleScale}
+                scale={handleScale}
                 label="Resize"
                 onActivate={(e) => onPointerDown(e, layer, "scale", "se")}
               >
@@ -629,6 +655,7 @@ function ControlButton({
   label,
   onActivate,
   shape = "circle",
+  scale = 1,
   children,
 }: {
   x: number;
@@ -636,11 +663,12 @@ function ControlButton({
   label: string;
   onActivate: (e: ReactPointerEvent) => void;
   shape?: "circle" | "pill";
+  scale?: number;
   children: React.ReactNode;
 }) {
   return (
     <g
-      transform={`translate(${x} ${y})`}
+      transform={`translate(${x} ${y}) scale(${scale})`}
       style={{ cursor: "pointer" }}
       onPointerDown={onActivate}
       role="button"

@@ -10,9 +10,10 @@ import { getProducts } from "@/lib/catalog";
 export const revalidate = 60;
 
 const POD_CATEGORIES = [
-  { name: "T-SHIRTS", href: "/shop?kind=tee", img: "/img/products/crown-classic-tee-white.jpg" },
-  { name: "LONG SLEEVES", href: "/shop?kind=longsleeve", img: "/img/products/long-sleeve-tee.jpg" },
-  { name: "HOODIES & FLEECE", href: "/shop?kind=fleece", img: "/img/mockups/families/hoodie/BLK_fr.webp" },
+  { name: "SHIRTS", href: "/shop?kind=tee", position: "0% 0%" },
+  { name: "HOODIES", href: "/shop?kind=fleece", position: "100% 0%" },
+  { name: "CAPS", href: "/shop?kind=cap", position: "0% 100%" },
+  { name: "MERCH", href: "/shop?category=accessories", position: "100% 100%" },
 ];
 
 const INSTA_IMAGES = [
@@ -58,8 +59,8 @@ export default async function HomePage() {
             <div className="mm-hero-media">
               <div className="mm-hero-img-wrap">
                 <Image
-                  src="/img/hero-editorial.png"
-                  alt="A person wearing an oversized custom printed t-shirt"
+                  src="/img/shop-studio.png"
+                  alt="Kingdom Custom Print studio with a custom printed shirt"
                   fill
                   loading="eager"
                   fetchPriority="high"
@@ -74,9 +75,16 @@ export default async function HomePage() {
         </div>
       </section>
 
-      {/* ------------------------------------------------------------------
-          2. MAKE IT YOURS (Product Grid)
-          ------------------------------------------------------------------ */}
+      <nav className="mm-category-strip minimog-container" aria-label="Shop by category">
+        {POD_CATEGORIES.map((category) => (
+          <Link key={category.name} href={category.href} className="mm-category-link">
+            <span className="mm-category-art" aria-hidden="true" style={{ backgroundPosition: category.position }} />
+            <span>{category.name}</span>
+          </Link>
+        ))}
+      </nav>
+
+      {/* Featured products */}
       <section className="mm-section">
         <div className="minimog-container">
           <div className="mm-section-head">
@@ -110,7 +118,7 @@ export default async function HomePage() {
                 backgroundColor: "#111",
               }}
             >
-              <Image src="/img/studio-editorial.png" alt="" fill sizes="(max-width: 768px) 100vw, 620px" className="mm-banner-photo" />
+              <Image src="/img/shop-printing.png" alt="Custom artwork being printed on a shirt in the studio" fill sizes="(max-width: 768px) 100vw, 620px" className="mm-banner-photo" />
               <div className="mm-banner-content">
                 <h3 className="mm-banner-title">PRINT ON DEMAND</h3>
                 <p className="mm-banner-sub">Your artwork, printed on the apparel you love.</p>
@@ -136,37 +144,6 @@ export default async function HomePage() {
                 </span>
               </div>
             </Link>
-          </div>
-        </div>
-      </section>
-
-      {/* ------------------------------------------------------------------
-          4. SHOP BY CATEGORIES
-          ------------------------------------------------------------------ */}
-      <section className="mm-section" style={{ backgroundColor: "#fbfbfb", borderTop: "1px solid #eee", borderBottom: "1px solid #eee" }}>
-        <div className="minimog-container">
-          <div className="mm-section-head">
-            <h2 className="mm-section-title">SHOP BY CATEGORIES</h2>
-            <p className="mm-section-sub">
-              Browse our diverse product catalog ready for on-demand custom printing.
-            </p>
-          </div>
-
-          <div className="mm-categories-grid">
-            {POD_CATEGORIES.map((cat, idx) => (
-              <Link key={`${cat.name}-${idx}`} href={cat.href} className="mm-category-item">
-                <div className="mm-category-thumb">
-                  <Image
-                    src={cat.img}
-                    alt={cat.name}
-                    fill
-                    sizes="(max-width: 768px) 33vw, 187px"
-                    style={{ objectFit: "cover" }}
-                  />
-                </div>
-                <span className="mm-category-name">{cat.name}</span>
-              </Link>
-            ))}
           </div>
         </div>
       </section>

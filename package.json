@@ -19,6 +19,7 @@
     "qa-cart-flow:hoodie": "QA_PRODUCT_SLUG=premium-pullover-hoodie QA_PRODUCT_NAME='Premium Pullover Hoodie' node scripts/qa-cart-flow.mjs",
     "qa-admin-flow": "node --env-file-if-exists=.env.local scripts/qa-admin-flow.mjs",
     "qa-customizer-controls": "node scripts/qa-customizer-controls.mjs",
+    "qa-customizer-interactions": "node scripts/qa-customizer-interactions.mjs",
     "qa-price-tamper": "node scripts/qa-payments.mjs",
     "qa-garment-families": "node scripts/qa-garment-families.mjs",
     "qa-site": "npm run qa-storefront && npm run qa-product-gallery && npm run qa-audit && npm run qa-garment-families && npm run qa-customizer-controls && npm run qa-cart-flow && npm run qa-payments",

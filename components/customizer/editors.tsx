@@ -16,6 +16,7 @@ import {
   LayerFrontIcon,
   LockIcon,
   SlashSwatch,
+  TrashIcon,
 } from "./icons";
 
 /* -------------------------------------------------------------------------
@@ -248,6 +249,7 @@ export function ActionBar({
   flipV,
   onLock,
   onDuplicate,
+  onDelete,
 }: {
   locked: boolean;
   canBackward: boolean;
@@ -261,6 +263,7 @@ export function ActionBar({
   onFlipV: () => void;
   onLock: () => void;
   onDuplicate: () => void;
+  onDelete: () => void;
 }) {
   return (
     <div className="rot-actionbar" role="toolbar" aria-label="Layer actions">
@@ -335,6 +338,12 @@ export function ActionBar({
           <DuplicateIcon size={24} />
         </button>
         <span>Duplicate</span>
+      </div>
+      <div className="rot-act">
+        <button type="button" className="rot-actbtn" onClick={onDelete} aria-label="Delete element">
+          <TrashIcon size={24} />
+        </button>
+        <span>Delete</span>
       </div>
     </div>
   );
@@ -465,6 +474,7 @@ export interface LayerActionsProps {
   onFlipV: () => void;
   onLock: () => void;
   onDuplicate: () => void;
+  onDelete: () => void;
 }
 
 /** Visual size of text = font size × average stretch, shown like the reference (1.0 ≈ default). */
@@ -908,24 +918,10 @@ export function ImageEditor({
           />
         ) : null}
         <Toggle
-          label="Remove Background"
-          badge="AI"
-          checked={fx.removeBg}
-          disabled={busy}
-          onChange={(v) => onFx({ removeBg: v })}
-        />
-        <Toggle
           label="Crop & Trim"
           checked={fx.crop}
           disabled={busy}
           onChange={(v) => onFx({ crop: v })}
-        />
-        <Toggle
-          label="Super Resolution"
-          badge="AI"
-          checked={fx.superRes}
-          disabled={busy}
-          onChange={(v) => onFx({ superRes: v })}
         />
 
         <SliderRow

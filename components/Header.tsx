@@ -17,12 +17,20 @@ const MAIN_NAV_LINKS = [
 
 export default async function Header({
   categories,
+  announcement,
 }: {
   categories: Category[];
+  announcement: string;
 }) {
 
   return (
     <header className="mm-header-wrapper">
+      {announcement.trim() ? (
+        <div className="mm-announcement" role="status">
+          <span className="mm-announcement-dot" aria-hidden="true" />
+          {announcement}
+        </div>
+      ) : null}
       {/* Main header */}
       <div className="mm-header">
         <div className="minimog-container mm-header-main">

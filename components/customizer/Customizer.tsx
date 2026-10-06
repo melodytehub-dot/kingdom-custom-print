@@ -4,10 +4,11 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import ProductPhotography from "../ProductPhotography";
-import DesignCanvas, { VIEW, printAreaView } from "./DesignCanvas";
+import DesignCanvas from "./DesignCanvas";
+import { fitStage } from "./stageGeometry";
 import {
   ArtPanel,
-  AiDesignPanel,
+  AiTextPanel,
   DistressPanel,
   NamesIntro,
   NamesTools,
@@ -22,7 +23,6 @@ import {
 } from "./panels";
 import { ImageEditor, TextEditor, type LayerActionsProps } from "./editors";
 import {
-  AiArtIcon,
   ArtIcon,
   CartGlyph,
   CheckGlyph,
@@ -114,7 +114,6 @@ interface DraftState {
 }
 
 const uid = () => `r-${Math.random().toString(36).slice(2, 9)}`;
-const clamp = (n: number, min: number, max: number) => Math.min(max, Math.max(min, n));
 
 function luminance(hex: string): number {
   const h = hex.replace("#", "");
@@ -348,12 +347,6 @@ export default function Customizer({
       if (id) {
         const layer = design[side].find((l) => l.id === id);
         if (layer) {
-          // Selecting artwork is the mobile equivalent of opening Edit. A
-          // locked layer from an older saved draft must not trap the customer
-          // in a disabled editor with no obvious way to continue.
-          if (layer.locked) {
-            setDesign((prev) => updateLayer(prev, side, id, { locked: false }));
-          }
           setPanel(layer.type === "text" ? "text" : "image");
         }
       } else {
@@ -371,12 +364,6 @@ export default function Customizer({
   const editLayer = (id: string) => {
     const layer = design[side].find((l) => l.id === id);
     if (!layer) return;
-    // Opening the editor is an explicit request to edit. Older saved drafts
-    // can contain a locked layer, so unlock it at this boundary instead of
-    // opening a panel whose controls are all disabled.
-    if (layer.locked) {
-      setDesign((prev) => updateLayer(prev, side, id, { locked: false }));
-    }
     setSelectedId(id);
     setPanel(layer.type === "text" ? "text" : "image");
     setFocusToken((n) => n + 1);
@@ -512,6 +499,7 @@ export default function Customizer({
       onFlipH: () => patchActive(layer.id, { flipH: !layer.flipH }),
       onFlipV: () => patchActive(layer.id, { flipV: !layer.flipV }),
       onLock: () => patchActive(layer.id, { locked: !layer.locked }),
+      onDelete: () => deleteLayer(layer.id),
       onDuplicate: () => {
         const res = duplicateLayer(design, side, layer.id);
         if (res) {
@@ -820,29 +808,9 @@ export default function Customizer({
     goStep(STEP_ORDER[stepIndex + 1]);
   };
 
-  /* ---- stage fit: shirt fills the width on phones, fits whole on desktop ---- */
+  /* ---- stage fit ---- */
   const split = SPLIT_PANELS.includes(panel);
-  const fit = useMemo(() => {
-    const { w, h } = stageBox;
-    if (!w || !h) return { size: 0, left: 0, ty: 0 };
-    // RushOrderTees keeps the garment large in the square workspace. The
-    // previous fit left too much empty space above and below the shirt.
-    const size = (compact ? w * 1.14 : Math.min(w * 1.1, h * 1.1)) * zoom;
-    const top = 0.054 * size;
-    const silhouetteH = 0.892 * size;
-    let ty = (h - silhouetteH) / 2 - top;
-    if (silhouetteH > h * 0.96) ty = -top + h * 0.02;
-    const selY = selected?.y ?? null;
-    if (split && selectedId && compact && selY !== null) {
-      const pa = printAreaView(side, product.printArea);
-      const focusY = ((pa.y + (selY / 100) * pa.h) / VIEW) * size;
-      const wanted = h * 0.6 - focusY;
-      const maxTy = -top + h * 0.06;
-      const minTy = h - 0.946 * size - h * 0.04;
-      ty = minTy < maxTy ? clamp(wanted, minTy, maxTy) : ty;
-    }
-    return { size, left: (w - size) / 2, ty };
-  }, [stageBox, compact, split, selectedId, selected?.y, side, zoom, product.printArea]);
+  const fit = useMemo(() => fitStage(stageBox.w, stageBox.h, zoom), [stageBox, zoom]);
 
   /* ---- what the rail highlights ---- */
   const railActive =
@@ -860,7 +828,7 @@ export default function Customizer({
                 ? "distress"
                 : panel === "saved"
                   ? "saved"
-                  : "";
+                  : panel === "ai" ? "ai" : "";
 
   const callHref = contactPhone ? `tel:${contactPhone.replace(/[^\d+]/g, "")}` : "/contact";
 
@@ -949,7 +917,7 @@ export default function Customizer({
       case "art":
         return <ArtPanel onAdd={addArt} onClose={closePanel} />;
       case "ai":
-        return <AiDesignPanel side={side} onGenerate={generateAiDesign} onClose={closePanel} />;
+        return <AiTextPanel side={side} onGenerate={generateAiDesign} onClose={closePanel} />;
       case "names-intro":
         return <NamesIntro onStart={() => setPanel("names")} onClose={closePanel} />;
       case "names":
@@ -1050,8 +1018,8 @@ export default function Customizer({
     },
     {
       id: "ai",
-      label: "AI Design",
-      icon: <AiArtIcon size={42} />,
+      label: "Text Ideas",
+      icon: <TextBoxIcon size={38} />,
       onClick: () => {
         setSelectedId(null);
         setPanel("ai");
@@ -1158,7 +1126,7 @@ export default function Customizer({
       {/* ---- Body ---- */}
       <div className="rot-body">
         <div className="rot-main">
-          <section className="rot-stage" ref={stageRef} aria-label="Design preview">
+          <div className="rot-preview">
             <div className="rot-stage-top">
               <div className="rot-history" role="group" aria-label="History">
                 <button type="button" onClick={undo} disabled={!hist.canUndo} aria-label="Undo">
@@ -1176,11 +1144,13 @@ export default function Customizer({
                       type="button"
                       className={`rot-side-thumb${!profileView && side === view ? " is-active" : ""}`}
                       onClick={() => {
+                        setProfileView(false);
                         setSide(view);
                         setSelectedId(null);
                         setPanel((p) => (SPLIT_PANELS.includes(p) ? "none" : p));
                       }}
                       aria-pressed={!profileView && side === view}
+                      aria-label={view === "front" ? "Front view" : "Back view"}
                     >
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img src={view === "front" ? mockup.front : mockup.back} alt="" />
@@ -1214,6 +1184,7 @@ export default function Customizer({
               </div>
             </div>
 
+          <section className="rot-stage" ref={stageRef} aria-label="Design preview">
             {fit.size > 0 ? (
               <div
                 className={`rot-shirt${flipping ? " is-flipping" : ""}`}
@@ -1232,6 +1203,8 @@ export default function Customizer({
                   printArea={product.printArea}
                   design={design}
                   selectedId={selectedId}
+                  compact={compact}
+                  renderSize={fit.size}
                   onSelect={handleSelect}
                   onChange={patch}
                   onCommit={() => undefined}
@@ -1268,6 +1241,7 @@ export default function Customizer({
             </button>
           </section>
 
+          </div>
           <nav className="rot-rail" aria-label="Design tools">
             {/* The tool callbacks intentionally close over the hidden file input ref. */}
             {/* eslint-disable-next-line react-hooks/refs */}

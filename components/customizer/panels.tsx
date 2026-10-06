@@ -3,8 +3,8 @@
 import Link from "next/link";
 import Image from "next/image";
 import type { ReactNode } from "react";
-import type { DesignLayer, GarmentSide, Product, RosterEntry, TextLayer } from "@/lib/types";
-import { newImageLayer, newTextLayer } from "@/lib/design";
+import type { GarmentSide, Product, RosterEntry, TextLayer } from "@/lib/types";
+import { newTextLayer } from "@/lib/design";
 import { sizeDisplayLabel, splitSizeGroups } from "@/lib/sizes";
 import type { SavedDraft } from "@/lib/design";
 import { PERSONALIZATION_FEE, formatUSD, type PriceQuote } from "@/lib/pricing";
@@ -129,7 +129,7 @@ export function ArtPanel({ onAdd, onClose }: { onAdd: (item: ArtItem) => void; o
 }
 
 /* -------------------------------------------------------------------------
-   Free AI design assistant
+   Local text-layout assistant
    ------------------------------------------------------------------------- */
 
 function conceptFromPrompt(prompt: string): {
@@ -138,25 +138,11 @@ function conceptFromPrompt(prompt: string): {
   ink: string;
   accent: string;
   font: string;
-  art: ArtItem;
   arc: number;
   summary: string;
 } {
   const value = prompt.trim();
   const lower = value.toLowerCase();
-  const art =
-    lower.includes("basket") || lower.includes("sport") || lower.includes("team")
-      ? ART_LIBRARY.find((item) => item.id === "burst")!
-      : lower.includes("music") || lower.includes("concert")
-        ? ART_LIBRARY.find((item) => item.id === "bolt")!
-        : lower.includes("heart") || lower.includes("love")
-          ? ART_LIBRARY.find((item) => item.id === "heart")!
-          : lower.includes("faith") || lower.includes("church")
-            ? ART_LIBRARY.find((item) => item.id === "cross")!
-            : lower.includes("crown") || lower.includes("king")
-              ? ART_LIBRARY.find((item) => item.id === "crown")!
-              : ART_LIBRARY.find((item) => item.id === "star")!;
-
   const quoted = value.match(/[“"]([^”"]+)[”"]/);
   const afterFor = value.match(/\bfor\s+(.+)$/i)?.[1];
   const rawTitle = quoted?.[1] ?? afterFor ?? value;
@@ -183,19 +169,18 @@ function conceptFromPrompt(prompt: string): {
     ink,
     accent,
     font,
-    art,
     arc,
-    summary: `${styleName} ${art.name.toLowerCase()} concept with ${title.toLowerCase()} lettering`,
+    summary: `${styleName} ${title.toLowerCase()} lettering`,
   };
 }
 
-export function AiDesignPanel({
+export function AiTextPanel({
   side,
   onGenerate,
   onClose,
 }: {
   side: GarmentSide;
-  onGenerate: (layers: DesignLayer[], summary: string) => void;
+  onGenerate: (layers: TextLayer[], summary: string) => void;
   onClose: () => void;
 }) {
   const [prompt, setPrompt] = useState("");
@@ -203,8 +188,6 @@ export function AiDesignPanel({
 
   const generate = () => {
     setBusy(true);
-    // Keep the first version completely local: no API key, upload, or request.
-    // The same callback can later be backed by an in-browser WebGPU model.
     const concept = conceptFromPrompt(prompt);
     const headline: TextLayer = newTextLayer({
       text: concept.title,
@@ -226,23 +209,15 @@ export function AiDesignPanel({
       weight: 700,
       letterSpacing: 7,
     });
-    const graphic = newImageLayer(concept.art.src, concept.art.name, 1, {
-      x: 50,
-      y: 50,
-      scaleX: 0.34,
-      scaleY: 0.34,
-      opacity: 0.92,
-    });
-    onGenerate([graphic, headline, subline], concept.summary);
+    onGenerate([headline, subline], concept.summary);
     setBusy(false);
   };
 
   return (
     <div className="rot-scroll">
       <PanelHeader
-        eyebrow="Free AI assistant"
-        title="Generate a concept"
-        hint="Describe a team, event or brand. This browser-local assistant creates editable text and art layers without an API key."
+        eyebrow="Text ideas"
+        title="Create your lettering"
         onClose={onClose}
       />
       <div className="rot-ai-panel">
@@ -254,10 +229,9 @@ export function AiDesignPanel({
           placeholder='“Kings United” basketball team, bold retro style'
           rows={4}
         />
-        <button type="button" className="rot-cta" onClick={generate} disabled={busy}>
-          <CheckGlyph size={18} /> {busy ? "Creating…" : "Generate editable design"}
+        <button type="button" className="rot-cta" onClick={generate} disabled={busy || !prompt.trim()}>
+          <CheckGlyph size={18} /> {busy ? "Creating…" : "Add lettering"}
         </button>
-        <p className="rot-phint">Nothing is uploaded or sent anywhere. Every generated layer can be edited after it is added.</p>
         <p className="rot-ai-examples">Try: “church youth retreat”, “summer concert”, or “minimal coffee brand”.</p>
       </div>
     </div>

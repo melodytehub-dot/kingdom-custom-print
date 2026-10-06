@@ -3,7 +3,7 @@ import { useState } from "react";
 import Link from "next/link";
 import ProductCard from "./ProductCard";
 import type { Product } from "@/lib/types";
-const filters = [{ value: "all", label: "All apparel" }, { value: "tee", label: "T-shirts" }, { value: "longsleeve", label: "Long sleeves" }, { value: "fleece", label: "Hoodies & fleece" }];
+const filters = [{ value: "all", label: "All products" }, { value: "tee", label: "T-shirts" }, { value: "longsleeve", label: "Long sleeves" }, { value: "fleece", label: "Hoodies & fleece" }, { value: "cap", label: "Caps" }, { value: "mug", label: "Mugs" }];
 export default function HomeProducts({ products }: { products: Product[] }) {
   const [filter, setFilter] = useState("all");
   const visible = products.filter((product) => filter === "all" || (filter === "fleece" ? product.kind === "hoodie" || product.kind === "crew" : product.kind === filter)).slice(0, 8);
