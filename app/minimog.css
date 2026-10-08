@@ -884,6 +884,18 @@ a {
   text-decoration: none;
 }
 
+.mm-banner-box-team {
+  min-height: 0;
+  align-items: stretch;
+  flex-direction: column;
+  padding: 0;
+  background: #171717;
+}
+.mm-banner-box-team::before { display: none; }
+.mm-banner-team-photo { position: relative; display: block; width: 100%; aspect-ratio: 6 / 5; flex: none; overflow: hidden; }
+.mm-banner-photo-team { object-position: center top; }
+.mm-banner-box-team .mm-banner-content { padding: 24px 32px 30px; }
+
 .mm-banner-box::before {
   content: "";
   position: absolute;
@@ -1454,6 +1466,10 @@ a {
   .mm-2col-banner {
     grid-template-columns: 1fr;
   }
+  .mm-banner-team-photo { aspect-ratio: 3 / 4; }
+  .mm-banner-box-team .mm-banner-content { padding: 22px 24px 26px; }
+  .mm-banner-box-team .mm-banner-title { font-size: 32px; }
+  .mm-banner-box-team .mm-banner-sub { font-size: 14px; margin-bottom: 12px; }
   .mm-3col-banner {
     grid-template-columns: 1fr;
   }

@@ -200,6 +200,15 @@ try {
   assert.ok(cartItems.every((item) => item.design.front.length === 3));
   console.log("PASS file upload, drop, paste, draft restore, preview download, and same design added in two colors");
   await page.goto(base, { waitUntil: "domcontentloaded" });
+  const teamBanner = page.locator(".mm-banner-box-team");
+  await teamBanner.locator("img").waitFor({ state: "attached" });
+  await teamBanner.locator("h3.mm-banner-title").waitFor({ state: "attached" });
+  assert.equal(await teamBanner.count(), 1);
+  assert.equal((await teamBanner.locator("h3.mm-banner-title").innerText()).trim(), "CROSSFIT & TEAMS");
+  assert.match(await teamBanner.locator("img").getAttribute("src"), /kingdom-team\.webp/);
+  assert.equal(await teamBanner.getAttribute("href"), "/customize");
+  assert.match(await teamBanner.innerText(), /DESIGN YOURS/);
+  assert.equal(await teamBanner.locator("img").evaluate((image) => getComputedStyle(image).objectPosition), "50% 0%");
   await scrollToCollections(page);
   try {
     await page.waitForFunction(() => [...document.querySelectorAll(".mm-collection img")].every((img) => img.complete && img.naturalWidth > 0), null, { timeout: 45000 });
@@ -211,6 +220,13 @@ try {
   await screenshot(page, "collections-desktop");
   await page.setViewportSize({ width: 390, height: 844 });
   await scrollToCollections(page);
+  const teamLayout = await page.locator(".mm-banner-box-team").evaluate((node) => {
+    const photo = node.querySelector(".mm-banner-team-photo").getBoundingClientRect();
+    const copy = node.querySelector(".mm-banner-content").getBoundingClientRect();
+    return { ratio: photo.width / photo.height, copyBelowPhoto: copy.top >= photo.bottom };
+  });
+  assert.ok(Math.abs(teamLayout.ratio - 0.75) < 0.02);
+  assert.equal(teamLayout.copyBelowPhoto, true);
   await screenshot(page, "collections-mobile");
   assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
   assert.deepEqual(errors, []);

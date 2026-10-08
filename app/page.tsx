@@ -137,12 +137,14 @@ export default async function HomePage() {
 
             <Link
               href="/customize"
-              className="mm-banner-box"
+              className="mm-banner-box mm-banner-box-team"
               style={{
                 backgroundColor: "#222",
               }}
             >
-              <Image src="/img/hero-editorial.png" alt="" fill sizes="(max-width: 768px) 100vw, 620px" className="mm-banner-photo" />
+              <span className="mm-banner-team-photo">
+                <Image src="/img/kingdom-team.webp" alt="Five people wearing Kingdom Custom Print shirts" fill sizes="(max-width: 768px) 100vw, 620px" className="mm-banner-photo mm-banner-photo-team" />
+              </span>
               <div className="mm-banner-content">
                 <h3 className="mm-banner-title">CROSSFIT & TEAMS</h3>
                 <p className="mm-banner-sub">Affiliate gear, custom uniforms and event apparel.</p>
