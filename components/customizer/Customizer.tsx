@@ -3,11 +3,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import ProductPhotography from "../ProductPhotography";
 import DesignCanvas from "./DesignCanvas";
 import { fitStage } from "./stageGeometry";
 import {
   ArtPanel,
+  AddTextPanel,
   AiTextPanel,
   DistressPanel,
   NamesIntro,
@@ -29,6 +29,7 @@ import {
   CloudUploadIcon,
   DistressIcon,
   DollarIcon,
+  ChevronRightIcon,
   HeadsetIcon,
   PersonalizeIcon,
   RedoIcon,
@@ -62,7 +63,7 @@ import { applyImageFx, DEFAULT_FX } from "@/lib/imageFx";
 import { drawPreview } from "./preview";
 import { mockupForColor, mockupsForProduct, TEE_MOCKUPS, type TeeMockup } from "@/lib/mockups";
 import { useCart } from "@/lib/cart-context";
-import { quoteProduct } from "@/lib/pricing";
+import { quoteProduct, formatUSD } from "@/lib/pricing";
 import type {
   Design,
   DesignLayer,
@@ -79,7 +80,9 @@ type Step = "design" | "quantity" | "review";
 type Panel =
   | "none"
   | "products"
+  | "upload"
   | "text"
+  | "text-add"
   | "image"
   | "art"
   | "ai"
@@ -96,7 +99,7 @@ const STEP_LABEL: Record<Step, string> = {
   review: "Review",
 };
 
-/** Panels that sit under the shirt; everything else takes over the screen on mobile. */
+/** Layer editors share selection state; all design panels keep a mobile preview visible. */
 const SPLIT_PANELS: Panel[] = ["text", "image"];
 
 const NN_FONT_SIZES: Record<NNSize, { name: number; number: number; sub: number }> = {
@@ -152,9 +155,7 @@ export default function Customizer({
 
   const [step, setStep] = useState<Step>("design");
   const [panel, setPanel] = useState<Panel>("none");
-  const [side, setActiveSide] = useState<GarmentSide>("front");
-  const [profileView, setProfileView] = useState(false);
-  const setSide = useCallback((view: GarmentSide | ((previous: GarmentSide) => GarmentSide)) => { setActiveSide(view); setProfileView(false); }, []);
+  const [side, setSide] = useState<GarmentSide>("front");
   const [colorCode, setColorCode] = useState(() => {
     const match =
       productMockups.find((m) => m.slug === initialColor || m.code === initialColor) ?? productMockups[0] ?? TEE_MOCKUPS[0];
@@ -166,6 +167,7 @@ export default function Customizer({
   const [drafts, setDrafts] = useState<SavedDraft[]>([]);
   const [notice, setNotice] = useState<{ tone: "ok" | "warn" | "error"; text: string } | null>(null);
   const [busy, setBusy] = useState(false);
+  const [transforming, setTransforming] = useState(false);
   const [fxBusy, setFxBusy] = useState(false);
   const [addedCount, setAddedCount] = useState(0);
   const [hist, setHist] = useState({ canUndo: false, canRedo: false });
@@ -267,19 +269,27 @@ export default function Customizer({
     }
   }, [ready, draftKey, colorCode, design, lines, roster, nn]);
 
-  /* ---- undo history (debounced so a drag is one step) ---- */
+  /* Text entry is grouped; pointer gestures commit as one history step. */
   useEffect(() => {
+    if (transforming) return;
     if (applyingHistory.current) {
       applyingHistory.current = false;
       return;
     }
+    if (!historyRef.current.length) {
+      historyRef.current = [design];
+      syncHist();
+      return;
+    }
+    if (historyRef.current.at(-1) === design) return;
+    setHist({ canUndo: true, canRedo: false });
     const t = setTimeout(() => {
       historyRef.current = [...historyRef.current.slice(-29), design];
       futureRef.current = [];
       syncHist();
     }, 450);
     return () => clearTimeout(t);
-  }, [design, syncHist]);
+  }, [design, syncHist, transforming]);
 
   useEffect(() => {
     if (!notice) return;
@@ -295,7 +305,7 @@ export default function Customizer({
     };
   }, []);
 
-  /* ---- measure the stage so the shirt can be fitted and panned ---- */
+  /* ---- measure the stage so the shirt can be fitted ---- */
   useEffect(() => {
     const el = stageRef.current;
     if (!el) return;
@@ -344,16 +354,9 @@ export default function Customizer({
   const handleSelect = useCallback(
     (id: string | null) => {
       setSelectedId(id);
-      if (id) {
-        const layer = design[side].find((l) => l.id === id);
-        if (layer) {
-          setPanel(layer.type === "text" ? "text" : "image");
-        }
-      } else {
-        setPanel((p) => (SPLIT_PANELS.includes(p) ? "none" : p));
-      }
+      if (!id) setPanel("none");
     },
-    [design, side]
+    []
   );
 
   const closePanel = () => {
@@ -361,11 +364,15 @@ export default function Customizer({
     setPanel("none");
   };
 
-  const editLayer = (id: string) => {
+  const openLayerPanel = (id: string) => {
     const layer = design[side].find((l) => l.id === id);
     if (!layer) return;
     setSelectedId(id);
     setPanel(layer.type === "text" ? "text" : "image");
+  };
+
+  const editLayer = (id: string) => {
+    openLayerPanel(id);
     setFocusToken((n) => n + 1);
   };
 
@@ -378,22 +385,40 @@ export default function Customizer({
   };
 
   const shareDesign = async () => {
-    const url = window.location.href;
+    if (busy) return;
+    setBusy(true);
     try {
-      if (navigator.share) {
-        await navigator.share({ title: `${product.name} design`, url });
-        return;
+      const previews = await drawPreview(mockup.front, mockup.back, stripForCart(design), product.printArea);
+      const preview = previews[side];
+      if (!preview) throw new Error("No preview available");
+      const blob = await (await fetch(preview)).blob();
+      const file = new File([blob], `${product.slug}-${side}.png`, { type: "image/png" });
+      if (navigator.canShare?.({ files: [file] })) {
+        try {
+          await navigator.share({ title: `${product.name} design`, files: [file] });
+          return;
+        } catch (error) {
+          if (error instanceof DOMException && error.name === "AbortError") return;
+          // Some browsers advertise file sharing but cannot open their share UI.
+        }
       }
-      await navigator.clipboard.writeText(url);
-      setNotice({ tone: "ok", text: "Design link copied to your clipboard." });
-    } catch {
-      // The user dismissed the share sheet; nothing to report.
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = file.name;
+      link.click();
+      window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+      setNotice({ tone: "ok", text: "Design preview downloaded." });
+    } catch (error) {
+      if (!(error instanceof DOMException && error.name === "AbortError")) setNotice({ tone: "error", text: "Could not create your preview. Please try again." });
+    } finally {
+      setBusy(false);
     }
   };
 
   /* ---- adding things ---- */
-  const addText = () => {
-    const layer = newTextLayer(darkShirt ? { color: "#FFFFFF" } : {});
+  const addText = (style: Partial<TextLayer> = {}) => {
+    const layer = newTextLayer({ ...(darkShirt ? { color: "#FFFFFF" } : {}), ...style });
     setDesign((prev) => ({ ...prev, [side]: [...prev[side], layer] }));
     setSelectedId(layer.id);
     setPanel("text");
@@ -412,7 +437,7 @@ export default function Customizer({
   };
 
   const onUpload = async (file: File | undefined) => {
-    if (!file) return;
+    if (!file || busy || step !== "design") return;
     const check = validateUpload(file);
     if (!check.ok) {
       setNotice({ tone: "error", text: check.error ?? "That file cannot be used." });
@@ -659,11 +684,12 @@ export default function Customizer({
   /* ---- history ---- */
   const undo = () => {
     const h = historyRef.current;
-    if (h.length < 2) return;
-    const current = h[h.length - 1];
-    const prev = h[h.length - 2];
+    const pending = h.at(-1) !== design;
+    if (!h.length || (!pending && h.length < 2)) return;
+    const current = design;
+    const prev = h[h.length - (pending ? 1 : 2)];
     futureRef.current = [current, ...futureRef.current].slice(0, 30);
-    historyRef.current = h.slice(0, -1);
+    historyRef.current = pending ? h : h.slice(0, -1);
     applyingHistory.current = true;
     setDesign(prev);
     setSelectedId(null);
@@ -795,6 +821,11 @@ export default function Customizer({
   const stepIndex = STEP_ORDER.indexOf(step);
 
   const goStep = (next: Step) => {
+    if (next === "review" && quantity < 1) {
+      setNotice({ tone: "warn", text: "Choose at least one size and quantity first." });
+      setStep("quantity");
+      return;
+    }
     setStep(next);
     setSelectedId(null);
     setPanel("none");
@@ -820,7 +851,7 @@ export default function Customizer({
         ? "text"
         : split
           ? "upload"
-          : panel === "art"
+          : panel === "text-add" ? "text" : panel === "upload" ? "upload" : panel === "art"
             ? "art"
             : panel.startsWith("names") || panel === "roster"
               ? "names"
@@ -901,6 +932,20 @@ export default function Customizer({
             onClose={closePanel}
           />
         ) : null;
+      case "text-add":
+        return <AddTextPanel onAdd={addText} onClose={closePanel} />;
+      case "upload":
+        return (
+          <div className="rot-scroll">
+            <h2 className="rot-ptitle">Upload Artwork</h2>
+            <button type="button" className="rot-upload-zone" onClick={openFilePicker} disabled={busy}>
+              <CloudUploadIcon size={42} />
+              <strong>{busy ? "Reading artwork..." : "Choose an image"}</strong>
+              <span>PNG, JPG, WebP, SVG or GIF</span>
+            </button>
+            <button type="button" className="rot-textlink" onClick={closePanel}>Done</button>
+          </div>
+        );
       case "image":
         return selected?.type === "image" ? (
           <ImageEditor
@@ -971,13 +1016,7 @@ export default function Customizer({
         );
       default:
         return (
-          <div className="rot-scroll rot-empty">
-            <p className="rot-eyebrow">Design Studio</p>
-            <h2 className="rot-ptitle">Start designing</h2>
-            <p className="rot-phint">
-              Add text, upload your artwork or pick clipart. Tap anything on the shirt to edit it.
-            </p>
-          </div>
+          <ProductsPanel product={product} products={products} mockup={mockup} mockups={productMockups} onColor={changeColor} onClose={closePanel} />
         );
     }
   }
@@ -999,13 +1038,13 @@ export default function Customizer({
       id: "text",
       label: "Add Text",
       icon: <TextBoxIcon size={38} />,
-      onClick: addText,
+      onClick: () => { setSelectedId(null); setPanel("text-add"); },
     },
     {
       id: "upload",
       label: "Upload Art",
       icon: <CloudUploadIcon size={38} />,
-      onClick: openFilePicker,
+      onClick: () => { setSelectedId(null); setPanel("upload"); },
     },
     {
       id: "art",
@@ -1057,6 +1096,40 @@ export default function Customizer({
       className="rot"
       data-step={step}
       data-layout={layout}
+      onKeyDown={(event) => {
+        if (step !== "design" || transforming || !(event.ctrlKey || event.metaKey)) return;
+        const target = event.target;
+        if (target instanceof HTMLElement && target.closest("input, textarea, [contenteditable=true]")) return;
+        if (event.key.toLowerCase() === "z") {
+          event.preventDefault();
+          if (event.shiftKey) redo(); else undo();
+        } else if (event.key.toLowerCase() === "y") {
+          event.preventDefault(); redo();
+        }
+      }}
+      onDragOver={(event) => {
+        if (event.dataTransfer.types.includes("Files")) {
+          event.preventDefault();
+          event.dataTransfer.dropEffect = step === "design" && !busy ? "copy" : "none";
+        }
+      }}
+      onDrop={(event) => {
+        if (!event.dataTransfer.files.length) return;
+        event.preventDefault();
+        void onUpload(event.dataTransfer.files[0]);
+      }}
+      onPaste={(event) => {
+        const target = event.target;
+        if (target instanceof HTMLElement && target.closest("input, textarea, [contenteditable=true]")) return;
+        const file = Array.from(event.clipboardData.items).find((item) => item.kind === "file" && item.type.startsWith("image/"))?.getAsFile();
+        if (file) { event.preventDefault(); void onUpload(file); }
+      }}
+      onPointerDownCapture={(event) => {
+        if (step !== "design" || panel === "none") return;
+        const target = event.target;
+        if (target instanceof Element && target.closest(".rot-panel, .rot-rail, .rot-quickadd, .rot-canvas")) return;
+        closePanel();
+      }}
       style={{ ["--step" as string]: stepIndex }}
     >
       {/* ---- App bar ---- */}
@@ -1071,6 +1144,7 @@ export default function Customizer({
           />
         </Link>
         <div className="rot-bar-actions">
+          <button type="button" className="rot-barbtn rot-mobile-share" onClick={shareDesign} disabled={busy} aria-label="Share design preview" title="Share design preview"><ShareIcon size={22} /></button>
           <Link href={callHref} className="rot-barbtn">
             <HeadsetIcon size={34} />
             <span>Call or Chat</span>
@@ -1129,10 +1203,10 @@ export default function Customizer({
           <div className="rot-preview">
             <div className="rot-stage-top">
               <div className="rot-history" role="group" aria-label="History">
-                <button type="button" onClick={undo} disabled={!hist.canUndo} aria-label="Undo">
+                <button type="button" onClick={undo} disabled={!hist.canUndo || transforming} aria-label="Undo" title="Undo">
                   <UndoIcon size={22} />
                 </button>
-                <button type="button" onClick={redo} disabled={!hist.canRedo} aria-label="Redo">
+                <button type="button" onClick={redo} disabled={!hist.canRedo || transforming} aria-label="Redo" title="Redo">
                   <RedoIcon size={22} />
                 </button>
               </div>
@@ -1142,14 +1216,13 @@ export default function Customizer({
                     <button
                       key={view}
                       type="button"
-                      className={`rot-side-thumb${!profileView && side === view ? " is-active" : ""}`}
+                      className={`rot-side-thumb${side === view ? " is-active" : ""}`}
                       onClick={() => {
-                        setProfileView(false);
                         setSide(view);
                         setSelectedId(null);
                         setPanel((p) => (SPLIT_PANELS.includes(p) ? "none" : p));
                       }}
-                      aria-pressed={!profileView && side === view}
+                      aria-pressed={side === view}
                       aria-label={view === "front" ? "Front view" : "Back view"}
                     >
                       {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -1157,12 +1230,6 @@ export default function Customizer({
                       <span>{view}</span>
                     </button>
                   ))}
-                  <button type="button" className={`rot-side-thumb${profileView ? " is-active" : ""}`}
-                    aria-pressed={profileView} aria-label="Side profile"
-                    onClick={() => { setProfileView(true); setSelectedId(null); setPanel("none"); }}>
-                    <span className="rot-profile-thumb"><ProductPhotography product={product} color={product.colors.find(c => c.slug === mockup.slug)} view="side" isolated decorative /></span>
-                    <span>side</span>
-                  </button>
                 </div>
                 <button type="button" className="rot-stage-chip" onClick={() => setZoom((z) => (z > 1 ? 1 : 1.12))}>
                   {zoom > 1 ? "Fit" : "Zoom"}
@@ -1195,7 +1262,7 @@ export default function Customizer({
                   transform: `translateY(${fit.ty}px)`,
                 }}
               >
-                {profileView ? <div className="rot-profile-preview"><ProductPhotography product={product} color={product.colors.find(c => c.slug === mockup.slug)} view="side" isolated /><p>Side profile</p></div> : <DesignCanvas
+                <DesignCanvas
                   key={`${mockup.code}-${side}`}
                   frontSrc={mockup.front}
                   backSrc={mockup.back}
@@ -1206,17 +1273,22 @@ export default function Customizer({
                   compact={compact}
                   renderSize={fit.size}
                   onSelect={handleSelect}
+                  onTap={openLayerPanel}
                   onChange={patch}
-                  onCommit={() => undefined}
+                  onGestureStart={() => {
+                    if (historyRef.current.at(-1) !== design) historyRef.current = [...historyRef.current.slice(-29), design];
+                    setTransforming(true);
+                  }}
+                  onCommit={() => setTransforming(false)}
                   onDelete={deleteLayer}
                   onEdit={editLayer}
-                />}
+                />
               </div>
             ) : null}
 
-            {!profileView && layers.length === 0 && panel === "none" && step === "design" ? (
+            {layers.length === 0 && panel === "none" && step === "design" ? (
               <div className="rot-quickadd" role="group" aria-label="Add to your design">
-                <button type="button" onClick={addText}>
+                <button type="button" onClick={() => setPanel("text-add")}>
                   <TextBoxIcon size={26} />
                   <span>Add Text</span>
                 </button>
@@ -1243,14 +1315,12 @@ export default function Customizer({
 
           </div>
           <nav className="rot-rail" aria-label="Design tools">
-            {/* The tool callbacks intentionally close over the hidden file input ref. */}
-            {/* eslint-disable-next-line react-hooks/refs */}
             {tools.map((t) => (
               <button
                 key={t.id}
                 type="button"
                 className={`rot-tool${railActive === t.id ? " is-active" : ""}`}
-                onClick={() => { setProfileView(false); t.onClick(); }}
+                onClick={t.onClick}
                 disabled={step !== "design"}
               >
                 <span className="rot-tool-icon">{t.icon}</span>
@@ -1264,6 +1334,20 @@ export default function Customizer({
           {renderPanel()}
         </aside>
       </div>
+
+      <footer className="rot-orderbar">
+        <div className="rot-order-summary">
+          <strong>{product.name}</strong>
+          <span>{mockup.name}{quantity > 0 ? ` · ${quantity} item${quantity === 1 ? "" : "s"} · ${formatUSD(quote.total)}` : ""}</span>
+        </div>
+        <button type="button" className="rot-footer-button" onClick={() => goStep(step === "design" ? "quantity" : "design")}>
+          <DollarIcon size={20} /><span>{step === "design" ? "Get Price" : "Edit Design"}</span>
+        </button>
+        <button type="button" className="rot-footer-button rot-save-design" onClick={saveDraft} aria-label="Save Design" title="Save Design"><SaveIcon size={20} /><span>Save Design</span></button>
+        <button type="button" className="rot-footer-button is-primary" onClick={goNext} disabled={busy || (step !== "design" && quantity < 1)}>
+          <span>{step === "review" ? (busy ? "Adding..." : "Add to Cart") : "Next Step"}</span><ChevronRightIcon size={20} />
+        </button>
+      </footer>
 
       <input
         ref={fileInput}

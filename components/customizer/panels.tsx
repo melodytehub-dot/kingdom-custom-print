@@ -44,7 +44,6 @@ export function ProductsPanel({
       <PanelHeader
         eyebrow="Products"
         title="Product & Color"
-        hint="Pick the shirt, then a colour. The preview swaps to that exact garment."
         onClose={onClose}
       />
 
@@ -104,17 +103,54 @@ export function ProductsPanel({
    Clipart
    ------------------------------------------------------------------------- */
 
+const TEXT_STYLES: { name: string; patch: Partial<TextLayer> }[] = [
+  { name: "Classic", patch: { font: "oswald", uppercase: false } },
+  { name: "Varsity", patch: { font: "archivo", color: "#ffffff", strokeColor: "#141414", strokeWidth: 8 } },
+  { name: "Groovy", patch: { font: "lobster", uppercase: false } },
+  { name: "Bold", patch: { font: "archivo" } },
+  { name: "College", patch: { font: "serif", weight: 900 } },
+  { name: "Elegant", patch: { font: "playfair", italic: true, uppercase: false } },
+  { name: "Marker", patch: { font: "permanent-marker" } },
+  { name: "Arc Up", patch: { font: "oswald", arc: 30, uppercase: false } },
+  { name: "Distressed", patch: { font: "anton", distress: 2 } },
+  { name: "Serif", patch: { font: "merriweather", uppercase: false } },
+  { name: "Script", patch: { font: "pacifico", uppercase: false } },
+  { name: "Modern", patch: { font: "montserrat" } },
+];
+
+export function AddTextPanel({ onAdd, onClose }: { onAdd: (patch: Partial<TextLayer>) => void; onClose: () => void }) {
+  const [text, setText] = useState("");
+  return (
+    <div className="rot-scroll">
+      <PanelHeader eyebrow="Text" title="Add Text" onClose={onClose} />
+      <textarea className="rot-textarea" aria-label="New text" placeholder="Enter text..." value={text} onChange={(event) => setText(event.target.value)} rows={3} />
+      <button type="button" className="rot-cta" disabled={!text.trim()} onClick={() => onAdd({ text: text.trim() })}>+ Add text</button>
+      <h3 className="rot-sub">Popular styles</h3>
+      <div className="rot-text-presets">
+        {TEXT_STYLES.map(({ name, patch }) => (
+          <button type="button" key={name} onClick={() => onAdd({ ...patch, text: text.trim() || name })} aria-label={`Add ${name} text`}>
+            <span style={{ fontFamily: svgFontStack(patch.font ?? "anton"), fontStyle: patch.italic ? "italic" : "normal", fontWeight: patch.weight ?? 700, WebkitTextStroke: patch.strokeWidth ? "1px #141414" : undefined, color: patch.strokeWidth ? "#fff" : undefined }}>{name}</span>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export function ArtPanel({ onAdd, onClose }: { onAdd: (item: ArtItem) => void; onClose: () => void }) {
+  const [query, setQuery] = useState("");
+  const results = ART_LIBRARY.filter((item) => item.name.toLowerCase().includes(query.trim().toLowerCase()));
   return (
     <div className="rot-scroll">
       <PanelHeader
         eyebrow="Add Art"
         title="Clipart"
-        hint="Tap a graphic to drop it on your shirt, then resize, rotate, recolour and flip it."
         onClose={onClose}
       />
+      <input className="rot-art-search" type="search" aria-label="Search artwork" placeholder="Search artwork" value={query} onChange={(event) => setQuery(event.target.value)} />
+      {!results.length ? <p role="status">No artwork found.</p> : null}
       <ul className="rot-artgrid">
-        {ART_LIBRARY.map((item) => (
+        {results.map((item) => (
           <li key={item.id}>
             <button type="button" onClick={() => onAdd(item)} title={item.name}>
               {/* eslint-disable-next-line @next/next/no-img-element */}

@@ -426,11 +426,14 @@ export function FontView({
   onPick: (font: string) => void;
   onBack: () => void;
 }) {
-  const list = fontsForScript(script);
+  const [query, setQuery] = useState("");
+  const list = fontsForScript(script).filter((font) => font.label.toLowerCase().includes(query.trim().toLowerCase()));
   return (
     <div className="rot-editor">
       <div className="rot-editor-scroll">
         <PanelHeader eyebrow="Text Editor" title="Choose a Font" onBack={onBack} />
+        <input className="rot-art-search" type="search" aria-label="Search fonts" placeholder="Search fonts" value={query} onChange={(event) => setQuery(event.target.value)} />
+        {!list.length ? <p role="status">No fonts found.</p> : null}
         <ul className="rot-fontlist">
           {list.map((f) => (
             <li key={f.value}>

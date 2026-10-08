@@ -25,6 +25,13 @@ const INSTA_IMAGES = [
   "/img/products/crown-classic-tee-ash.jpg",
 ];
 
+const COLLECTIONS = [
+  { title: "CUSTOM SHIRTS", href: "/shop?kind=tee", image: "shirts", alt: "Kingdom Custom Print shirt" },
+  { title: "CUSTOM TOTES", href: "/shop?kind=tote", image: "totes", alt: "Black tote with a colorful floral print" },
+  { title: "CAPS & HATS", href: "/shop?kind=cap", image: "caps", alt: "Printed caps in a variety of colors" },
+  { title: "MUGS & MERCH", href: "/shop?category=accessories", image: "merch", alt: "Custom printed shirts, mugs and accessories" },
+];
+
 export default async function HomePage() {
   const products = await getProducts().catch(() => []);
 
@@ -153,48 +160,18 @@ export default async function HomePage() {
           ------------------------------------------------------------------ */}
       <section style={{ paddingBlock: "80px" }}>
         <div className="minimog-container">
-          <div className="mm-3col-banner">
-            <Link
-              href="/shop"
-              className="mm-promo-card"
-              style={{
-                backgroundImage: "url('/img/products/crown-classic-tee-black.jpg')",
-                backgroundColor: "#181818",
-              }}
-            >
-              <div className="mm-promo-content">
-                <h3 className="mm-promo-title">THE STREETWEAR EDIT</h3>
-                <span className="mm-promo-link">SHOP NOW</span>
-              </div>
-            </Link>
-
-            <Link
-              href="/shop"
-              className="mm-promo-card"
-              style={{
-                backgroundImage: "url('/img/products/crown-classic-tee-maroon.jpg')",
-                backgroundColor: "#2a1215",
-              }}
-            >
-              <div className="mm-promo-content">
-                <h3 className="mm-promo-title">BOSS LADY COLLECTION</h3>
-                <span className="mm-promo-link">SHOP NOW</span>
-              </div>
-            </Link>
-
-            <Link
-              href="/customize"
-              className="mm-promo-card"
-              style={{
-                backgroundImage: "url('/img/products/comfort-colors-tee.jpg')",
-                backgroundColor: "#333",
-              }}
-            >
-              <div className="mm-promo-content">
-                <h3 className="mm-promo-title">CUSTOM STUDIO</h3>
-                <span className="mm-promo-link">DESIGN NOW</span>
-              </div>
-            </Link>
+          <div className="mm-client-collections">
+            {COLLECTIONS.map((collection) => (
+              <Link key={collection.image} href={collection.href} className="mm-collection">
+                <div className="mm-collection-image">
+                  <Image src={`/img/collections/${collection.image}.jpg`} alt={collection.alt} fill sizes="(max-width: 600px) 100vw, (max-width: 1000px) 50vw, 25vw" />
+                </div>
+                <div className="mm-collection-caption">
+                  <h3>{collection.title}</h3>
+                  <span>SHOP NOW <ArrowRight size={16} /></span>
+                </div>
+              </Link>
+            ))}
           </div>
         </div>
       </section>

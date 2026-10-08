@@ -35,8 +35,10 @@ interface CanvasProps {
   compact?: boolean;
   renderSize?: number;
   onSelect: (id: string | null) => void;
+  onTap: (id: string) => void;
   onChange: (side: GarmentSide, id: string, patch: Partial<DesignLayer>) => void;
   onCommit: () => void;
+  onGestureStart?: () => void;
   onDelete: (id: string) => void;
   onEdit: (id: string) => void;
   style?: CSSProperties;
@@ -51,6 +53,11 @@ interface Box {
 
 interface DragState {
   pointerId: number;
+  startClientX: number;
+  startClientY: number;
+  moved: boolean;
+  locked: boolean;
+  rect: { left: number; top: number; width: number; height: number };
   id: string;
   tool: Tool;
   edge: Edge | null;
@@ -103,8 +110,10 @@ export default function DesignCanvas({
   compact = false,
   renderSize = VIEW,
   onSelect,
+  onTap,
   onChange,
   onCommit,
+  onGestureStart,
   onDelete,
   onEdit,
   style,
@@ -143,18 +152,9 @@ export default function DesignCanvas({
     event.stopPropagation();
     if (dragRef.current) return;
 
-    // Opening the mobile editor resizes the stage. Select first, then drag in
-    // the settled coordinate system on the next gesture.
-    if (compact && selectedId !== layer.id) {
-      onSelect(layer.id);
-      return;
-    }
-
     const pt = toView(event.clientX, event.clientY);
-    if (!pt) return;
-
-    onSelect(layer.id);
-    if (layer.locked) return;
+    const rect = svgRef.current?.getBoundingClientRect();
+    if (!pt || !rect || (layer.locked && nextTool !== "move")) return;
 
     const pivot = {
       x: areaOrigin.x + (layer.x / 100) * area.w,
@@ -163,6 +163,11 @@ export default function DesignCanvas({
 
     dragRef.current = {
       pointerId: event.pointerId,
+      startClientX: event.clientX,
+      startClientY: event.clientY,
+      moved: false,
+      locked: Boolean(layer.locked),
+      rect: { left: rect.left, top: rect.top, width: rect.width, height: rect.height },
       id: layer.id,
       tool: nextTool,
       edge,
@@ -179,6 +184,7 @@ export default function DesignCanvas({
       rotation: layer.rotation,
     };
     event.currentTarget.setPointerCapture(event.pointerId);
+    if (nextTool !== "move") onGestureStart?.();
     setDragging(nextTool);
   };
 
@@ -189,15 +195,30 @@ export default function DesignCanvas({
       const s = dragRef.current;
       if (!s || e.pointerId !== s.pointerId) return;
       e.preventDefault();
-      const pt = toView(e.clientX, e.clientY);
-      if (!pt) return;
+      if (s.tool === "move" && !s.moved) {
+        if (Math.hypot(e.clientX - s.startClientX, e.clientY - s.startClientY) <= 6) return;
+        s.moved = true;
+        if (!s.locked) onGestureStart?.();
+        onSelect(s.id);
+      }
+      if (s.locked) return;
+      // Measure from the gesture's original frame, even if the viewport changes.
+      const pt = {
+        x: ((e.clientX - s.rect.left) / s.rect.width) * VIEW,
+        y: ((e.clientY - s.rect.top) / s.rect.height) * VIEW,
+      };
 
       if (s.tool === "move") {
         const dx = ((pt.x - s.startPx) / area.w) * 100;
         const dy = ((pt.y - s.startPy) / area.h) * 100;
+        const x = clamp(s.originX + dx, -40, 140);
+        const y = clamp(s.originY + dy, -30, 130);
+        // Keep snapping equally precise at every zoom and screen size.
+        const toleranceX = (5 * VIEW * 100) / (s.rect.width * area.w);
+        const toleranceY = (5 * VIEW * 100) / (s.rect.height * area.h);
         onChange(side, s.id, {
-          x: round2(clamp(s.originX + dx, -40, 140)),
-          y: round2(clamp(s.originY + dy, -30, 130)),
+          x: round2(!e.altKey && Math.abs(x - 50) < toleranceX ? 50 : x),
+          y: round2(!e.altKey && Math.abs(y - 50) < toleranceY ? 50 : y),
         });
         return;
       }
@@ -239,10 +260,15 @@ export default function DesignCanvas({
     };
 
     const onUp = (e: PointerEvent) => {
-      if (e.pointerId !== dragRef.current?.pointerId) return;
+      const s = dragRef.current;
+      if (!s || e.pointerId !== s.pointerId) return;
       dragRef.current = null;
       setDragging(null);
-      onCommit();
+      if (!s.locked && (s.moved || s.tool !== "move")) onCommit();
+      if (e.type === "pointercancel") return;
+      if (s.tool === "move" && !s.moved) {
+        if (Math.hypot(e.clientX - s.startClientX, e.clientY - s.startClientY) <= 6) onTap(s.id);
+      }
     };
 
     window.addEventListener("pointermove", onMove, { passive: false });
@@ -253,7 +279,7 @@ export default function DesignCanvas({
       window.removeEventListener("pointerup", onUp);
       window.removeEventListener("pointercancel", onUp);
     };
-  }, [dragging, side, area.w, area.h, toView, onChange, onCommit]);
+  }, [dragging, side, area.w, area.h, onChange, onCommit, onSelect, onTap, onGestureStart]);
 
   // Keyboard nudging for the selected layer (desktop).
   useEffect(() => {
@@ -369,6 +395,13 @@ export default function DesignCanvas({
           />
         ) : null}
 
+        {dragging === "move" && layers.filter((layer) => layer.id === selectedId).map((layer) => (
+          <g key={`guides-${layer.id}`} stroke="#e74879" strokeWidth={2} pointerEvents="none" data-alignment-guides>
+            {layer.x === 50 ? <line x1={areaOrigin.x + area.w / 2} x2={areaOrigin.x + area.w / 2} y1={areaOrigin.y} y2={areaOrigin.y + area.h} /> : null}
+            {layer.y === 50 ? <line x1={areaOrigin.x} x2={areaOrigin.x + area.w} y1={areaOrigin.y + area.h / 2} y2={areaOrigin.y + area.h / 2} /> : null}
+          </g>
+        ))}
+
         <g>
           {layers.map((layer) => (
             <LayerContent
@@ -390,7 +423,7 @@ export default function DesignCanvas({
               areaOrigin={areaOrigin}
               selected={layer.id === selectedId}
               compact={compact}
-              handleScale={compact ? (44 * VIEW) / (68 * Math.max(renderSize, 1)) : 1}
+              handleScale={((compact ? 44 : 32) * VIEW) / (68 * Math.max(renderSize, 1))}
               onPointerDown={startDrag}
               onDelete={onDelete}
               onEdit={onEdit}
@@ -534,8 +567,17 @@ function LayerOverlay({
   const box = effBox(base, layer);
   const halfW = box.w / 2;
   const halfH = box.h / 2;
-  const GAP = 44;
+  const GAP = 44 * handleScale;
   const isText = layer.type === "text";
+  const radians = layer.rotation * Math.PI / 180;
+  const cos = Math.cos(radians), sin = Math.sin(radians);
+  const margin = 42 * handleScale;
+  const rx = halfW + GAP, ry = halfH + GAP;
+  // Keep the resize target inside the canvas, including short landscape views.
+  const screenX = clamp(cx + rx * cos - ry * sin, margin, VIEW - margin) - cx;
+  const screenY = clamp(cy + rx * sin + ry * cos, margin, VIEW - margin) - cy;
+  const resizeX = screenX * cos + screenY * sin;
+  const resizeY = -screenX * sin + screenY * cos;
 
   return (
     <g transform={`translate(${cx} ${cy}) rotate(${layer.rotation})`}>
@@ -567,6 +609,7 @@ function LayerOverlay({
             x={-halfW - GAP}
             y={-halfH - GAP}
             label="Delete"
+            scale={handleScale}
             onActivate={(e) => {
               e.preventDefault();
               e.stopPropagation();
@@ -583,6 +626,7 @@ function LayerOverlay({
                 x={0}
                 y={-halfH - GAP}
                 label="Stretch vertically"
+                scale={handleScale}
                 shape="pill"
                 onActivate={(e) => onPointerDown(e, layer, "scale", "n")}
               >
@@ -593,6 +637,7 @@ function LayerOverlay({
                 x={halfW + GAP}
                 y={-halfH - GAP}
                 label="Rotate"
+                scale={handleScale}
                 onActivate={(e) => onPointerDown(e, layer, "rotate")}
               >
                 <RotateIcon />
@@ -602,6 +647,7 @@ function LayerOverlay({
                 x={halfW + GAP}
                 y={0}
                 label="Stretch horizontally"
+                scale={handleScale}
                 shape="pill"
                 onActivate={(e) => onPointerDown(e, layer, "scale", "e")}
               >
@@ -613,6 +659,7 @@ function LayerOverlay({
                   x={-halfW - GAP}
                   y={halfH + GAP}
                   label="Edit text"
+                  scale={handleScale}
                   onActivate={(e) => {
                     e.preventDefault();
                     e.stopPropagation();
@@ -633,8 +680,8 @@ function LayerOverlay({
               </> : null}
 
               <ControlButton
-                x={halfW + GAP * handleScale}
-                y={halfH + GAP * handleScale}
+                x={resizeX}
+                y={resizeY}
                 scale={handleScale}
                 label="Resize"
                 onActivate={(e) => onPointerDown(e, layer, "scale", "se")}
