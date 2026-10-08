@@ -170,6 +170,7 @@ export function mockupsForProduct(product: ProductLike): TeeMockup[] {
     usedCodes.add(base.code);
     const productColor = {
       ...base,
+      code: color.slug,
       slug: color.slug,
       name: color.name,
       hex: color.hex,

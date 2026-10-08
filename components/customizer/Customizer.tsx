@@ -3,17 +3,19 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
+import { useRouter } from "next/navigation";
 import DesignCanvas from "./DesignCanvas";
 import { fitStage } from "./stageGeometry";
 import {
   ArtPanel,
   AddTextPanel,
-  AiTextPanel,
+  TextIdeasPanel,
   DistressPanel,
   NamesIntro,
   NamesTools,
   NN_DEFAULTS,
   ProductsPanel,
+  ProductSwitchConfirmPanel,
   QuantityPanel,
   ReviewPanel,
   RosterEditor,
@@ -28,7 +30,6 @@ import {
   CheckGlyph,
   CloudUploadIcon,
   DistressIcon,
-  DollarIcon,
   ChevronRightIcon,
   HeadsetIcon,
   PersonalizeIcon,
@@ -61,7 +62,7 @@ import {
 } from "@/lib/design";
 import { applyImageFx, DEFAULT_FX } from "@/lib/imageFx";
 import { drawPreview } from "./preview";
-import { mockupForColor, mockupsForProduct, TEE_MOCKUPS, type TeeMockup } from "@/lib/mockups";
+import { mockupByCode, mockupsForProduct, TEE_MOCKUPS, type TeeMockup } from "@/lib/mockups";
 import { useCart } from "@/lib/cart-context";
 import { quoteProduct, formatUSD } from "@/lib/pricing";
 import type {
@@ -80,12 +81,13 @@ type Step = "design" | "quantity" | "review";
 type Panel =
   | "none"
   | "products"
+  | "switch-confirm"
   | "upload"
   | "text"
   | "text-add"
   | "image"
   | "art"
-  | "ai"
+  | "ideas"
   | "names-intro"
   | "names"
   | "roster"
@@ -114,6 +116,41 @@ interface DraftState {
   lines: Record<string, number>;
   roster: RosterEntry[];
   nn: NNSettings;
+}
+
+interface ProductHandoff extends DraftState {
+  targetSlug: string;
+  colorSlug: string;
+  colorName: string;
+  colorHex: string;
+  notice?: string;
+}
+
+interface ProductSwitchPrompt {
+  target: Product;
+  unavailableLines: { label: string; qty: number }[];
+  rosterCount: number;
+}
+
+let pendingProductHandoff: ProductHandoff | null = null;
+
+function colorForProduct(productMockups: TeeMockup[], value: string | undefined) {
+  if (!value) return undefined;
+  const exact = productMockups.find((item) => item.slug === value || item.code === value);
+  if (exact) return exact;
+  const legacySlug = mockupByCode(value)?.slug;
+  return legacySlug ? productMockups.find((item) => item.slug === legacySlug) : undefined;
+}
+
+function closestProductColor(productMockups: TeeMockup[], hex: string) {
+  const source = hex.replace("#", "").match(/../g)?.map((part) => Number.parseInt(part, 16));
+  if (!source || source.length !== 3) return productMockups[0];
+  return productMockups.reduce((closest, candidate) => {
+    const rgb = candidate.hex.replace("#", "").match(/../g)?.map((part) => Number.parseInt(part, 16));
+    if (!rgb || rgb.length !== 3) return closest;
+    const distance = source.reduce((sum, channel, index) => sum + (channel - rgb[index]) ** 2, 0);
+    return distance < closest.distance ? { item: candidate, distance } : closest;
+  }, { item: productMockups[0], distance: Number.POSITIVE_INFINITY }).item;
 }
 
 const uid = () => `r-${Math.random().toString(36).slice(2, 9)}`;
@@ -150,6 +187,7 @@ export default function Customizer({
   contactPhone: string;
 }) {
   const { addItem, items } = useCart();
+  const router = useRouter();
 
   const productMockups = useMemo(() => mockupsForProduct(product), [product]);
 
@@ -157,8 +195,7 @@ export default function Customizer({
   const [panel, setPanel] = useState<Panel>("none");
   const [side, setSide] = useState<GarmentSide>("front");
   const [colorCode, setColorCode] = useState(() => {
-    const match =
-      productMockups.find((m) => m.slug === initialColor || m.code === initialColor) ?? productMockups[0] ?? TEE_MOCKUPS[0];
+    const match = colorForProduct(productMockups, initialColor) ?? productMockups[0] ?? TEE_MOCKUPS[0];
     return match.code;
   });
   const [design, setDesign] = useState<Design>(emptyDesign);
@@ -166,6 +203,7 @@ export default function Customizer({
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [drafts, setDrafts] = useState<SavedDraft[]>([]);
   const [notice, setNotice] = useState<{ tone: "ok" | "warn" | "error"; text: string } | null>(null);
+  const [productSwitchPrompt, setProductSwitchPrompt] = useState<ProductSwitchPrompt | null>(null);
   const [busy, setBusy] = useState(false);
   const [transforming, setTransforming] = useState(false);
   const [fxBusy, setFxBusy] = useState(false);
@@ -191,10 +229,11 @@ export default function Customizer({
 
   const draftKey = `kcp.draft.v3.${product.slug}`;
   const [ready, setReady] = useState(false);
+  const [restoredSlug, setRestoredSlug] = useState("");
   const historyRef = useRef<Design[]>([]);
   const futureRef = useRef<Design[]>([]);
   const applyingHistory = useRef(false);
-  const restored = useRef(false);
+  const restoredSlugRef = useRef<string | null>(null);
 
   const syncHist = useCallback(() => {
     setHist({
@@ -229,36 +268,80 @@ export default function Customizer({
   /* ---- restore draft on mount ---- */
   /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
+    if (restoredSlugRef.current === product.slug) return;
+    restoredSlugRef.current = product.slug;
     setDrafts(loadDrafts());
+    let restoredDesign: Design | null = null;
     try {
-      const raw = window.localStorage.getItem(draftKey);
-      if (raw) {
-        const parsed = JSON.parse(raw) as Partial<DraftState>;
-        if (parsed?.design?.front && parsed?.design?.back) {
-          setDesign(normalizeDesign(parsed.design));
+      const handoff = pendingProductHandoff;
+      if (handoff?.targetSlug === product.slug && handoff.design?.front && handoff.design?.back) {
+        restoredDesign = normalizeDesign(handoff.design);
+        setDesign(restoredDesign);
+        const transferredColor = productMockups.find((item) => item.slug === handoff.colorSlug);
+        const matchingName = productMockups.find((item) => item.name.toLowerCase() === handoff.colorName.toLowerCase());
+        setColorCode((transferredColor ?? matchingName ?? closestProductColor(productMockups, handoff.colorHex))?.code ?? TEE_MOCKUPS[0].code);
+        setLines(Object.fromEntries(product.sizes.map((size) => [size.label, handoff.lines?.[size.label] ?? 0])));
+        setRoster((handoff.roster ?? []).map((entry) => ({
+          ...entry,
+          size: product.sizes.some((size) => size.label === entry.size) ? entry.size : product.sizes[0]?.label,
+        })));
+        if (handoff.nn) setNn({ ...NN_DEFAULTS, ...handoff.nn });
+        if (handoff.notice) setNotice({ tone: "warn", text: handoff.notice });
+        pendingProductHandoff = null;
+      } else {
+        if (handoff) pendingProductHandoff = null;
+        const raw = window.localStorage.getItem(draftKey);
+        if (raw) {
+          const parsed = JSON.parse(raw) as Partial<DraftState>;
+          if (parsed?.design?.front && parsed?.design?.back) {
+            restoredDesign = normalizeDesign(parsed.design);
+            setDesign(restoredDesign);
+          }
+          const requestedColor = colorForProduct(productMockups, initialColor);
+          const savedColor = colorForProduct(productMockups, parsed?.colorCode);
+          if (requestedColor) setColorCode(requestedColor.code);
+          else if (savedColor) setColorCode(savedColor.code);
+          if (Array.isArray(parsed?.roster)) setRoster(parsed.roster);
+          if (parsed?.nn) setNn({ ...NN_DEFAULTS, ...parsed.nn });
+          const fromUrl = Object.values(initialLines).some((n) => n > 0);
+          if (!fromUrl && parsed?.lines) {
+            setLines(Object.fromEntries(product.sizes.map((size) => [size.label, parsed.lines?.[size.label] ?? 0])));
+          } else {
+            setLines(Object.fromEntries(product.sizes.map((size) => [size.label, initialLines[size.label] ?? 0])));
+          }
         }
-        if (!initialColor && parsed?.colorCode && productMockups.some((m) => m.code === parsed.colorCode)) {
-          setColorCode(parsed.colorCode);
-        }
-        if (Array.isArray(parsed?.roster)) setRoster(parsed.roster);
-        if (parsed?.nn) setNn({ ...NN_DEFAULTS, ...parsed.nn });
-        const fromUrl = Object.values(initialLines).some((n) => n > 0);
-        if (!fromUrl && parsed?.lines) {
-          setLines((prev) => ({ ...prev, ...parsed.lines }));
+        if (!colorForProduct(productMockups, initialColor)) {
+          const first = productMockups[0];
+          if (first) setColorCode(first.code);
         }
       }
     } catch {
       // A corrupt draft should not block the editor; start clean.
     }
-    restored.current = true;
+    historyRef.current = [restoredDesign ?? emptyDesign()];
+    futureRef.current = [];
+    setHist({ canUndo: false, canRedo: false });
+    setPanel("none");
+    setStep("design");
+    setRestoredSlug(product.slug);
     setReady(true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [draftKey, productMockups]);
+
+  useEffect(() => {
+    if (!ready || restoredSlug !== product.slug) return;
+    const url = new URL(window.location.href);
+    url.searchParams.set("color", mockup.slug);
+    const encodedSizes = sizeLines.filter((line) => line.qty > 0).map((line) => `${line.label}:${line.qty}`).join(",");
+    if (encodedSizes) url.searchParams.set("sizes", encodedSizes);
+    else url.searchParams.delete("sizes");
+    window.history.replaceState(window.history.state, "", `${url.pathname}${url.search}${url.hash}`);
+  }, [ready, restoredSlug, product.slug, mockup.slug, sizeLines]);
   /* eslint-enable react-hooks/set-state-in-effect */
 
   /* ---- autosave draft ---- */
   useEffect(() => {
-    if (!ready) return;
+    if (!ready || restoredSlug !== product.slug) return;
     try {
       window.localStorage.setItem(
         draftKey,
@@ -267,7 +350,7 @@ export default function Customizer({
     } catch {
       // Storage unavailable or full; the in-progress design still works.
     }
-  }, [ready, draftKey, colorCode, design, lines, roster, nn]);
+  }, [ready, restoredSlug, product.slug, draftKey, colorCode, design, lines, roster, nn]);
 
   /* Text entry is grouped; pointer gestures commit as one history step. */
   useEffect(() => {
@@ -591,7 +674,7 @@ export default function Customizer({
     setPanel(personalization === "none" ? "names-intro" : "names");
   };
 
-  const generateAiDesign = (created: DesignLayer[], summary: string) => {
+  const addTextIdeaLayers = (created: DesignLayer[], summary: string) => {
     setDesign((prev) => ({ ...prev, [side]: [...prev[side], ...created] }));
     setSelectedId(null);
     setPanel("none");
@@ -720,6 +803,9 @@ export default function Customizer({
       colorName: mockup.name,
       colorHex: mockup.hex,
       design,
+      lines,
+      roster,
+      nn,
       savedAt: Date.now(),
     };
     const next = [entry, ...drafts].slice(0, 12);
@@ -731,13 +817,38 @@ export default function Customizer({
   const loadDraft = (id: string) => {
     const found = drafts.find((d) => d.id === id);
     if (!found) return;
+    if (found.productSlug !== product.slug) {
+      const target = products.find((item) => item.slug === found.productSlug);
+      if (!target) {
+        setNotice({ tone: "error", text: "That saved product is no longer in the catalog." });
+        return;
+      }
+      const handoff: ProductHandoff = {
+        targetSlug: target.slug,
+        colorSlug: found.colorSlug,
+        colorCode: found.colorSlug,
+        colorName: found.colorName,
+        colorHex: found.colorHex,
+        design: normalizeDesign(found.design),
+        lines: Object.fromEntries(target.sizes.map((size) => [size.label, found.lines?.[size.label] ?? 0])),
+        roster: (found.roster ?? []).map((entry) => ({
+          ...entry,
+          size: target.sizes.some((size) => size.label === entry.size) ? entry.size : target.sizes[0]?.label,
+        })),
+        nn: found.nn ?? nn,
+      };
+      pendingProductHandoff = handoff;
+      router.push(`/customize/${target.slug}`);
+      return;
+    }
     applyingHistory.current = true;
     setDesign(normalizeDesign(found.design));
     setSelectedId(null);
-    const m =
-      productMockups.find((candidate) => candidate.slug === found.colorSlug) ??
-      mockupForColor(found.colorName, found.colorHex);
+    const m = productMockups.find((candidate) => candidate.slug === found.colorSlug);
     if (m) setColorCode(m.code);
+    setLines(Object.fromEntries(product.sizes.map((size) => [size.label, found.lines?.[size.label] ?? 0])));
+    setRoster(found.roster ?? []);
+    if (found.nn) setNn({ ...NN_DEFAULTS, ...found.nn });
     setPanel("none");
     setNotice({ tone: "ok", text: `Loaded your saved ${found.productName} design.` });
   };
@@ -802,9 +913,6 @@ export default function Customizer({
       });
       setAddedCount((n) => n + 1);
       setNotice({ tone: "ok", text: "Added to cart." });
-      applyingHistory.current = true;
-      setDesign(emptyDesign());
-      setRoster([]);
       setLines(Object.fromEntries(product.sizes.map((s) => [s.label, 0])));
       setSelectedId(null);
     } catch {
@@ -839,6 +947,57 @@ export default function Customizer({
     goStep(STEP_ORDER[stepIndex + 1]);
   };
 
+  const queueProductHandoff = (
+    target: Product,
+    transferLines: Record<string, number>,
+    transferRoster: RosterEntry[],
+    handoffNotice?: string
+  ) => {
+    pendingProductHandoff = {
+      targetSlug: target.slug,
+      colorSlug: mockup.slug,
+      colorCode,
+      colorName: mockup.name,
+      colorHex: mockup.hex,
+      design,
+      lines: Object.fromEntries(target.sizes.map((size) => [size.label, transferLines[size.label] ?? 0])),
+      roster: transferRoster,
+      nn,
+      notice: handoffNotice,
+    };
+  };
+
+  const handoffToProduct = (target: Product): boolean => {
+    if (target.id === product.id) return false;
+    const unavailableLines = product.sizes
+      .filter((size) => (lines[size.label] ?? 0) > 0 && !target.sizes.some((targetSize) => targetSize.label === size.label))
+      .map((size) => ({ label: size.label, qty: lines[size.label] ?? 0 }));
+    const incompatibleRoster = roster.filter((entry) => !target.sizes.some((size) => size.label === entry.size));
+    if (unavailableLines.length || incompatibleRoster.length) {
+      setProductSwitchPrompt({ target, unavailableLines, rosterCount: incompatibleRoster.length });
+      setPanel("switch-confirm");
+      return false;
+    }
+    queueProductHandoff(target, lines, roster);
+    return true;
+  };
+
+  const confirmProductSwitch = () => {
+    if (!productSwitchPrompt) return;
+    const { target, unavailableLines, rosterCount } = productSwitchPrompt;
+    const retainedRoster = roster.filter((entry) => target.sizes.some((size) => size.label === entry.size));
+    const removedUnits = unavailableLines.reduce((sum, line) => sum + line.qty, 0);
+    const summary = [
+      removedUnits ? `${removedUnits} item${removedUnits === 1 ? "" : "s"} in ${unavailableLines.map((line) => line.label).join(", ")}` : "",
+      rosterCount ? `${rosterCount} names/numbers assignment${rosterCount === 1 ? "" : "s"}` : "",
+    ].filter(Boolean).join(" and ");
+    const handoffNotice = summary ? `Unavailable sizes were removed: ${summary}. Your artwork was kept.` : undefined;
+    queueProductHandoff(target, lines, retainedRoster, handoffNotice);
+    setProductSwitchPrompt(null);
+    setPanel("none");
+    router.push(`/customize/${target.slug}`);
+  };
+
   /* ---- stage fit ---- */
   const split = SPLIT_PANELS.includes(panel);
   const fit = useMemo(() => fitStage(stageBox.w, stageBox.h, zoom), [stageBox, zoom]);
@@ -859,7 +1018,7 @@ export default function Customizer({
                 ? "distress"
                 : panel === "saved"
                   ? "saved"
-                  : panel === "ai" ? "ai" : "";
+                  : panel === "ideas" ? "ideas" : "";
 
   const callHref = contactPhone ? `tel:${contactPhone.replace(/[^\d+]/g, "")}` : "/contact";
 
@@ -897,6 +1056,7 @@ export default function Customizer({
           elements={design.front.length + design.back.length}
           quantity={quantity}
           quote={quote}
+          lines={sizeLines}
           roster={rosterLocked ? roster.length : 0}
           previews={previews}
           rows={
@@ -919,9 +1079,23 @@ export default function Customizer({
             mockup={mockup}
             mockups={productMockups}
             onColor={changeColor}
+            onSwitchProduct={handoffToProduct}
             onClose={closePanel}
           />
         );
+      case "switch-confirm":
+        return productSwitchPrompt ? (
+          <ProductSwitchConfirmPanel
+            target={productSwitchPrompt.target}
+            unavailableLines={productSwitchPrompt.unavailableLines}
+            rosterCount={productSwitchPrompt.rosterCount}
+            onContinue={confirmProductSwitch}
+            onCancel={() => {
+              setProductSwitchPrompt(null);
+              setPanel("products");
+            }}
+          />
+        ) : null;
       case "text":
         return selected?.type === "text" ? (
           <TextEditor
@@ -961,8 +1135,8 @@ export default function Customizer({
         ) : null;
       case "art":
         return <ArtPanel onAdd={addArt} onClose={closePanel} />;
-      case "ai":
-        return <AiTextPanel side={side} onGenerate={generateAiDesign} onClose={closePanel} />;
+      case "ideas":
+        return <TextIdeasPanel side={side} onAdd={addTextIdeaLayers} onClose={closePanel} />;
       case "names-intro":
         return <NamesIntro onStart={() => setPanel("names")} onClose={closePanel} />;
       case "names":
@@ -1016,7 +1190,7 @@ export default function Customizer({
         );
       default:
         return (
-          <ProductsPanel product={product} products={products} mockup={mockup} mockups={productMockups} onColor={changeColor} onClose={closePanel} />
+          <ProductsPanel product={product} products={products} mockup={mockup} mockups={productMockups} onColor={changeColor} onSwitchProduct={handoffToProduct} onClose={closePanel} />
         );
     }
   }
@@ -1056,12 +1230,12 @@ export default function Customizer({
       },
     },
     {
-      id: "ai",
+      id: "ideas",
       label: "Text Ideas",
       icon: <TextBoxIcon size={38} />,
       onClick: () => {
         setSelectedId(null);
-        setPanel("ai");
+        setPanel("ideas");
       },
     },
     {
@@ -1160,9 +1334,13 @@ export default function Customizer({
               <b className="rot-cartbadge">{cartCount}</b>
             </Link>
           ) : null}
+          <div className="rot-bar-price" aria-live="polite">
+            <small>Blank from {formatUSD(product.basePrice)}</small>
+            <strong>{quantity > 0 ? `Order ${formatUSD(quote.total)} total · ${formatUSD(quote.total / quantity)} avg each` : "Price updates with quantity"}</strong>
+          </div>
           <button type="button" className="rot-next" onClick={goNext} disabled={busy}>
-            {step === "review" ? <CartGlyph size={34} /> : <DollarIcon size={34} />}
-            <span>{step === "review" ? (busy ? "Adding…" : addedCount ? "Add more" : "Add to Cart") : "Next"}</span>
+            {step === "review" ? <CartGlyph size={24} /> : <ChevronRightIcon size={24} />}
+            <span>{step === "review" ? (busy ? "Adding…" : addedCount ? "Add another" : "Add to Cart") : step === "quantity" ? "Review" : "Next"}</span>
           </button>
         </div>
       </header>
@@ -1334,20 +1512,6 @@ export default function Customizer({
           {renderPanel()}
         </aside>
       </div>
-
-      <footer className="rot-orderbar">
-        <div className="rot-order-summary">
-          <strong>{product.name}</strong>
-          <span>{mockup.name}{quantity > 0 ? ` · ${quantity} item${quantity === 1 ? "" : "s"} · ${formatUSD(quote.total)}` : ""}</span>
-        </div>
-        <button type="button" className="rot-footer-button" onClick={() => goStep(step === "design" ? "quantity" : "design")}>
-          <DollarIcon size={20} /><span>{step === "design" ? "Get Price" : "Edit Design"}</span>
-        </button>
-        <button type="button" className="rot-footer-button rot-save-design" onClick={saveDraft} aria-label="Save Design" title="Save Design"><SaveIcon size={20} /><span>Save Design</span></button>
-        <button type="button" className="rot-footer-button is-primary" onClick={goNext} disabled={busy || (step !== "design" && quantity < 1)}>
-          <span>{step === "review" ? (busy ? "Adding..." : "Add to Cart") : "Next Step"}</span><ChevronRightIcon size={20} />
-        </button>
-      </footer>
 
       <input
         ref={fileInput}

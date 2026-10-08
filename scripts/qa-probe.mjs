@@ -1,9 +1,8 @@
 import { chromium } from "playwright";
 
 const BASE = "http://localhost:3000";
-const CHROME = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
 
-const browser = await chromium.launch({ executablePath: CHROME, headless: true });
+const browser = await chromium.launch({ channel: process.env.QA_BROWSER ?? "chrome", headless: true });
 
 async function probe(path, width) {
   const ctx = await browser.newContext({ viewport: { width, height: 844 } });

@@ -5,6 +5,7 @@ import type {
   ImageLayer,
   PersonalizationKind,
   PrintArea,
+  RosterEntry,
   TextLayer,
 } from "./types";
 import { measureTextLayer } from "@/components/customizer/textGeometry";
@@ -426,6 +427,17 @@ export interface SavedDraft {
   colorName: string;
   colorHex: string;
   design: Design;
+  lines?: Record<string, number>;
+  roster?: RosterEntry[];
+  nn?: {
+    names: boolean;
+    numbers: boolean;
+    subtitles: boolean;
+    side: GarmentSide;
+    size: "small" | "medium" | "large";
+    font: string;
+    color: string;
+  };
   savedAt: number;
 }
 

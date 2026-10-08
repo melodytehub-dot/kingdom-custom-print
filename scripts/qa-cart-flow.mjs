@@ -10,7 +10,6 @@ import { chromium } from "playwright";
 const BASE = process.env.QA_BASE ?? "http://localhost:3000";
 const PRODUCT_SLUG = process.env.QA_PRODUCT_SLUG ?? "crown-classic-tee";
 const PRODUCT_NAME = (process.env.QA_PRODUCT_NAME ?? "Crown Classic").toLowerCase();
-const CHROME = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
 
 let failures = 0;
 const check = (name, ok, detail = "") => {
@@ -20,7 +19,7 @@ const check = (name, ok, detail = "") => {
 
 const money = (s) => Number((s ?? "").replace(/[^0-9.]/g, ""));
 
-const browser = await chromium.launch({ executablePath: CHROME, headless: true });
+const browser = await chromium.launch({ channel: process.env.QA_BROWSER ?? "chrome", headless: true });
 const context = await browser.newContext({ viewport: { width: 1280, height: 900 } });
 const page = await context.newPage();
 

@@ -149,7 +149,7 @@ assert.equal(taps.length, 1);
 console.log("PASS proportional resize, pointer cancellation, and locked-layer movement guard");
 cleanups.forEach(fn => fn?.());
 
-const { AiTextPanel } = load("components/customizer/panels.tsx", {
+const { TextIdeasPanel } = load("components/customizer/panels.tsx", {
   react, "react/jsx-runtime": jsx,
   "next/link": {}, "next/image": {},
   "@/lib/design": { newTextLayer: values => ({ type: "text", ...values }) },
@@ -158,18 +158,18 @@ const { AiTextPanel } = load("components/customizer/panels.tsx", {
   "./icons": { CheckGlyph: () => null },
 });
 slots = []; cursor = 0;
-let generated;
-const textProps = { side: "front", onClose() {}, onGenerate: layers => { generated = layers; } };
-let textNodes = nodes(AiTextPanel(textProps));
+let added;
+const textProps = { side: "front", onClose() {}, onAdd: layers => { added = layers; } };
+let textNodes = nodes(TextIdeasPanel(textProps));
 assert.equal(textNodes.find(node => node.type === "button").props.disabled, true);
 textNodes.find(node => node.type === "textarea").props.onChange({ target: { value: 'Vintage "Kings United"' } });
 cursor = 0;
-textNodes = nodes(AiTextPanel(textProps));
+textNodes = nodes(TextIdeasPanel(textProps));
 textNodes.find(node => node.type === "button").props.onClick();
-assert.equal(generated.length, 2);
-assert.ok(generated.every(layer => layer.type === "text"));
-assert.equal(generated[0].text, "KINGS UNITED");
-console.log("PASS text helper disables empty prompts and generates lettering only");
+assert.equal(added.length, 2);
+assert.ok(added.every(layer => layer.type === "text"));
+assert.equal(added[0].text, "KINGS UNITED");
+console.log("PASS local Text Ideas disables empty prompts and adds editable lettering");
 
 class PanelTarget {
   constructor(region) { this.region = region; }
@@ -181,7 +181,7 @@ const { default: Customizer } = load("components/customizer/Customizer.tsx", {
   react: { ...react, useState(initial) {
     return react.useState(initial?.w === 0 && initial?.h === 0 ? { w: 400, h: 500 } : initial);
   } },
-  "react/jsx-runtime": jsx, "next/link": {}, "next/image": {}, "../ProductPhotography": {},
+  "react/jsx-runtime": jsx, "next/link": {}, "next/image": {}, "next/navigation": { useRouter: () => ({ push() {} }) }, "../ProductPhotography": {},
   "./DesignCanvas": { default: Canvas }, "./stageGeometry": { fitStage },
   "./panels": { NN_DEFAULTS: {} }, "./editors": {}, "./icons": {}, "./art": { ART_LIBRARY: [] },
   "@/lib/design": {
@@ -191,7 +191,7 @@ const { default: Customizer } = load("components/customizer/Customizer.tsx", {
   "@/lib/imageFx": {}, "./preview": {},
   "@/lib/mockups": { mockupsForProduct: () => [mockup], TEE_MOCKUPS: [mockup] },
   "@/lib/cart-context": { useCart: () => ({ items: [], addItem() {} }) },
-  "@/lib/pricing": { quoteProduct: () => ({}) },
+  "@/lib/pricing": { quoteProduct: () => ({}), formatUSD: value => `$${value}` },
 }, { Element: PanelTarget });
 function rawNodes(node) {
   if (!node || typeof node !== "object") return [];

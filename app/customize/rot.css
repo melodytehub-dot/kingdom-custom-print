@@ -512,19 +512,19 @@
   padding: 14px 22px 32px;
 }
 
-.rot-ai-panel {
+.rot-ideas-panel {
   display: grid;
   gap: 14px;
   padding: 8px 0 28px;
 }
 
-.rot-ai-panel label {
+.rot-ideas-panel label {
   color: #34343a;
   font-size: 15px;
   font-weight: 650;
 }
 
-.rot-ai-panel textarea {
+.rot-ideas-panel textarea {
   width: 100%;
   min-height: 116px;
   resize: vertical;
@@ -537,21 +537,25 @@
   line-height: 1.45;
 }
 
-.rot-ai-panel textarea:focus {
+.rot-ideas-panel textarea:focus {
   outline: 2px solid rgba(47, 123, 255, 0.25);
   border-color: #2f7bff;
 }
 
-.rot-ai-panel .rot-cta {
+.rot-ideas-panel .rot-cta {
   justify-content: center;
 }
 
-.rot-ai-examples {
+.rot-ideas-examples {
   margin: 0;
   color: #676a72;
   font-size: 13px;
   line-height: 1.5;
 }
+
+.rot-switch-impact { margin-block: 16px; }
+.rot-switch-actions { display: grid; gap: 8px; }
+.rot-switch-actions .rot-cta { margin: 0; }
 
 .rot-editor {
   display: flex;
@@ -2235,7 +2239,7 @@
 }
 
 .rot-textarea,
-.rot-ai-panel textarea {
+.rot-ideas-panel textarea {
   max-width: 100%;
   box-sizing: border-box;
 }
@@ -2410,22 +2414,22 @@
   font-size: 12px;
 }
 
-.rot-ai-panel {
+.rot-ideas-panel {
   gap: 10px;
   padding-top: 4px;
 }
 
-.rot-ai-panel label {
+.rot-ideas-panel label {
   font-size: 12px;
 }
 
-.rot-ai-panel textarea {
+.rot-ideas-panel textarea {
   min-height: 88px;
   padding: 10px;
   font-size: 13px;
 }
 
-.rot-ai-examples {
+.rot-ideas-examples {
   font-size: 11px;
 }
 
@@ -2635,4 +2639,42 @@
   .rot[data-step="design"] .rot-preview { grid-column: 3; grid-row: 1; }
   .rot[data-step="design"][data-layout="none"] .rot-preview { grid-column: 2; }
   .rot[data-step="design"] .rot-stage-top { padding: 0; }
+}
+
+.rot-catalog-filters { display: grid; gap: 8px; margin: 10px 0 14px; }
+.rot-catalog-filter-row { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.rot-catalog-filters .rot-input { min-width: 0; min-height: 42px; padding: 8px 10px; border: 1px solid var(--rot-line); border-radius: 6px; background: #fff; }
+.rot-blanks { display: flex; flex-direction: column; gap: 8px; }
+.rot-blank { flex-direction: row; align-items: center; gap: 12px; padding: 8px; border-radius: 6px; text-align: left; }
+.rot-blank img { flex: 0 0 64px; width: 64px; height: 64px; object-fit: contain; }
+.rot-blank-details { display: grid; gap: 3px; min-width: 0; }
+.rot-blank-details strong { color: #25262a; font-size: 13px; }
+.rot-blank-details small { color: #626772; font-size: 11px; }
+.rot-bar-price { display: grid; gap: 2px; max-width: 250px; padding: 0 10px; color: #24252a; font-size: 12px; line-height: 1.25; }
+.rot-bar-price small { color: #656a74; font-size: 10px; }
+.rot-bar-price strong { font-weight: 700; }
+.rot-orderbar { display: none !important; }
+
+@media (min-width: 901px) {
+  .rot-bar-actions > button { display: flex; }
+}
+
+@media (max-width: 900px) {
+  .rot-bar-actions { align-items: center; min-width: 0; }
+  .rot-bar-actions > button { display: flex; }
+  .rot-barbtn { flex-direction: row; min-width: 42px; padding: 0 8px; gap: 6px; }
+  .rot-barbtn span { display: none; }
+  .rot-barbtn svg { width: 21px; height: 21px; }
+  .rot-next { flex-direction: row; min-width: 74px; gap: 4px; padding-inline: 8px; font-size: 11px; }
+  .rot-next svg { width: 20px; height: 20px; }
+  .rot-bar-price { max-width: 120px; padding-inline: 5px; font-size: 10px; }
+  .rot-bar-price small { font-size: 9px; }
+  .rot-cartbtn, .rot-mobile-share { display: none !important; }
+}
+
+@media (max-width: 400px) {
+  .rot-logo { flex: 0 0 68px; }
+  .rot-bar-price { display: none; }
+  .rot-barbtn { min-width: 38px; padding-inline: 5px; }
+  .rot-next { min-width: 66px; }
 }

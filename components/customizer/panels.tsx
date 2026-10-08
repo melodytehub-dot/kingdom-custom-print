@@ -7,7 +7,8 @@ import type { GarmentSide, Product, RosterEntry, TextLayer } from "@/lib/types";
 import { newTextLayer } from "@/lib/design";
 import { sizeDisplayLabel, splitSizeGroups } from "@/lib/sizes";
 import type { SavedDraft } from "@/lib/design";
-import { PERSONALIZATION_FEE, formatUSD, type PriceQuote } from "@/lib/pricing";
+import { PERSONALIZATION_FEE, formatUSD, lowestPrintedUnit, type PriceQuote } from "@/lib/pricing";
+import { sizeSummary } from "@/lib/sizes";
 import { TEE_MOCKUPS, type TeeMockup } from "@/lib/mockups";
 import { FONTS, svgFontStack } from "@/lib/fonts";
 import { ART_LIBRARY, type ArtItem } from "./art";
@@ -30,6 +31,7 @@ export function ProductsPanel({
   mockup,
   mockups,
   onColor,
+  onSwitchProduct,
   onClose,
 }: {
   product: Product;
@@ -37,8 +39,31 @@ export function ProductsPanel({
   mockup: TeeMockup;
   mockups: TeeMockup[];
   onColor: (code: string) => void;
+  onSwitchProduct: (product: Product) => boolean;
   onClose: () => void;
 }) {
+  const [query, setQuery] = useState("");
+  const [category, setCategory] = useState("all");
+  const [kind, setKind] = useState("all");
+  const [color, setColor] = useState("all");
+  const [sort, setSort] = useState("featured");
+  const categories = [...new Set(products.map((item) => item.categoryName).filter((value): value is string => Boolean(value)))];
+  const kinds = [...new Set(products.map((item) => item.kind))];
+  const colors = [...new Set(products.flatMap((item) => item.colors.map((variant) => variant.name)))].sort();
+  const visibleProducts = products
+    .filter((item) => {
+      const text = `${item.name} ${item.styleCode} ${item.material} ${item.categoryName ?? ""}`.toLowerCase();
+      return (!query || text.includes(query.toLowerCase()))
+        && (category === "all" || item.categoryName === category)
+        && (kind === "all" || item.kind === kind)
+        && (color === "all" || item.colors.some((variant) => variant.name === color));
+    })
+    .sort((a, b) => sort === "name"
+      ? a.name.localeCompare(b.name)
+      : sort === "price"
+        ? a.basePrice - b.basePrice
+        : a.sortOrder - b.sortOrder);
+
   return (
     <div className="rot-scroll">
       <PanelHeader
@@ -68,6 +93,8 @@ export function ProductsPanel({
             className={`rot-garment${m.code === mockup.code ? " is-active" : ""}`}
             onClick={() => onColor(m.code)}
             aria-pressed={m.code === mockup.code}
+            aria-label={m.name}
+            data-color-slug={m.slug}
             title={m.name}
           >
             <span style={{ background: m.hex }} />
@@ -77,23 +104,102 @@ export function ProductsPanel({
       </div>
 
       <h3 className="rot-sub">Switch blank</h3>
-      <div className="rot-blanks">
-        {products.map((p) => (
+      <div className="rot-catalog-filters">
+        <input className="rot-input" type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search products or style" aria-label="Search products or style" />
+        <div className="rot-catalog-filter-row">
+          <select className="rot-input" value={category} onChange={(event) => setCategory(event.target.value)} aria-label="Filter by category">
+            <option value="all">All categories</option>
+            {categories.map((value) => <option key={value} value={value}>{value}</option>)}
+          </select>
+          <select className="rot-input" value={kind} onChange={(event) => setKind(event.target.value)} aria-label="Filter by product type">
+            <option value="all">All types</option>
+            {kinds.map((value) => <option key={value} value={value}>{value}</option>)}
+          </select>
+        </div>
+        <div className="rot-catalog-filter-row">
+          <select className="rot-input" value={color} onChange={(event) => setColor(event.target.value)} aria-label="Filter by available color">
+            <option value="all">Any color</option>
+            {colors.map((value) => <option key={value} value={value}>{value}</option>)}
+          </select>
+          <select className="rot-input" value={sort} onChange={(event) => setSort(event.target.value)} aria-label="Sort products">
+            <option value="featured">Catalog order</option>
+            <option value="name">Name</option>
+            <option value="price">Lowest blank price</option>
+          </select>
+        </div>
+      </div>
+      <div className="rot-blanks" aria-live="polite">
+        {visibleProducts.map((p) => (
           <Link
             key={p.id}
             href={`/customize/${p.slug}`}
             className={`rot-blank${p.id === product.id ? " is-active" : ""}`}
             aria-current={p.id === product.id ? "true" : undefined}
+            onClick={(event) => {
+              if (!onSwitchProduct(p)) event.preventDefault();
+            }}
           >
-            {p.images[0] ? (
+            {p.id === product.id || p.images[0] ? (
               // eslint-disable-next-line @next/next/no-img-element
-              <img src={p.images[0].url} alt="" />
+              <img src={p.id === product.id ? mockup.front : p.images[0].url} alt="" />
             ) : (
               <Image src="/brand/kingdom-logo.png" alt="" width={40} height={24} />
             )}
-            <span>{p.name}</span>
+            <span className="rot-blank-details">
+              <strong>{p.name}</strong>
+              <small>{p.styleCode} · {p.kind} · {p.colors.length} colors</small>
+              <small>{sizeSummary(p.sizes) || p.sizes.map((size) => size.label).join(", ")}</small>
+              <small>From {formatUSD(lowestPrintedUnit(p) ?? p.basePrice + p.printFeePerSide)} printed</small>
+            </span>
           </Link>
         ))}
+        {visibleProducts.length === 0 ? <p className="rot-phint">No products match those filters.</p> : null}
+      </div>
+    </div>
+  );
+}
+
+export function ProductSwitchConfirmPanel({
+  target,
+  unavailableLines,
+  rosterCount,
+  onContinue,
+  onCancel,
+}: {
+  target: Product;
+  unavailableLines: { label: string; qty: number }[];
+  rosterCount: number;
+  onContinue: () => void;
+  onCancel: () => void;
+}) {
+  return (
+    <div className="rot-scroll">
+      <PanelHeader
+        eyebrow="Product change"
+        title="Unavailable sizes"
+        hint={`${target.name} does not offer every size in your current order.`}
+        onClose={onCancel}
+      />
+      <p className="rot-callout">
+        Your artwork and compatible quantities will stay. Continuing removes the unavailable quantities and size assignments listed below.
+      </p>
+      <ul className="rot-review rot-switch-impact">
+        {unavailableLines.length ? (
+          <li>
+            <span>Quantity to remove</span>
+            <strong>{unavailableLines.map(({ label, qty }) => `${label} × ${qty}`).join(", ")}</strong>
+          </li>
+        ) : null}
+        {rosterCount ? (
+          <li>
+            <span>Name/number assignments to remove</span>
+            <strong>{rosterCount}</strong>
+          </li>
+        ) : null}
+      </ul>
+      <div className="rot-switch-actions">
+        <button type="button" className="rot-cta rot-cta-ghost" onClick={onCancel}>Keep current product</button>
+        <button type="button" className="rot-cta" onClick={onContinue}>Continue without unavailable sizes</button>
       </div>
     </div>
   );
@@ -210,13 +316,13 @@ function conceptFromPrompt(prompt: string): {
   };
 }
 
-export function AiTextPanel({
+export function TextIdeasPanel({
   side,
-  onGenerate,
+  onAdd,
   onClose,
 }: {
   side: GarmentSide;
-  onGenerate: (layers: TextLayer[], summary: string) => void;
+  onAdd: (layers: TextLayer[], summary: string) => void;
   onClose: () => void;
 }) {
   const [prompt, setPrompt] = useState("");
@@ -245,7 +351,7 @@ export function AiTextPanel({
       weight: 700,
       letterSpacing: 7,
     });
-    onGenerate([headline, subline], concept.summary);
+    onAdd([headline, subline], concept.summary);
     setBusy(false);
   };
 
@@ -256,10 +362,10 @@ export function AiTextPanel({
         title="Create your lettering"
         onClose={onClose}
       />
-      <div className="rot-ai-panel">
-        <label htmlFor="ai-design-prompt">What should go on the {side}?</label>
+      <div className="rot-ideas-panel">
+        <label htmlFor="text-ideas-prompt">Describe the lettering for the {side}.</label>
         <textarea
-          id="ai-design-prompt"
+          id="text-ideas-prompt"
           value={prompt}
           onChange={(event) => setPrompt(event.target.value)}
           placeholder='“Kings United” basketball team, bold retro style'
@@ -268,7 +374,7 @@ export function AiTextPanel({
         <button type="button" className="rot-cta" onClick={generate} disabled={busy || !prompt.trim()}>
           <CheckGlyph size={18} /> {busy ? "Creating…" : "Add lettering"}
         </button>
-        <p className="rot-ai-examples">Try: “church youth retreat”, “summer concert”, or “minimal coffee brand”.</p>
+        <p className="rot-ideas-examples">Try a team, event, or brand phrase with a style such as retro or minimal.</p>
       </div>
     </div>
   );
@@ -839,9 +945,15 @@ export function QuantityPanel({
           <dd>{quantity}</dd>
         </div>
         <div>
-          <dt>Price each</dt>
+          <dt>Base each</dt>
           <dd>{formatUSD(quote.unitBase)}</dd>
         </div>
+        {quote.surchargeTotal > 0 ? (
+          <div>
+            <dt>Size surcharges</dt>
+            <dd>{formatUSD(quote.surchargeTotal)}</dd>
+          </div>
+        ) : null}
         <div className="is-total">
           <dt>Subtotal</dt>
           <dd>{formatUSD(quote.total)}</dd>
@@ -858,6 +970,7 @@ export function ReviewPanel({
   elements,
   quantity,
   quote,
+  lines,
   roster,
   previews,
   rows,
@@ -868,6 +981,7 @@ export function ReviewPanel({
   elements: number;
   quantity: number;
   quote: PriceQuote;
+  lines: { label: string; qty: number }[];
   roster: number;
   previews: { front: string | null; back: string | null };
   rows?: ReactNode;
@@ -900,7 +1014,7 @@ export function ReviewPanel({
         ))}
       </div>
       <ul className="rot-review">
-        {item("Blank", product.name)}
+        {item("Blank", `${product.name}${product.styleCode ? ` · ${product.styleCode}` : ""}`)}
         {item(
           "Color",
           <>
@@ -909,9 +1023,16 @@ export function ReviewPanel({
         )}
         {item("Printed sides", sidesLabel)}
         {item("Elements", elements || "None")}
+        {item(
+          "Size quantities",
+          lines.filter((line) => line.qty > 0).map((line) => {
+            const surcharge = product.sizes.find((size) => size.label === line.label)?.surcharge ?? 0;
+            return `${line.label} × ${line.qty} at ${formatUSD(quote.unitBase + surcharge)} each`;
+          }).join(", ") || "None"
+        )}
         {roster ? item("Names & numbers", `${roster} shirts`) : null}
         {item("Shirts", quantity)}
-        {item("Price each", formatUSD(quote.unitBase))}
+        {item("Average price each", quantity ? formatUSD(quote.total / quantity) : formatUSD(quote.unitBase))}
         <li className="is-total">
           <span>Subtotal</span>
           <strong>{formatUSD(quote.total)}</strong>

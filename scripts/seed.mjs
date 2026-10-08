@@ -1,5 +1,6 @@
 import postgres from "postgres";
 import { additionalCategories, additionalProducts } from "./additional-catalog.mjs";
+import { RT2000_COLORS, RT2000B_COLORS } from "./rt2000-colors.mjs";
 
 if (!process.env.DATABASE_URL) {
   console.error("DATABASE_URL is not set. Run with --env-file=.env.local");
@@ -118,7 +119,7 @@ const YOUTH_SIZES = [
 // The core RT2000-style blank is available in both runs. Prefixing stored
 // youth labels keeps the size keys unique while the UI displays XS–XL under a
 // separate Youth Sizes heading.
-const CLASSIC_COMBO_SIZES = [...ADULT_SIZES.slice(0, 5), ...YOUTH_SIZES];
+const CLASSIC_COMBO_SIZES = [...ADULT_SIZES, { label: "5XL", surcharge: 9 }, ...YOUTH_SIZES];
 
 /* Quantity breaks: amount subtracted from the unit price as the run grows. */
 const TEE_BREAKS = [
@@ -157,7 +158,7 @@ const baseProducts = [
     print_area: { frontW: 0.42, frontH: 0.5, backW: 0.62, backH: 0.66 },
     featured: true,
     sort: 1,
-    colors: CLASSIC_COLORS,
+    colors: RT2000_COLORS,
     sizes: CLASSIC_COMBO_SIZES,
     breaks: TEE_BREAKS,
     images: [
@@ -403,7 +404,7 @@ const baseProducts = [
     print_area: { frontW: 0.4, frontH: 0.46, backW: 0.56, backH: 0.6 },
     featured: false,
     sort: 12,
-    colors: CLASSIC_COLORS,
+    colors: RT2000B_COLORS,
     sizes: YOUTH_SIZES,
     breaks: TEE_BREAKS,
     images: [{ url: "/img/mockups/families/youth/WHT_fr.webp", alt: "Youth Classic Tee in White" }],

@@ -3,7 +3,6 @@ import { chromium } from "playwright";
 
 const BASE = process.env.QA_BASE ?? "http://localhost:3000";
 const PASSWORD = process.env.QA_ADMIN_PASSWORD ?? process.env.ADMIN_PASSWORD;
-const CHROME = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
 
 let failures = 0;
 const check = (n, ok, d = "") => {
@@ -11,7 +10,7 @@ const check = (n, ok, d = "") => {
   if (!ok) failures++;
 };
 
-const browser = await chromium.launch({ executablePath: CHROME, headless: true });
+const browser = await chromium.launch({ channel: process.env.QA_BROWSER ?? "chrome", headless: true });
 const page = await (await browser.newContext({ viewport: { width: 1440, height: 900 } })).newPage();
 const errors = [];
 page.on("pageerror", (e) => errors.push(e.message));

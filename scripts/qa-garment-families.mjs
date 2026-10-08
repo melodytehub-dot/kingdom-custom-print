@@ -8,9 +8,8 @@ import fs from "node:fs";
 import path from "node:path";
 
 const BASE = process.env.QA_BASE ?? "http://localhost:3000";
-const CHROME = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
 const products = [
-  ["crown-classic-tee", null, 14],
+  ["crown-classic-tee", null, 77],
   ["heavy-cotton-tee", null, 14],
   ["softstyle-tee", null, 14],
   ["comfort-colors-tee", null, 10],
@@ -21,7 +20,7 @@ const products = [
   ["pocket-tee", "pocket", 10],
   ["heather-cvc-tee", null, 8],
   ["womens-fitted-tee", "fitted", 8],
-  ["youth-classic-tee", "youth", 14],
+  ["youth-classic-tee", "youth", 48],
   ["v-neck-tee", "vneck", 6],
   ["long-sleeve-tee", "longsleeve", 6],
   ["premium-pullover-hoodie", "hoodie", 8],
@@ -42,7 +41,7 @@ for (const family of generatedFamilies) {
 }
 console.log(`PASS generated non-tee families — ${generatedFamilies.length} families with front/back assets`);
 
-const browser = await chromium.launch({ executablePath: CHROME, headless: true });
+const browser = await chromium.launch({ channel: process.env.QA_BROWSER ?? "chrome", headless: true });
 const context = await browser.newContext({ viewport: { width: 390, height: 844 } });
 let failures = 0;
 
@@ -52,6 +51,7 @@ try {
     waitUntil: "domcontentloaded",
     timeout: 30000,
   });
+  await shopPage.locator(".mm-card").first().waitFor({ state: "attached", timeout: 15000 });
   const cards = shopPage.locator(".mm-card");
   const cardCount = await cards.count();
   for (let i = 0; i < cardCount; i += 1) {
@@ -91,15 +91,43 @@ for (const [slug, family, expectedColors] of products) {
     const panelPreview = page.locator(".rot-product img").first();
     const renderedColors = new Set();
     for (let colorIndex = 0; colorIndex < colors; colorIndex += 1) {
-      await page.locator(".rot-garment").nth(colorIndex).evaluate((button) => button.click());
+      const swatch = page.locator(".rot-garment").nth(colorIndex);
+      const variant = await swatch.evaluate((button) => {
+        const rgb = getComputedStyle(button.querySelector("span")).backgroundColor.match(/\d+/g).map(Number);
+        return {
+          slug: button.dataset.colorSlug,
+          name: button.getAttribute("aria-label"),
+          hex: rgb.map((channel) => channel.toString(16).padStart(2, "0")).join("").toUpperCase(),
+        };
+      });
+      await swatch.evaluate((button) => button.click());
+      await page.waitForFunction(({ slug, hex, name }) => {
+        const photo = document.querySelector("image.rot-shirt-photo");
+        const preview = document.querySelector(".rot-product img");
+        const tile = document.querySelector(".rot-blank.is-active img");
+        const label = document.querySelector(".rot-product-color")?.textContent?.trim();
+        return new URL(location.href).searchParams.get("color") === slug
+          && new URL(photo.getAttribute("href"), location.href).searchParams.get("color")?.toUpperCase() === hex
+          && preview?.getAttribute("src") === photo.getAttribute("href")
+          && tile?.getAttribute("src") === preview?.getAttribute("src")
+          && label?.includes(name);
+      }, variant);
       await panelPreview.waitFor({ state: "visible", timeout: 5000 });
       const src = await panelPreview.getAttribute("src");
       if (src) renderedColors.add(src);
     }
+    const front = await photo.getAttribute("href");
+    await page.getByRole("button", { name: "Back view", exact: true }).click();
+    const back = await photo.getAttribute("href");
+    await page.getByRole("button", { name: "Front view", exact: true }).click();
+    const selected = page.locator(".rot-blank.is-active .rot-blank-details");
+    const catalogDetails = await selected.innerText();
     const familyOk = href?.includes(`/api/garment-preview?family=${family ?? "tee"}&`);
     const colorsOk = renderedColors.size === colors;
-    const ok = Boolean(familyOk) && colors === expectedColors && colorsOk && overflow <= 1;
-    console.log(`${ok ? "PASS" : "FAIL"} ${slug} href=${href} colors=${colors}/${expectedColors} renders=${renderedColors.size}/${colors} overflow=${overflow}px`);
+    const viewsOk = front?.includes("view=front") && back?.includes("view=back");
+    const detailsOk = Boolean(catalogDetails.match(/\S+\s+·/) && catalogDetails.match(/\d+ colors/) && catalogDetails.match(/(?:Adult|Youth)/) && catalogDetails.match(/From \$\d/));
+    const ok = Boolean(familyOk) && colors === expectedColors && colorsOk && viewsOk && detailsOk && overflow <= 1;
+    console.log(`${ok ? "PASS" : "FAIL"} ${slug} family=${Boolean(familyOk)} colors=${colors}/${expectedColors} renders=${renderedColors.size}/${colors} sync=pass front/back=${Boolean(viewsOk)} details=${Boolean(detailsOk)} overflow=${overflow}px`);
     if (!ok) failures += 1;
   } catch (error) {
     failures += 1;

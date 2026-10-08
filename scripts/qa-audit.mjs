@@ -1,9 +1,10 @@
 import { chromium } from "playwright";
 import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
 
 const BASE = process.env.QA_BASE ?? "http://localhost:3000";
-const OUT = "/tmp/qa";
-const CHROME = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
+const OUT = path.join(os.tmpdir(), "qa");
 
 const VIEWPORTS = [
   { name: "desktop", width: 1440, height: 900 },
@@ -136,7 +137,7 @@ async function audit(page, routeName, vpName) {
 
 const run = async () => {
   fs.mkdirSync(OUT, { recursive: true });
-  const browser = await chromium.launch({ executablePath: CHROME, headless: true });
+  const browser = await chromium.launch({ channel: process.env.QA_BROWSER ?? "chrome", headless: true });
 
   for (const vp of VIEWPORTS) {
     const context = await browser.newContext({
