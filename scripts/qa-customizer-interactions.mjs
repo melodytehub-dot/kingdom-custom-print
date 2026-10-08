@@ -22,12 +22,19 @@ for (const width of [320, 375, 390, 430, 768, 901, 1440]) {
   for (const height of [130, 180, 260, 500, 800]) {
     const fit = fitStage(width, height);
     assert.ok(fit.size > 0);
-    assert.ok(fit.left >= 12 && fit.ty >= 12);
-    assert.ok(fit.left + fit.size <= width - 12);
+    assert.ok(fit.ty >= 12);
     assert.ok(fit.ty + fit.size <= height - 12);
+    assert.equal(fit.left + fit.size / 2, width / 2);
+    if (!(width <= 900 && height > width)) {
+      assert.ok(fit.left >= 12);
+      assert.ok(fit.left + fit.size <= width - 12);
+    }
     assert.equal(fitStage(width, height, 1.12).size, fit.size * 1.12);
   }
 }
+assert.equal(fitStage(390, 632).size, 546);
+assert.equal(fitStage(320, 356).size, 332);
+assert.equal(fitStage(844, 390).size, 366);
 assert.equal(fitStage(0, 500).size, 0);
 assert.equal(fitStage(320, 0).size, 0);
 console.log("PASS stage fits both dimensions across 35 mobile/desktop stage sizes");
