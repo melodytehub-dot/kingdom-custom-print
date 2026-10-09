@@ -4,6 +4,7 @@ import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import type { ImageFx, ImageLayer, TextLayer } from "@/lib/types";
 import { FONTS, fontsForScript, svgFontStack, type FontScript } from "@/lib/fonts";
 import { DEFAULT_FX, dominantColours } from "@/lib/imageFx";
+import { SubjectSelectionEditor } from "./SubjectSelectionEditor";
 import {
   BackArrowIcon,
   CenterIcon,
@@ -755,18 +756,24 @@ export function TextEditor({
 export function ImageEditor({
   layer,
   busy,
+  busyLabel,
+  progress,
   eyebrow,
   actions,
   onFx,
+  onApplySelection,
   onChange,
   onReset,
   onClose,
 }: {
   layer: ImageLayer;
   busy: boolean;
+  busyLabel?: string;
+  progress: number | null;
   eyebrow: string;
   actions: LayerActionsProps;
   onFx: (next: Partial<ImageFx>) => void;
+  onApplySelection: (layer: ImageLayer, cutout: string) => Promise<void>;
   onChange: (patch: Partial<ImageLayer>) => void;
   onReset: () => void;
   onClose: () => void;
@@ -774,7 +781,7 @@ export function ImageEditor({
   const fx = layer.fx ?? DEFAULT_FX;
   const original = layer.origSrc ?? layer.src;
   const [palette, setPalette] = useState<string[]>([]);
-  const [view, setView] = useState<"main" | "colors" | "ink">("main");
+  const [view, setView] = useState<"main" | "colors" | "ink" | "select">("main");
   const colourFor = (hex: string) => fx.recolors.find((r) => r.from === hex)?.to ?? hex;
 
   useEffect(() => {
@@ -794,6 +801,17 @@ export function ImageEditor({
   }, [layer.id]);
 
   const avg = (layer.scaleX + layer.scaleY) / 2;
+
+  if (view === "select") {
+    return (
+      <SubjectSelectionEditor
+        src={original}
+        eyebrow={eyebrow}
+        onBack={() => setView("main")}
+        onApply={(cutout) => onApplySelection(layer, cutout)}
+      />
+    );
+  }
 
   if (view === "ink") {
     return (
@@ -897,6 +915,29 @@ export function ImageEditor({
           ))}
         </div>
 
+        <Toggle
+          label="Remove Background"
+          badge="AI"
+          checked={fx.removeBg}
+          disabled={busy}
+          onChange={(removeBg) => onFx({ removeBg })}
+        />
+        <button type="button" className="rot-row is-link rot-subject-link" onClick={() => setView("select")} disabled={busy}>
+          <span className="rot-row-label">
+            <span>Select Object<small>For busy or detailed photos</small></span>
+          </span>
+          <span className="rot-row-value">
+            <span className="rot-badge">AI</span>
+            <span className="rot-chev"><ChevronRightIcon size={16} /></span>
+          </span>
+        </button>
+        {busy ? (
+          <div className="rot-ai-status" role="status" aria-live="polite">
+            <span>{busyLabel ?? "Working on your artwork…"}</span>
+            {progress !== null ? <progress max={100} value={progress} aria-label="AI model download progress" /> : null}
+          </div>
+        ) : null}
+
         <Row
           label="Edit Colors"
           onClick={() => setView("colors")}
@@ -958,7 +999,6 @@ export function ImageEditor({
           value={Math.round(layer.opacity * 100)}
           onChange={(v) => onChange({ opacity: v / 100 })}
         />
-        {busy ? <p className="rot-phint">Working on your artwork…</p> : null}
         <button type="button" className="rot-textlink" onClick={onReset} disabled={busy}>
           Reset to Defaults
         </button>

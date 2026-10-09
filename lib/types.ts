@@ -137,6 +137,8 @@ export interface ImageLayer extends BaseLayer {
   aspect: number;
   /** Untouched upload, kept so edits can be re-applied or undone. */
   origSrc?: string;
+  /** Cached local-AI cutout used when other artwork edits are reapplied. */
+  backgroundRemovedSrc?: string;
   fx?: ImageFx;
 }
 

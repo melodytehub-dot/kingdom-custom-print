@@ -61,6 +61,7 @@ import {
   type SavedDraft,
 } from "@/lib/design";
 import { applyImageFx, DEFAULT_FX } from "@/lib/imageFx";
+import { removeBackgroundLocally, type BackgroundRemovalProgress } from "@/lib/backgroundRemoval";
 import { drawPreview } from "./preview";
 import { mockupByCode, mockupsForProduct, TEE_MOCKUPS, type TeeMockup } from "@/lib/mockups";
 import { useCart } from "@/lib/cart-context";
@@ -167,7 +168,7 @@ function stripForCart(design: Design): Design {
     layers.map((l) => {
       if (l.type !== "image") return l;
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      const { origSrc, fx, ...rest } = l as ImageLayer;
+      const { origSrc, backgroundRemovedSrc, fx, ...rest } = l as ImageLayer;
       return rest as ImageLayer;
     });
   return { front: clean(design.front), back: clean(design.back) };
@@ -207,6 +208,8 @@ export default function Customizer({
   const [busy, setBusy] = useState(false);
   const [transforming, setTransforming] = useState(false);
   const [fxBusy, setFxBusy] = useState(false);
+  const [fxStatus, setFxStatus] = useState<string | null>(null);
+  const [fxProgress, setFxProgress] = useState<number | null>(null);
   const [addedCount, setAddedCount] = useState(0);
   const [hist, setHist] = useState({ canUndo: false, canRedo: false });
   const [roster, setRoster] = useState<RosterEntry[]>([]);
@@ -547,15 +550,36 @@ export default function Customizer({
   const applyFx = async (layer: ImageLayer, next: Partial<ImageFx>) => {
     const fx: ImageFx = { ...(layer.fx ?? DEFAULT_FX), ...next };
     const orig = layer.origSrc ?? layer.src;
+    let backgroundRemovedSrc = layer.backgroundRemovedSrc;
     setFxBusy(true);
+    setFxProgress(null);
+    setFxStatus(fx.removeBg ? "Preparing background removal…" : "Applying artwork edits…");
     try {
-      const res = await applyImageFx(orig, fx);
+      if (fx.removeBg && !backgroundRemovedSrc) {
+        backgroundRemovedSrc = await removeBackgroundLocally(orig, (progress: BackgroundRemovalProgress) => {
+          setFxStatus(
+            progress.phase === "download"
+              ? "Downloading AI model…"
+              : progress.phase === "compatibility"
+                ? "Using compatibility mode; this may take longer…"
+                : "Removing background…",
+          );
+          setFxProgress(progress.phase === "download" ? progress.percent ?? null : null);
+        });
+      }
+      setFxStatus("Applying artwork edits…");
+      const source = fx.removeBg ? backgroundRemovedSrc ?? orig : orig;
+      const res = await applyImageFx(source, { ...fx, removeBg: false });
       patch(side, layer.id, {
         fx,
         origSrc: orig,
+        backgroundRemovedSrc,
         src: res.dataUrl,
         aspect: res.aspect,
       } as Partial<ImageLayer>);
+      if (next.removeBg !== undefined) {
+        setNotice({ tone: "ok", text: fx.removeBg ? "Background removed." : "Original background restored." });
+      }
     } catch (err) {
       setNotice({
         tone: "error",
@@ -563,6 +587,8 @@ export default function Customizer({
       });
     } finally {
       setFxBusy(false);
+      setFxStatus(null);
+      setFxProgress(null);
     }
   };
 
@@ -574,6 +600,7 @@ export default function Customizer({
       patch(side, layer.id, {
         fx: { ...DEFAULT_FX },
         origSrc: orig,
+        backgroundRemovedSrc: undefined,
         src: res.dataUrl,
         aspect: res.aspect,
         x: 50,
@@ -947,6 +974,35 @@ export default function Customizer({
     goStep(STEP_ORDER[stepIndex + 1]);
   };
 
+  const applySubjectSelection = async (layer: ImageLayer, cutout: string) => {
+    const orig = layer.origSrc ?? layer.src;
+    const fx: ImageFx = { ...(layer.fx ?? DEFAULT_FX), removeBg: true };
+    setFxBusy(true);
+    setFxProgress(null);
+    setFxStatus("Applying selected cutout…");
+    try {
+      const result = await applyImageFx(cutout, { ...fx, removeBg: false });
+      patch(side, layer.id, {
+        fx,
+        origSrc: orig,
+        backgroundRemovedSrc: cutout,
+        src: result.dataUrl,
+        aspect: result.aspect,
+      } as Partial<ImageLayer>);
+      setNotice({ tone: "ok", text: "Selected object cut out." });
+    } catch (error) {
+      setNotice({
+        tone: "error",
+        text: error instanceof Error ? error.message : "Could not apply the selected cutout.",
+      });
+      throw error;
+    } finally {
+      setFxBusy(false);
+      setFxStatus(null);
+      setFxProgress(null);
+    }
+  };
+
   const queueProductHandoff = (
     target: Product,
     transferLines: Record<string, number>,
@@ -1125,9 +1181,12 @@ export default function Customizer({
           <ImageEditor
             layer={selected}
             busy={fxBusy}
+            busyLabel={fxStatus ?? undefined}
+            progress={fxProgress}
             eyebrow={ART_LIBRARY.some((a) => a.src === selected.origSrc) ? "Add Art" : "Upload Art"}
             actions={actionsFor(selected)}
             onFx={(next) => void applyFx(selected, next)}
+            onApplySelection={applySubjectSelection}
             onChange={(changes) => patchActive(selected.id, changes)}
             onReset={() => void resetImage(selected)}
             onClose={closePanel}

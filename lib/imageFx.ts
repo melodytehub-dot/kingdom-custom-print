@@ -67,56 +67,6 @@ function borderColour(d: Uint8ClampedArray, w: number, h: number): [number, numb
   return [best.r / best.n, best.g / best.n, best.b / best.n];
 }
 
-/** Flood-fills the background from the borders so interior colours survive. */
-function removeBackground(img: ImageData): boolean {
-  const { data: d, width: w, height: h } = img;
-  const bg = borderColour(d, w, h);
-  if (!bg) return false;
-  const tol = 46;
-  const seen = new Uint8Array(w * h);
-  const stack: number[] = [];
-  const push = (x: number, y: number) => {
-    const p = y * w + x;
-    if (seen[p]) return;
-    const i = p * 4;
-    if (d[i + 3] === 0 || dist([d[i], d[i + 1], d[i + 2]], bg) <= tol) {
-      seen[p] = 1;
-      stack.push(p);
-    }
-  };
-  for (let x = 0; x < w; x++) {
-    push(x, 0);
-    push(x, h - 1);
-  }
-  for (let y = 0; y < h; y++) {
-    push(0, y);
-    push(w - 1, y);
-  }
-  let cleared = 0;
-  while (stack.length) {
-    const p = stack.pop() as number;
-    d[p * 4 + 3] = 0;
-    cleared++;
-    const x = p % w;
-    const y = (p - x) / w;
-    if (x > 0) push(x - 1, y);
-    if (x < w - 1) push(x + 1, y);
-    if (y > 0) push(x, y - 1);
-    if (y < h - 1) push(x, y + 1);
-  }
-  // Soften the cut-out edge by half-fading pixels that touch the cleared area.
-  const edge: number[] = [];
-  for (let y = 1; y < h - 1; y++) {
-    for (let x = 1; x < w - 1; x++) {
-      const p = y * w + x;
-      if (seen[p]) continue;
-      if (seen[p - 1] || seen[p + 1] || seen[p - w] || seen[p + w]) edge.push(p);
-    }
-  }
-  for (const p of edge) d[p * 4 + 3] = Math.min(d[p * 4 + 3], 150);
-  return cleared > 0;
-}
-
 /** Bounding box of visible pixels, ignoring near-empty margins. */
 function contentBox(img: ImageData) {
   const { data: d, width: w, height: h } = img;
@@ -197,8 +147,6 @@ export async function applyImageFx(origSrc: string, fx: ImageFx): Promise<FxResu
   if (fx.superRes) sharpen(ctx, W, H);
 
   let data = ctx.getImageData(0, 0, W, H);
-
-  if (fx.removeBg) removeBackground(data);
 
   // Recolour swaps from "Edit Colors".
   if (fx.recolors.length) {
