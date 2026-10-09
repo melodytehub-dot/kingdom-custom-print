@@ -20,7 +20,7 @@ const SLIDES = [
     src: "/img/kingdom-team.webp",
     alt: "A team wearing Kingdom Custom Print shirts",
     name: "Kingdom team",
-    position: "center 40%",
+    position: "center top",
   },
 ];
 
