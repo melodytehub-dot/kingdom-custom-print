@@ -1,5 +1,6 @@
 import Link from "next/link";
 import Image from "next/image";
+import HeroImageSlider from "@/components/HeroImageSlider";
 import HomeProducts from "@/components/HomeProducts";
 import ArrowRight from "@/components/icons/ArrowRight";
 import Truck from "@/components/icons/Truck";
@@ -44,15 +45,17 @@ export default async function HomePage() {
         <div className="minimog-container">
           <div className="mm-hero-grid">
             <div className="mm-hero-content">
-              <span className="mm-hero-tag">PRINT ON DEMAND STUDIO</span>
-              <h1 className="mm-hero-title">
-                YOUR IDEAS.
-                <br />
-                MADE TO WEAR.
-              </h1>
-              <p className="mm-hero-desc">
-                Custom apparel for your everyday, your brand, or your team. Design it online. Make it yours.
-              </p>
+              <div className="mm-hero-copy">
+                <span className="mm-hero-tag">PRINT ON DEMAND STUDIO</span>
+                <h1 className="mm-hero-title">
+                  YOUR IDEAS.
+                  <br />
+                  MADE TO WEAR.
+                </h1>
+                <p className="mm-hero-desc">
+                  Custom apparel for your everyday, your brand, or your team. Design it online. Make it yours.
+                </p>
+              </div>
               <div className="mm-hero-actions">
                 <Link href="/shop" className="mm-btn mm-btn-black">
                   SHOP NOW
@@ -64,19 +67,7 @@ export default async function HomePage() {
             </div>
 
             <div className="mm-hero-media">
-              <div className="mm-hero-img-wrap">
-                <Image
-                  src="/img/shop-studio.png"
-                  alt="Kingdom Custom Print studio with a custom printed shirt"
-                  fill
-                  loading="eager"
-                  fetchPriority="high"
-                  sizes="(max-width: 768px) 100vw, 520px"
-                  style={{ objectFit: "cover" }}
-                />
-              </div>
-
-
+              <HeroImageSlider />
             </div>
           </div>
         </div>
