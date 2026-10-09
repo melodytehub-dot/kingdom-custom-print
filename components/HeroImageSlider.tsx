@@ -57,12 +57,12 @@ export default function HeroImageSlider() {
   }, []);
 
   useEffect(() => {
-    if (!isMobile || reducedMotion || paused || hovered || focused || !pageVisible) return;
+    if (reducedMotion || paused || hovered || focused || !pageVisible) return;
     const interval = window.setInterval(() => {
       setActiveSlide((current) => (current + 1) % SLIDES.length);
     }, 4500);
     return () => window.clearInterval(interval);
-  }, [focused, hovered, isMobile, pageVisible, paused, reducedMotion]);
+  }, [focused, hovered, pageVisible, paused, reducedMotion]);
 
   const handlePointerDown = (event: PointerEvent<HTMLDivElement>) => {
     if (!isMobile || (event.pointerType !== "touch" && event.pointerType !== "pen")) return;
@@ -100,7 +100,7 @@ export default function HeroImageSlider() {
         if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setFocused(false);
       }}
     >
-      <div className={`mm-hero-slider-track${isMobile ? " is-mobile" : ""}`} style={{ transform: `translateX(-${activeSlide * 100}%)` }}>
+      <div className="mm-hero-slider-track" style={{ transform: `translateX(-${activeSlide * 100}%)` }}>
         {SLIDES.map((slide, index) => (
           <div
             key={slide.src}
@@ -114,7 +114,7 @@ export default function HeroImageSlider() {
               src={slide.src}
               alt={slide.alt}
               fill
-              sizes="(max-width: 768px) calc(100vw - 36px), 520px"
+              sizes="100vw"
               priority={index === 0}
               style={{ objectFit: "cover", objectPosition: slide.position }}
             />
@@ -122,32 +122,30 @@ export default function HeroImageSlider() {
         ))}
       </div>
 
-      {isMobile ? (
-        <div className="mm-hero-slider-controls" role="group" aria-label="Choose a featured photo">
-          <div className="mm-hero-slider-dots">
-            {SLIDES.map((slide, index) => (
-              <button
-                key={slide.src}
-                type="button"
-                className={`mm-hero-slider-dot${activeSlide === index ? " is-active" : ""}`}
-                aria-label={`Show photo ${index + 1}: ${slide.name}`}
-                aria-pressed={activeSlide === index}
-                onClick={() => setActiveSlide(index)}
-              />
-            ))}
-          </div>
-          {!reducedMotion ? (
+      <div className="mm-hero-slider-controls" role="group" aria-label="Choose a featured photo">
+        <div className="mm-hero-slider-dots">
+          {SLIDES.map((slide, index) => (
             <button
+              key={slide.src}
               type="button"
-              className="mm-hero-slider-toggle"
-              aria-label={paused ? "Resume slideshow" : "Pause slideshow"}
-              onClick={() => setPaused((current) => !current)}
-            >
-              <span className={paused ? "is-play" : "is-pause"} aria-hidden="true" />
-            </button>
-          ) : null}
+              className={`mm-hero-slider-dot${activeSlide === index ? " is-active" : ""}`}
+              aria-label={`Show photo ${index + 1}: ${slide.name}`}
+              aria-pressed={activeSlide === index}
+              onClick={() => setActiveSlide(index)}
+            />
+          ))}
         </div>
-      ) : null}
+        {!reducedMotion ? (
+          <button
+            type="button"
+            className="mm-hero-slider-toggle"
+            aria-label={paused ? "Resume slideshow" : "Pause slideshow"}
+            onClick={() => setPaused((current) => !current)}
+          >
+            <span className={paused ? "is-play" : "is-pause"} aria-hidden="true" />
+          </button>
+        ) : null}
+      </div>
     </div>
   );
 }
