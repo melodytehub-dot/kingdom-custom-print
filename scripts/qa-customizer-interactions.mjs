@@ -211,13 +211,13 @@ function renderStudio() {
   cursor = 0; effects = [];
   return Customizer({ product: studioProduct, products: [studioProduct], initialColor: "black", initialLines: {}, contactPhone: "" });
 }
-function tool(root, label) {
+function tool(root, id) {
   const rail = rawNodes(root).find(node => node.props?.className === "rot-rail");
-  return rail.props.children.find(button => button.props.children[1].props.children === label);
+  return rail.props.children.find(button => button.props["data-tool"] === id);
 }
-for (const label of ["Add Text", "Products", "Add Art", "Text Ideas", "Saved", "Distress", "Personalize"]) {
+for (const [id, label] of [["text", "Add Text"], ["products", "Product"], ["art", "Add Graphics"], ["ideas", "Text Ideas"], ["saved", "Saved Designs"], ["distress", "Distress"], ["names", "Names & Numbers"]]) {
   let root = renderStudio();
-  const button = tool(root, label);
+  const button = tool(root, id);
   assert.ok(button, `${label} tool exists`);
   button.props.onClick();
   root = renderStudio();
@@ -232,11 +232,11 @@ for (const label of ["Add Text", "Products", "Add Art", "Text Ideas", "Saved", "
   assert.equal(renderStudio().props["data-layout"], "none", `${label} dismisses on outside tap`);
 }
 let root = renderStudio();
-tool(root, "Add Text").props.onClick();
+tool(root, "text").props.onClick();
 root = renderStudio();
 rawNodes(root).find(node => node.props?.onAdd && node.props?.onClose).props.onAdd({});
 root = renderStudio();
-tool(root, "Add Art").props.onClick();
+tool(root, "art").props.onClick();
 root = renderStudio();
 let canvas = rawNodes(root).find(node => node.props?.onTap && node.props?.onSelect);
 canvas.props.onSelect(null);

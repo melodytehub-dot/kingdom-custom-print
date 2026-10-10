@@ -273,6 +273,10 @@
   background: var(--bone);
 }
 
+.rot-panel-dismiss {
+  display: none;
+}
+
 /* --------------------------------------------------------------------------
    Stage
    -------------------------------------------------------------------------- */
@@ -2854,8 +2858,43 @@
   .rot[data-step="design"] .rot-stage-top { padding: 0; }
 }
 
-/* Keep the mobile garment stage fixed while its inspector opens as a sheet. */
+/* Keep the mobile garment stationary while tools and the inspector toggle. */
 @media (max-width: 900px) {
+  .rot[data-step="design"][data-layout="none"] .rot-body {
+    position: relative;
+    display: block;
+    overflow: hidden;
+  }
+
+  .rot[data-step="design"][data-layout="none"] .rot-main {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    width: 100%;
+    min-height: 0;
+    flex: none;
+  }
+
+  .rot[data-step="design"][data-layout="none"] .rot-preview {
+    min-height: 0;
+    flex: 1 1 auto;
+  }
+
+  .rot[data-step="design"] .rot-stage-top {
+    box-sizing: border-box;
+    height: 58px;
+    min-height: 58px;
+    max-height: 58px;
+    flex: 0 0 58px;
+  }
+
+  .rot[data-step="design"][data-layout="none"] .rot-rail {
+    position: absolute;
+    z-index: 7;
+    inset: auto 0 0;
+    width: 100%;
+  }
+
   .rot[data-step="design"][data-layout="split"] .rot-body {
     position: relative;
     display: block;
@@ -2889,6 +2928,38 @@
     border-top: 1px solid var(--rot-line);
     box-shadow: 0 -5px 18px rgba(20, 20, 24, 0.12);
     overscroll-behavior: contain;
+    padding-top: 20px;
+  }
+
+  .rot[data-step="design"][data-layout="split"] .rot-panel-dismiss {
+    position: absolute;
+    z-index: 12;
+    top: 0;
+    left: 50%;
+    display: grid;
+    place-items: center;
+    width: 48px;
+    height: 20px;
+    padding: 0;
+    transform: translateX(-50%);
+    background: transparent;
+    touch-action: manipulation;
+  }
+
+  .rot-panel-dismiss span {
+    display: block;
+    width: 34px;
+    height: 4px;
+    border-radius: 4px;
+    background: #aeb3ba;
+  }
+
+  .rot-panel-dismiss:hover span {
+    background: #737982;
+  }
+
+  .rot[data-step="design"][data-layout="split"] .rot-editor-scroll {
+    padding-top: 10px;
   }
 
   .rot[data-step="design"][data-layout="split"] .rot-editor {
@@ -2917,7 +2988,9 @@
 .rot-bar-price { display: grid; gap: 2px; max-width: 250px; padding: 0 10px; color: #24252a; font-size: 12px; line-height: 1.25; }
 .rot-bar-price small { color: #656a74; font-size: 10px; }
 .rot-bar-price strong { font-weight: 700; }
-.rot-orderbar { display: none !important; }
+@media (max-width: 900px) {
+  .rot-orderbar { display: none !important; }
+}
 
 @media (min-width: 901px) {
   .rot-bar-actions > button { display: flex; }
@@ -2926,6 +2999,7 @@
 @media (max-width: 900px) {
   .rot-bar-actions { align-items: center; min-width: 0; }
   .rot-bar-actions > button { display: flex; }
+  .rot-bar-price { display: none !important; }
   .rot-barbtn { flex-direction: row; min-width: 42px; padding: 0 8px; gap: 6px; }
   .rot-barbtn span { display: none; }
   .rot-barbtn svg { width: 21px; height: 21px; }
@@ -2934,6 +3008,49 @@
   .rot-bar-price { max-width: 120px; padding-inline: 5px; font-size: 10px; }
   .rot-bar-price small { font-size: 9px; }
   .rot-cartbtn, .rot-mobile-share { display: none !important; }
+  .rot-side-switcher { display: none; }
+  .rot-rotate-compact {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: center;
+    gap: 5px;
+    min-width: 78px;
+    min-height: 44px;
+    padding: 3px 8px;
+    border: 1px solid var(--rot-line);
+    border-radius: 24px;
+    background: #fff;
+    box-shadow: 0 1px 5px rgba(20, 20, 24, 0.12);
+    color: #30343a;
+  }
+  .rot-rotate-icon { width: 26px; height: 26px; }
+  .rot-rotate-label { display: inline; font-size: 10px; line-height: 1; }
+  .rot-stage-actions { align-items: center; gap: 4px; }
+  .rot-tool { flex: 0 0 68px; width: 68px; min-width: 68px; }
+  .rot-tool-label {
+    width: 100%;
+    max-width: 66px;
+    white-space: normal;
+    text-align: center;
+    line-height: 1.05;
+  }
+}
+
+@media (min-width: 901px) {
+  .rot-tool-label {
+    width: 100%;
+    max-width: 68px;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    text-align: center;
+    line-height: 1.05;
+  }
+
+  .rot-header-save,
+  .rot-header-next,
+  .rot-bar-price { display: none !important; }
+  .rot-orderbar { display: flex !important; }
 }
 
 @media (max-width: 400px) {

@@ -31,6 +31,7 @@ import {
   CloudUploadIcon,
   DistressIcon,
   ChevronRightIcon,
+  DollarIcon,
   HeadsetIcon,
   PersonalizeIcon,
   RedoIcon,
@@ -974,6 +975,13 @@ export default function Customizer({
     goStep(STEP_ORDER[stepIndex + 1]);
   };
 
+  const showPrice = () => {
+    const text = quantity > 0
+      ? `Estimated total for ${quantity} item${quantity === 1 ? "" : "s"}: ${formatUSD(quote.total)}.`
+      : `Blank garments start at ${formatUSD(product.basePrice)}. Enter quantities to calculate your total.`;
+    setNotice({ tone: "ok", text });
+  };
+
   const applySubjectSelection = async (layer: ImageLayer, cutout: string) => {
     const orig = layer.origSrc ?? layer.src;
     const fx: ImageFx = { ...(layer.fx ?? DEFAULT_FX), removeBg: true };
@@ -1260,12 +1268,18 @@ export default function Customizer({
   const tools: { id: string; label: string; icon: React.ReactNode; onClick: () => void }[] = [
     {
       id: "products",
-      label: "Products",
+      label: "Product",
       icon: <ShirtIcon size={38} />,
       onClick: () => {
         setSelectedId(null);
         setPanel("products");
       },
+    },
+    {
+      id: "upload",
+      label: "Upload",
+      icon: <CloudUploadIcon size={38} />,
+      onClick: () => { setSelectedId(null); setPanel("upload"); },
     },
     {
       id: "text",
@@ -1274,18 +1288,28 @@ export default function Customizer({
       onClick: () => { setSelectedId(null); setPanel("text-add"); },
     },
     {
-      id: "upload",
-      label: "Upload Art",
-      icon: <CloudUploadIcon size={38} />,
-      onClick: () => { setSelectedId(null); setPanel("upload"); },
-    },
-    {
       id: "art",
-      label: "Add Art",
+      label: "Add Graphics",
       icon: <ArtIcon size={38} />,
       onClick: () => {
         setSelectedId(null);
         setPanel("art");
+      },
+    },
+    {
+      id: "names",
+      label: "Names & Numbers",
+      icon: <PersonalizeIcon size={40} />,
+      onClick: startNames,
+    },
+    {
+      id: "saved",
+      label: "Saved Designs",
+      icon: <UserIcon size={38} />,
+      onClick: () => {
+        setSelectedId(null);
+        setDrafts(loadDrafts());
+        setPanel("saved");
       },
     },
     {
@@ -1295,22 +1319,6 @@ export default function Customizer({
       onClick: () => {
         setSelectedId(null);
         setPanel("ideas");
-      },
-    },
-    {
-      id: "names",
-      label: "Personalize",
-      icon: <PersonalizeIcon size={40} />,
-      onClick: startNames,
-    },
-    {
-      id: "saved",
-      label: "Saved",
-      icon: <UserIcon size={38} />,
-      onClick: () => {
-        setSelectedId(null);
-        setDrafts(loadDrafts());
-        setPanel("saved");
       },
     },
     {
@@ -1382,7 +1390,7 @@ export default function Customizer({
             <HeadsetIcon size={34} />
             <span>Call or Chat</span>
           </Link>
-          <button type="button" className="rot-barbtn" onClick={saveDraft}>
+          <button type="button" className="rot-barbtn rot-header-save" onClick={saveDraft}>
             <SaveIcon size={34} />
             <span>Save</span>
           </button>
@@ -1397,7 +1405,7 @@ export default function Customizer({
             <small>Blank from {formatUSD(product.basePrice)}</small>
             <strong>{quantity > 0 ? `Order ${formatUSD(quote.total)} total · ${formatUSD(quote.total / quantity)} avg each` : "Price updates with quantity"}</strong>
           </div>
-          <button type="button" className="rot-next" onClick={goNext} disabled={busy}>
+          <button type="button" className="rot-next rot-header-next" onClick={goNext} disabled={busy}>
             {step === "review" ? <CartGlyph size={24} /> : <ChevronRightIcon size={24} />}
             <span>{step === "review" ? (busy ? "Adding…" : addedCount ? "Add another" : "Add to Cart") : step === "quantity" ? "Review" : "Next"}</span>
           </button>
@@ -1515,6 +1523,7 @@ export default function Customizer({
                   onGestureStart={() => {
                     if (historyRef.current.at(-1) !== design) historyRef.current = [...historyRef.current.slice(-29), design];
                     setTransforming(true);
+                    if (compact && SPLIT_PANELS.includes(panel)) setPanel("none");
                   }}
                   onCommit={() => setTransforming(false)}
                   onDelete={deleteLayer}
@@ -1557,6 +1566,7 @@ export default function Customizer({
                 key={t.id}
                 type="button"
                 className={`rot-tool${railActive === t.id ? " is-active" : ""}`}
+                data-tool={t.id}
                 onClick={t.onClick}
                 disabled={step !== "design"}
               >
@@ -1568,9 +1578,39 @@ export default function Customizer({
         </div>
 
         <aside className="rot-panel" aria-label="Design controls">
+          {split ? (
+            <button
+              type="button"
+              className="rot-panel-dismiss"
+              onClick={() => setPanel("none")}
+              aria-label="Hide controls to move artwork"
+              title="Hide controls to move artwork"
+            >
+              <span aria-hidden="true" />
+            </button>
+          ) : null}
           {renderPanel()}
         </aside>
       </div>
+
+      <footer className="rot-orderbar" aria-label="Design order actions">
+        <div className="rot-order-summary" aria-live="polite">
+          <strong>{product.name}</strong>
+          <span>{quantity > 0 ? `${quantity} item${quantity === 1 ? "" : "s"} · ${formatUSD(quote.total)} total` : `Blank from ${formatUSD(product.basePrice)} · price updates with quantity`}</span>
+        </div>
+        <button type="button" className="rot-footer-button" onClick={showPrice}>
+          <DollarIcon size={20} />
+          <span>Get Price</span>
+        </button>
+        <button type="button" className="rot-footer-button rot-save-design" onClick={saveDraft} aria-label="Save design">
+          <SaveIcon size={20} />
+          <span>Save Design</span>
+        </button>
+        <button type="button" className="rot-footer-button is-primary" onClick={goNext} disabled={busy}>
+          <span>{step === "review" ? (addedCount ? "Add Another" : "Add to Cart") : step === "quantity" ? "Review" : "Next Step"}</span>
+          {step === "review" ? <CartGlyph size={20} /> : <ChevronRightIcon size={20} />}
+        </button>
+      </footer>
 
       <input
         ref={fileInput}

@@ -31,8 +31,33 @@ try {
   });
   await page.locator("image.rot-shirt-photo").first().waitFor({ state: "attached", timeout: 60000 });
 
+  const tool = (id) => page.locator(`button.rot-tool[data-tool="${id}"]`).first();
+  const footer = page.locator(".rot-orderbar");
+  await page.setViewportSize({ width: 1366, height: 900 });
+  check(
+    "desktop uses the persistent Rush-style order bar",
+    await footer.isVisible()
+      && !(await page.locator(".rot-header-save").isVisible())
+      && !(await page.locator(".rot-header-next").isVisible())
+      && await page.locator(".rot-side-switcher").isVisible()
+      && !(await page.locator(".rot-rotate-compact").isVisible()),
+  );
+  const desktopLabelOverflow = await page.locator(".rot-tool-label").evaluateAll((labels) => labels
+    .filter((label) => label.scrollWidth > label.clientWidth + 1)
+    .map((label) => label.textContent?.trim()));
+  check("desktop tool labels stay inside the Rush-style rail", desktopLabelOverflow.length === 0, desktopLabelOverflow.join(", "));
+  await page.setViewportSize({ width: 390, height: 844 });
+  check(
+    "mobile keeps compact header actions and exposes the rotate control",
+    !(await footer.isVisible())
+      && await page.locator(".rot-header-save").isVisible()
+      && await page.locator(".rot-header-next").isVisible()
+      && !(await page.locator(".rot-side-switcher").isVisible())
+      && await page.locator(".rot-rotate-compact").isVisible(),
+  );
+
   const photo = page.locator("image.rot-shirt-photo").first();
-  const products = page.locator("button.rot-tool").filter({ hasText: "Products" }).first();
+  const products = tool("products");
   await products.evaluate((button) => button.click());
   await page.locator(".rot-garment").nth(1).waitFor({ state: "visible", timeout: 5000 });
   const swatches = page.locator(".rot-garment");
@@ -55,7 +80,7 @@ try {
   const refreshedSlug = await page.locator(".rot-garment[aria-pressed=true]").getAttribute("data-color-slug");
   check("direct refresh restores the selected product color", refreshedSlug === new URL(page.url()).searchParams.get("color") && refreshedSlug === selectedSlug, `${refreshedSlug} after reload`);
 
-  const addText = page.locator("button.rot-tool").filter({ hasText: "Add Text" }).first();
+  const addText = tool("text");
   await addText.evaluate((button) => button.click());
   await page.getByRole("textbox", { name: "New text", exact: true }).fill("QA headline");
   await page.getByRole("button", { name: "+ Add text", exact: true }).click();
@@ -67,7 +92,7 @@ try {
   await fontRow.evaluate((row) => row.click());
   const fonts = page.locator(".rot-fontitem");
   const fontCount = await fonts.count();
-  const fontScroller = page.locator(".rot-editor").first();
+  const fontScroller = page.locator(".rot-editor-scroll").first();
   const beforeScroll = await fontScroller.evaluate((node) => node.scrollTop);
   await fontScroller.evaluate((node) => {
     node.scrollTop = node.scrollHeight;
@@ -79,18 +104,66 @@ try {
 
   const stageWithInspector = await page.locator(".rot-stage").boundingBox();
   const garmentWithInspector = await page.locator(".rot-shirt").boundingBox();
-  await page.locator(".rot-canvas-svg").click({ position: { x: 8, y: 8 }, force: true });
-  await page.waitForFunction(() => document.querySelector(".rot")?.getAttribute("data-layout") === "none");
+  const svgBox = await page.locator(".rot-canvas-svg").boundingBox();
+  const viewport = page.viewportSize();
+  if (svgBox && viewport) {
+    const tapX = Math.min(viewport.width - 8, Math.max(8, svgBox.x + 12));
+    const tapY = Math.min(viewport.height - 8, Math.max(8, svgBox.y + 12));
+    await page.mouse.click(tapX, tapY);
+  }
+  await page.waitForFunction(() => document.querySelector(".rot")?.getAttribute("data-layout") === "none", { timeout: 5000 }).catch(() => {});
+  const layoutAfterCanvasTap = await page.locator(".rot").getAttribute("data-layout");
+  check("tapping the empty canvas dismisses the active editor", layoutAfterCanvasTap === "none", layoutAfterCanvasTap ?? "missing layout");
+  if (layoutAfterCanvasTap !== "none" && await page.locator(".rot-panel-dismiss").isVisible()) {
+    await page.getByRole("button", { name: "Hide controls to move artwork" }).click();
+  }
   const stageWithoutInspector = await page.locator(".rot-stage").boundingBox();
   const garmentWithoutInspector = await page.locator(".rot-shirt").boundingBox();
   check(
     "mobile layer selection keeps the canvas and garment at the same scale",
     Boolean(stageWithInspector && stageWithoutInspector && garmentWithInspector && garmentWithoutInspector)
       && Math.abs(stageWithInspector.height - stageWithoutInspector.height) <= 1
-      && Math.abs(garmentWithInspector.width - garmentWithoutInspector.width) <= 1,
+      && Math.abs(garmentWithInspector.x - garmentWithoutInspector.x) <= 1
+      && Math.abs(garmentWithInspector.y - garmentWithoutInspector.y) <= 1
+      && Math.abs(garmentWithInspector.width - garmentWithoutInspector.width) <= 1
+      && Math.abs(garmentWithInspector.height - garmentWithoutInspector.height) <= 1,
+    stageWithInspector && stageWithoutInspector && garmentWithInspector && garmentWithoutInspector
+      ? `stage ${Math.round(stageWithInspector.height)}->${Math.round(stageWithoutInspector.height)}px; garment ${Math.round(garmentWithInspector.x)},${Math.round(garmentWithInspector.y)},${Math.round(garmentWithInspector.width)}->${Math.round(garmentWithoutInspector.x)},${Math.round(garmentWithoutInspector.y)},${Math.round(garmentWithoutInspector.width)}px`
+      : "missing layout bounds",
   );
 
-  const ideas = page.locator("button.rot-tool").filter({ hasText: "Text Ideas" }).first();
+  const headline = page.locator(".rot-canvas-svg text").filter({ hasText: "QA HEADLINE" }).first();
+  const headlineBox = await headline.boundingBox();
+  check("selected artwork is visible after dismissing its editor", Boolean(headlineBox));
+  if (headlineBox) {
+    await page.mouse.click(headlineBox.x + headlineBox.width / 2, headlineBox.y + headlineBox.height / 2);
+    await page.locator(".rot-panel-dismiss").waitFor({ state: "visible", timeout: 5000 });
+    const oldPanelBox = await page.locator(".rot-panel").boundingBox();
+    await page.getByRole("button", { name: "Hide controls to move artwork" }).click();
+    await page.waitForFunction(() => document.querySelector(".rot")?.getAttribute("data-layout") === "none");
+    check("hiding the mobile editor retains the active layer selection", await page.locator('.rot-canvas-svg rect[stroke="#2f7bff"]').count() === 1);
+    const start = await headline.boundingBox();
+    if (start && oldPanelBox) {
+      const from = { x: start.x + start.width / 2, y: start.y + start.height / 2 };
+      const to = { x: from.x + 16, y: Math.min(oldPanelBox.y + 48, 660) };
+      await page.mouse.move(from.x, from.y);
+      await page.mouse.down();
+      await page.mouse.move(from.x + 3, from.y + 3);
+      await page.mouse.move(to.x, to.y, { steps: 10 });
+      await page.mouse.up();
+      const moved = await headline.boundingBox();
+      check(
+        "artwork can be moved into the area previously covered by the editor",
+        Boolean(moved && moved.y + moved.height / 2 > oldPanelBox.y),
+        moved ? `center y=${Math.round(moved.y + moved.height / 2)}, sheet y=${Math.round(oldPanelBox.y)}` : "artwork not found after drag",
+      );
+      check("moving artwork leaves the editor dismissed", await page.locator(".rot").getAttribute("data-layout") === "none");
+    } else {
+      check("artwork can be moved into the area previously covered by the editor", false, "missing artwork or editor bounds");
+    }
+  }
+
+  const ideas = tool("ideas");
   await ideas.evaluate((button) => button.click());
   await page.locator("#text-ideas-prompt").fill("Kings United basketball team, bold retro style");
   await page.getByRole("button", { name: /add lettering/i }).evaluate((button) => button.click());
@@ -100,9 +173,9 @@ try {
   const label = await canvas.getAttribute("aria-label");
   check("non-AI text ideas add editable layers", /3 design element/.test(label ?? ""), label ?? "no canvas label");
 
-  await page.locator("button.rot-tool").filter({ hasText: "Saved" }).first().evaluate((button) => button.click());
+  await tool("saved").evaluate((button) => button.click());
   await page.getByRole("button", { name: "Save current design", exact: true }).click();
-  await page.locator("button.rot-tool").filter({ hasText: "Products" }).first().evaluate((button) => button.click());
+  await tool("products").evaluate((button) => button.click());
   await page.getByRole("searchbox", { name: "Search products or style" }).fill("Premium Pullover Hoodie");
   await page.locator(".rot-blank").filter({ hasText: "Premium Pullover Hoodie" }).click();
   await page.waitForURL(/\/customize\/premium-pullover-hoodie/);
@@ -110,7 +183,7 @@ try {
   const carriedLayers = await page.locator(".rot-canvas-svg").getAttribute("aria-label");
   check("switching products retains all artwork", /3 design element/.test(carriedLayers ?? ""), carriedLayers ?? "no canvas label");
   check("product switch keeps a compatible selected color", new URL(page.url()).searchParams.get("color") === "black", new URL(page.url()).searchParams.get("color") ?? "no color in URL");
-  await page.locator("button.rot-tool").filter({ hasText: "Saved" }).first().evaluate((button) => button.click());
+  await tool("saved").evaluate((button) => button.click());
   await page.locator(".rot-draft").first().evaluate((button) => button.click());
   await page.waitForURL(/\/customize\/v-neck-tee/);
   const restoredLayers = await page.locator(".rot-canvas-svg").getAttribute("aria-label");
@@ -133,14 +206,14 @@ try {
     timeout: 30000,
   });
   await page.locator("image.rot-shirt-photo").first().waitFor({ state: "attached", timeout: 60000 });
-  await page.locator("button.rot-tool").filter({ hasText: "Add Art" }).first().evaluate((button) => button.click());
+  await tool("art").evaluate((button) => button.click());
   await page.locator("select[aria-label='Artwork category']").selectOption("Sports");
   const sportsArtwork = await page.locator(".rot-artgrid button").allTextContents();
   check("clipart library offers categorized sports artwork", sportsArtwork.some((name) => name.includes("Basketball")) && sportsArtwork.some((name) => name.includes("Football")), sportsArtwork.join(", "));
   await page.locator(".rot-artgrid button").first().evaluate((button) => button.click());
   const configuredPriceLabel = await page.locator(".rot-bar-price strong").innerText();
   check("configured order price is distinguished from the blank catalog price", configuredPriceLabel.startsWith("Order $") && configuredPriceLabel.includes(" total"), configuredPriceLabel);
-  await page.locator("button.rot-tool").filter({ hasText: "Products" }).first().evaluate((button) => button.click());
+  await tool("products").evaluate((button) => button.click());
   await page.getByRole("searchbox", { name: "Search products or style" }).fill("Premium Pullover Hoodie");
   await page.locator(".rot-blank").filter({ hasText: "Premium Pullover Hoodie" }).click();
   await page.getByRole("heading", { name: "Unavailable sizes" }).waitFor({ state: "visible" });
@@ -159,7 +232,7 @@ try {
     timeout: 30000,
   });
   await page.locator("image.rot-shirt-photo").first().waitFor({ state: "attached", timeout: 60000 });
-  await page.locator("button.rot-tool").filter({ hasText: "Add Art" }).first().evaluate((button) => button.click());
+  await tool("art").evaluate((button) => button.click());
   await page.locator(".rot-artgrid button").first().evaluate((button) => button.click());
   await page.locator('button[aria-label="Lock"]').click();
   await page.locator('button[aria-label="Close"]').click();
