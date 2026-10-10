@@ -12,6 +12,7 @@ export const FONTS: FontOption[] = [
   { value: "anton", label: "Anton", cssVar: "--font-anton", fallback: "'Arial Narrow', Impact, sans-serif" },
   { value: "bebas", label: "Bebas Neue", cssVar: "--font-bebas", fallback: "Impact, 'Arial Narrow', sans-serif" },
   { value: "archivo", label: "Archivo Black", cssVar: "--font-archivo", fallback: "'Arial Black', sans-serif" },
+  { value: "outfit", label: "Outfit", cssVar: "--font-outfit", fallback: "system-ui, -apple-system, 'Segoe UI', sans-serif" },
   { value: "oswald", label: "Oswald", cssVar: "--font-oswald", fallback: "'Arial Narrow', sans-serif" },
   { value: "inter", label: "Inter", cssVar: "--font-inter", fallback: "system-ui, -apple-system, 'Segoe UI', sans-serif" },
   { value: "playfair", label: "Playfair Display", cssVar: "--font-playfair", fallback: "Georgia, 'Times New Roman', serif" },

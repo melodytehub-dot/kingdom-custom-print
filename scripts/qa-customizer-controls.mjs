@@ -77,6 +77,19 @@ try {
   check("font library contains the expanded set", fontCount >= 10, `${fontCount} fonts`);
   check("font library scrolls inside the editor", afterScroll > beforeScroll);
 
+  const stageWithInspector = await page.locator(".rot-stage").boundingBox();
+  const garmentWithInspector = await page.locator(".rot-shirt").boundingBox();
+  await page.locator(".rot-canvas-svg").click({ position: { x: 8, y: 8 }, force: true });
+  await page.waitForFunction(() => document.querySelector(".rot")?.getAttribute("data-layout") === "none");
+  const stageWithoutInspector = await page.locator(".rot-stage").boundingBox();
+  const garmentWithoutInspector = await page.locator(".rot-shirt").boundingBox();
+  check(
+    "mobile layer selection keeps the canvas and garment at the same scale",
+    Boolean(stageWithInspector && stageWithoutInspector && garmentWithInspector && garmentWithoutInspector)
+      && Math.abs(stageWithInspector.height - stageWithoutInspector.height) <= 1
+      && Math.abs(garmentWithInspector.width - garmentWithoutInspector.width) <= 1,
+  );
+
   const ideas = page.locator("button.rot-tool").filter({ hasText: "Text Ideas" }).first();
   await ideas.evaluate((button) => button.click());
   await page.locator("#text-ideas-prompt").fill("Kings United basketball team, bold retro style");
@@ -121,6 +134,9 @@ try {
   });
   await page.locator("image.rot-shirt-photo").first().waitFor({ state: "attached", timeout: 60000 });
   await page.locator("button.rot-tool").filter({ hasText: "Add Art" }).first().evaluate((button) => button.click());
+  await page.locator("select[aria-label='Artwork category']").selectOption("Sports");
+  const sportsArtwork = await page.locator(".rot-artgrid button").allTextContents();
+  check("clipart library offers categorized sports artwork", sportsArtwork.some((name) => name.includes("Basketball")) && sportsArtwork.some((name) => name.includes("Football")), sportsArtwork.join(", "));
   await page.locator(".rot-artgrid button").first().evaluate((button) => button.click());
   const configuredPriceLabel = await page.locator(".rot-bar-price strong").innerText();
   check("configured order price is distinguished from the blank catalog price", configuredPriceLabel.startsWith("Order $") && configuredPriceLabel.includes(" total"), configuredPriceLabel);

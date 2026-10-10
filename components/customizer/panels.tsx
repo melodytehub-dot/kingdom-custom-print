@@ -11,7 +11,7 @@ import { PERSONALIZATION_FEE, formatUSD, lowestPrintedUnit, type PriceQuote } fr
 import { sizeSummary } from "@/lib/sizes";
 import { TEE_MOCKUPS, type TeeMockup } from "@/lib/mockups";
 import { FONTS, svgFontStack } from "@/lib/fonts";
-import { ART_LIBRARY, type ArtItem } from "./art";
+import { ART_CATEGORIES, ART_LIBRARY, type ArtItem } from "./art";
 import {
   ColorView,
   PanelHeader,
@@ -245,7 +245,11 @@ export function AddTextPanel({ onAdd, onClose }: { onAdd: (patch: Partial<TextLa
 
 export function ArtPanel({ onAdd, onClose }: { onAdd: (item: ArtItem) => void; onClose: () => void }) {
   const [query, setQuery] = useState("");
-  const results = ART_LIBRARY.filter((item) => item.name.toLowerCase().includes(query.trim().toLowerCase()));
+  const [category, setCategory] = useState<(typeof ART_CATEGORIES)[number]>("All");
+  const results = ART_LIBRARY.filter((item) =>
+    (category === "All" || (item.category ?? "Symbols") === category)
+    && item.name.toLowerCase().includes(query.trim().toLowerCase()),
+  );
   return (
     <div className="rot-scroll">
       <PanelHeader
@@ -254,6 +258,9 @@ export function ArtPanel({ onAdd, onClose }: { onAdd: (item: ArtItem) => void; o
         onClose={onClose}
       />
       <input className="rot-art-search" type="search" aria-label="Search artwork" placeholder="Search artwork" value={query} onChange={(event) => setQuery(event.target.value)} />
+      <select className="rot-art-category" aria-label="Artwork category" value={category} onChange={(event) => setCategory(event.target.value as (typeof ART_CATEGORIES)[number])}>
+        {ART_CATEGORIES.map((option) => <option key={option} value={option}>{option === "All" ? "All artwork" : option}</option>)}
+      </select>
       {!results.length ? <p role="status">No artwork found.</p> : null}
       <ul className="rot-artgrid">
         {results.map((item) => (

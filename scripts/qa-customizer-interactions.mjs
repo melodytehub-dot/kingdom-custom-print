@@ -195,7 +195,7 @@ const { default: Customizer } = load("components/customizer/Customizer.tsx", {
     emptyDesign: blank, usedSides: () => [], personalizationOf: () => "none", loadDrafts: () => [],
     newTextLayer: () => ({ ...layer, type: "text" }),
   },
-  "@/lib/imageFx": {}, "./preview": {},
+  "@/lib/imageFx": {}, "@/lib/backgroundRemoval": { removeBackgroundLocally: async () => "" }, "./preview": {},
   "@/lib/mockups": { mockupsForProduct: () => [mockup], TEE_MOCKUPS: [mockup] },
   "@/lib/cart-context": { useCart: () => ({ items: [], addItem() {} }) },
   "@/lib/pricing": { quoteProduct: () => ({}), formatUSD: value => `$${value}` },
