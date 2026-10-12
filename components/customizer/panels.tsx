@@ -12,6 +12,7 @@ import { sizeSummary } from "@/lib/sizes";
 import { TEE_MOCKUPS, type TeeMockup } from "@/lib/mockups";
 import { FONTS, svgFontStack } from "@/lib/fonts";
 import { ART_CATEGORIES, ART_LIBRARY, type ArtItem } from "./art";
+import { DESIGN_TEMPLATES, TEMPLATE_CATEGORIES, type DesignTemplate } from "./templates";
 import {
   ColorView,
   PanelHeader,
@@ -272,6 +273,48 @@ export function ArtPanel({ onAdd, onClose }: { onAdd: (item: ArtItem) => void; o
             </button>
           </li>
         ))}
+      </ul>
+    </div>
+  );
+}
+
+export function TemplatesPanel({ onAdd, onClose }: { onAdd: (template: DesignTemplate) => void; onClose: () => void }) {
+  const [query, setQuery] = useState("");
+  const [category, setCategory] = useState<(typeof TEMPLATE_CATEGORIES)[number]>("All");
+  const normalizedQuery = query.trim().toLowerCase();
+  const results = DESIGN_TEMPLATES.filter((item) =>
+    (category === "All" || item.category === category)
+    && (!normalizedQuery || `${item.name} ${item.category} ${item.subtitle} ${item.tags.join(" ")}`.toLowerCase().includes(normalizedQuery)),
+  );
+
+  return (
+    <div className="rot-scroll">
+      <PanelHeader eyebrow="Design Library" title="Templates" onClose={onClose} />
+      <input className="rot-art-search" type="search" aria-label="Search templates" placeholder="Search templates" value={query} onChange={(event) => setQuery(event.target.value)} />
+      <select className="rot-art-category" aria-label="Template category" value={category} onChange={(event) => setCategory(event.target.value as (typeof TEMPLATE_CATEGORIES)[number])}>
+        {TEMPLATE_CATEGORIES.map((option) => <option key={option} value={option}>{option === "All" ? "All categories" : option}</option>)}
+      </select>
+      {!results.length ? <p role="status">No templates found.</p> : null}
+      <ul className="rot-template-grid">
+        {results.map((item) => {
+          const previewArt = ART_LIBRARY.find((artItem) => artItem.id === item.artId);
+          const previewText = item.elements.filter((element) => element.type === "text").map((element) => element.layer);
+          const [headline, tagline] = previewText;
+          return (
+            <li key={item.id}>
+              <button type="button" className="rot-template-card" onClick={() => onAdd(item)} aria-label={`Use ${item.name} template`}>
+                <span className="rot-template-preview" aria-hidden="true">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  {previewArt ? <img src={previewArt.src} alt="" /> : null}
+                  {headline ? <strong style={{ fontFamily: svgFontStack(headline.font), color: headline.color }}>{headline.text}</strong> : null}
+                  {tagline ? <small>{tagline.text}</small> : null}
+                  <span className="rot-template-free">FREE</span>
+                </span>
+                <span className="rot-template-info"><strong>{item.name}</strong><small>{item.category}</small></span>
+              </button>
+            </li>
+          );
+        })}
       </ul>
     </div>
   );

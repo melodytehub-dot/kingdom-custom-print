@@ -605,7 +605,7 @@ function LayerOverlay({
             pointerEvents="none"
           />
 
-          {!compact ? <ControlButton
+          <ControlButton
             x={-halfW - GAP}
             y={-halfH - GAP}
             label="Delete"
@@ -617,7 +617,7 @@ function LayerOverlay({
             }}
           >
             <TrashIcon />
-          </ControlButton> : null}
+          </ControlButton>
 
           {!layer.locked ? (
             <>
@@ -654,29 +654,6 @@ function LayerOverlay({
                 <StretchIcon axis="h" />
               </ControlButton>
 
-              {isText ? (
-                <ControlButton
-                  x={-halfW - GAP}
-                  y={halfH + GAP}
-                  label="Edit text"
-                  scale={handleScale}
-                  onActivate={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    onEdit(layer.id);
-                  }}
-                >
-                  <text
-                    textAnchor="middle"
-                    dominantBaseline="central"
-                    fontSize="19"
-                    fontWeight="500"
-                    fill="#2c2b28"
-                  >
-                    edit
-                  </text>
-                </ControlButton>
-              ) : null}
               </> : null}
 
               <ControlButton
@@ -690,6 +667,20 @@ function LayerOverlay({
               </ControlButton>
             </>
           ) : null}
+
+          <ControlButton
+            x={-halfW - GAP}
+            y={halfH + GAP}
+            label={isText ? "Edit text" : "Edit artwork"}
+            scale={handleScale}
+            onActivate={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              onEdit(layer.id);
+            }}
+          >
+            <EditIcon />
+          </ControlButton>
         </>
       ) : null}
     </g>
@@ -757,6 +748,15 @@ function TrashIcon() {
   return (
     <Icon>
       <path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 10v7M14 10v7" />
+    </Icon>
+  );
+}
+
+function EditIcon() {
+  return (
+    <Icon>
+      <path d="m4 16.5-.8 4.3 4.3-.8L19.8 7.7a2.5 2.5 0 0 0-3.5-3.5L4 16.5Z" />
+      <path d="m14.8 5.7 3.5 3.5" />
     </Icon>
   );
 }

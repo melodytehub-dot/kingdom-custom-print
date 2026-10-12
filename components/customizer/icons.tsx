@@ -93,6 +93,12 @@ export const ArtIcon = ({ size }: P) => (
   </svg>
 );
 
+export const TemplatesIcon = ({ size }: P) => (
+  <Svg size={size}>
+    <path d="m12 3 2.4 5 5.5.8-4 3.9.9 5.5-4.8-2.6-4.8 2.6.9-5.5-4-3.9 5.5-.8z" />
+  </Svg>
+);
+
 export const PersonalizeIcon = ({ size }: P) => (
   <Svg size={size}>
     <path d="M21 11.5a8.5 8.5 0 0 1-12.4 7.6L3 20.5l1.5-4.8A8.5 8.5 0 1 1 21 11.5Z" />

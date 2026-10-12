@@ -20,6 +20,7 @@ import {
   ReviewPanel,
   RosterEditor,
   SavedPanel,
+  TemplatesPanel,
   type NNSettings,
   type NNSize,
 } from "./panels";
@@ -40,10 +41,12 @@ import {
   ShareIcon,
   ShirtIcon,
   TextBoxIcon,
+  TemplatesIcon,
   UndoIcon,
   UserIcon,
 } from "./icons";
 import { type ArtItem, ART_LIBRARY } from "./art";
+import type { DesignTemplate } from "./templates";
 import {
   duplicateLayer,
   emptyDesign,
@@ -89,6 +92,7 @@ type Panel =
   | "text-add"
   | "image"
   | "art"
+  | "templates"
   | "ideas"
   | "names-intro"
   | "names"
@@ -521,6 +525,39 @@ export default function Customizer({
   const addArt = (item: ArtItem) => {
     addImageLayer(item.src, item.name, 1);
     setNotice({ tone: "ok", text: `${item.name} added to the ${side}.` });
+  };
+
+  const addTemplate = (template: DesignTemplate) => {
+    const additions: DesignLayer[] = [];
+    for (const element of template.elements) {
+      if (element.type === "text") {
+        additions.push(newTextLayer({
+          ...element.layer,
+          ...(darkShirt ? { color: "#FFFFFF" } : {}),
+        }));
+        continue;
+      }
+
+      const item = ART_LIBRARY.find((artItem) => artItem.id === element.layer.artId);
+      if (!item) continue;
+      const src = darkShirt && item.src.startsWith("data:image/svg+xml;utf8,")
+        ? `data:image/svg+xml;utf8,${encodeURIComponent(decodeURIComponent(item.src.slice("data:image/svg+xml;utf8,".length)).replaceAll("#141414", "#FFFFFF"))}`
+        : item.src;
+      additions.push(newImageLayer(src, `Template: ${template.name} / ${item.name}`, 1, {
+        x: element.layer.x,
+        y: element.layer.y,
+        scaleX: element.layer.scaleX,
+        scaleY: element.layer.scaleY,
+        origSrc: src,
+        fx: { ...DEFAULT_FX },
+      }));
+    }
+
+    if (!additions.length) return;
+    setDesign((prev) => ({ ...prev, [side]: [...prev[side], ...additions] }));
+    setSelectedId(null);
+    setPanel("none");
+    setNotice({ tone: "ok", text: `${template.name} added to the ${side}. Tap a part to edit it.` });
   };
 
   const onUpload = async (file: File | undefined) => {
@@ -1074,15 +1111,14 @@ export default function Customizer({
         ? "text"
         : split
           ? "upload"
-          : panel === "text-add" ? "text" : panel === "upload" ? "upload" : panel === "art"
-            ? "art"
-            : panel.startsWith("names") || panel === "roster"
-              ? "names"
-              : panel === "distress"
-                ? "distress"
-                : panel === "saved"
-                  ? "saved"
-                  : panel === "ideas" ? "ideas" : "";
+          : panel === "text-add" ? "text"
+            : panel === "upload" ? "upload"
+              : panel === "art" ? "art"
+                : panel === "templates" ? "templates"
+                  : panel.startsWith("names") || panel === "roster" ? "names"
+                    : panel === "distress" ? "distress"
+                      : panel === "saved" ? "saved"
+                        : panel === "ideas" ? "ideas" : "";
 
   const callHref = contactPhone ? `tel:${contactPhone.replace(/[^\d+]/g, "")}` : "/contact";
 
@@ -1202,6 +1238,8 @@ export default function Customizer({
         ) : null;
       case "art":
         return <ArtPanel onAdd={addArt} onClose={closePanel} />;
+      case "templates":
+        return <TemplatesPanel onAdd={addTemplate} onClose={closePanel} />;
       case "ideas":
         return <TextIdeasPanel side={side} onAdd={addTextIdeaLayers} onClose={closePanel} />;
       case "names-intro":
@@ -1294,6 +1332,15 @@ export default function Customizer({
       onClick: () => {
         setSelectedId(null);
         setPanel("art");
+      },
+    },
+    {
+      id: "templates",
+      label: "Templates",
+      icon: <TemplatesIcon size={38} />,
+      onClick: () => {
+        setSelectedId(null);
+        setPanel("templates");
       },
     },
     {

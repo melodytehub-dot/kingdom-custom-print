@@ -1679,6 +1679,52 @@
   object-fit: contain;
 }
 
+.rot-template-grid {
+  list-style: none;
+  margin: 14px 0 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+.rot-template-card {
+  position: relative;
+  display: flex;
+  width: 100%;
+  min-width: 0;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 7px;
+  padding: 6px;
+  border: 1px solid var(--rot-line);
+  border-radius: 6px;
+  background: #fff;
+  text-align: left;
+}
+.rot-template-card:hover { border-color: var(--rot-accent); }
+.rot-template-preview {
+  display: flex;
+  position: relative;
+  min-width: 0;
+  aspect-ratio: 1.12;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  overflow: hidden;
+  padding: 8px 6px;
+  border-radius: 4px;
+  background: #f0f1f3;
+  text-align: center;
+}
+.rot-template-preview img { width: 42px; height: 42px; object-fit: contain; }
+.rot-template-preview strong { max-width: 100%; font-size: 11px; line-height: 1.05; overflow-wrap: anywhere; }
+.rot-template-preview small { max-width: 100%; color: #555b65; font-size: 7px; line-height: 1.1; overflow-wrap: anywhere; }
+.rot-template-info { display: grid; gap: 2px; min-width: 0; padding: 0 2px 2px; }
+.rot-template-info strong { overflow: hidden; font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+.rot-template-info small { color: #666c75; font-size: 10px; }
+.rot-template-free { position: absolute; right: 6px; bottom: 6px; padding: 3px 6px; border-radius: 3px; background: #dfe2e6; color: #34343a; font-size: 9px; line-height: 1.1; }
+
 .rot-drafts {
   list-style: none;
   margin: 16px 0 0;

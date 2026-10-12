@@ -186,6 +186,7 @@ try {
   await tool("saved").evaluate((button) => button.click());
   await page.locator(".rot-draft").first().evaluate((button) => button.click());
   await page.waitForURL(/\/customize\/v-neck-tee/);
+  await page.waitForFunction(() => new URL(location.href).searchParams.get("color") === "black", null, { timeout: 5000 }).catch(() => {});
   const restoredLayers = await page.locator(".rot-canvas-svg").getAttribute("aria-label");
   check("saved design reopens on its original product, color, and artwork", new URL(page.url()).searchParams.get("color") === "black" && /3 design element/.test(restoredLayers ?? ""), `${new URL(page.url()).searchParams.get("color")} · ${restoredLayers ?? "no canvas label"}`);
 
@@ -226,6 +227,44 @@ try {
   const retainedArtwork = await page.locator(".rot-canvas-svg").getAttribute("aria-label");
   check("confirmed product switch keeps compatible artwork", /1 design element/.test(retainedArtwork ?? ""), retainedArtwork ?? "no canvas label");
   check("confirmed switch removes only unavailable size quantities", !new URL(page.url()).searchParams.has("sizes"));
+
+  await page.goto(`${BASE}/customize/crown-classic-tee?qa=templates`, {
+    waitUntil: "commit",
+    timeout: 30000,
+  });
+  await page.locator("image.rot-shirt-photo").first().waitFor({ state: "attached", timeout: 60000 });
+  const beforeTemplateLabel = await page.locator(".rot-canvas-svg").first().getAttribute("aria-label") ?? "";
+  const beforeTemplateCount = Number(beforeTemplateLabel.match(/with (\d+) design element/)?.[1] ?? "0");
+  await tool("templates").evaluate((button) => button.click());
+  check("template gallery offers a varied ready-made set", await page.locator(".rot-template-card").count() >= 8);
+  await page.locator("select[aria-label='Template category']").selectOption("Nature");
+  check("template categories narrow the gallery", await page.locator(".rot-template-card").count() === 2);
+  await page.getByRole("searchbox", { name: "Search templates" }).fill("ocean");
+  check("template search matches names and tags", await page.locator(".rot-template-card").count() === 1);
+  await page.getByRole("button", { name: "Use Ocean Club template" }).click();
+  const templateCanvas = page.locator(".rot-canvas-svg").first();
+  const templateLayerLabel = await templateCanvas.getAttribute("aria-label") ?? "";
+  const afterTemplateCount = Number(templateLayerLabel.match(/with (\d+) design element/)?.[1] ?? "0");
+  check("template adds independently editable art and text layers", afterTemplateCount === beforeTemplateCount + 3, `${beforeTemplateCount} -> ${afterTemplateCount}`);
+  check("new template appears without obstructing selection handles", await page.locator('.rot-canvas-svg g[role="button"][aria-label="Delete"]').count() === 0);
+  const templateHeadline = page.locator(".rot-canvas-svg text").filter({ hasText: "OCEAN CLUB" }).first();
+  const templateHeadlineBox = await templateHeadline.boundingBox();
+  if (templateHeadlineBox) await page.mouse.click(templateHeadlineBox.x + templateHeadlineBox.width / 2, templateHeadlineBox.y + templateHeadlineBox.height / 2);
+  check(
+    "tapping template text opens its editor and layer actions",
+    await page.locator('.rot-canvas-svg g[role="button"][aria-label="Delete"]').count() === 1
+      && await page.locator('.rot-canvas-svg g[role="button"][aria-label="Edit text"]').count() === 1
+      && await page.getByRole("button", { name: "Hide controls to move artwork" }).count() === 1,
+  );
+  const templateArt = page.locator(".rot-canvas-svg image").nth(1);
+  const templateArtBox = await templateArt.boundingBox();
+  if (templateArtBox) await page.mouse.click(templateArtBox.x + templateArtBox.width / 2, templateArtBox.y + templateArtBox.height / 2);
+  check(
+    "selected template artwork exposes background removal and artwork actions",
+    await page.getByRole("switch", { name: "Remove Background" }).count() === 1
+      && await page.locator('.rot-canvas-svg g[role="button"][aria-label="Edit artwork"]').count() === 1
+      && await page.locator('.rot-canvas-svg g[role="button"][aria-label="Delete"]').count() === 1,
+  );
 
   await page.goto(`${BASE}/customize/v-neck-tee?qa=lock`, {
     waitUntil: "commit",
