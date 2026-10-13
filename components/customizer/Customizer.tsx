@@ -597,10 +597,12 @@ export default function Customizer({
         backgroundRemovedSrc = await removeBackgroundLocally(orig, (progress: BackgroundRemovalProgress) => {
           setFxStatus(
             progress.phase === "download"
-              ? "Downloading AI model…"
+              ? "Downloading the free AI model (first use)…"
               : progress.phase === "compatibility"
-                ? "Using compatibility mode; this may take longer…"
-                : "Removing background…",
+                ? "Switching to a more compatible mode for this device…"
+                : progress.phase === "prepare"
+                  ? "Preparing the image and removal model…"
+                  : "Removing background…",
           );
           setFxProgress(progress.phase === "download" ? progress.percent ?? null : null);
         });
@@ -1624,7 +1626,7 @@ export default function Customizer({
           </nav>
         </div>
 
-        <aside className="rot-panel" aria-label="Design controls">
+        <aside className={`rot-panel${panel === "image" ? " is-image-editor" : ""}`} aria-label="Design controls">
           {split ? (
             <button
               type="button"

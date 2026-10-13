@@ -16,9 +16,9 @@ export interface ArtItem {
   category?: ArtCategory;
 }
 
-export type ArtCategory = "Symbols" | "Sports" | "Faith" | "Nature";
+export type ArtCategory = "Symbols" | "Sports" | "Faith" | "Nature" | "Celebration" | "School & Work";
 
-export const ART_CATEGORIES = ["All", "Symbols", "Sports", "Faith", "Nature"] as const;
+export const ART_CATEGORIES = ["All", "Symbols", "Sports", "Faith", "Nature", "Celebration", "School & Work"] as const;
 
 function categorizedArt(id: string, name: string, category: ArtCategory, inner: string): ArtItem {
   return { id, name, category, src: svg(inner) };
@@ -127,4 +127,22 @@ export const ART_LIBRARY: ArtItem[] = [
   categorizedArt("anchor", "Anchor", "Symbols", `<circle cx="50" cy="21" r="10" fill="none" stroke="#141414" stroke-width="7"/><path d="M50 31v53M28 47h44M12 66c3 18 16 27 29 27 17 0 25-11 29-27l15 12M12 66l15 12" fill="none" stroke="#141414" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>`),
   categorizedArt("music", "Music Note", "Symbols", `<path d="M57 18v53m0-53 29-7v53M57 31l29-7M43 71c0 8-8 15-18 15S9 81 9 74s8-15 18-15 16 5 16 12zm43-3c0 8-8 15-18 15s-16-5-16-12 8-15 18-15 16 5 16 12z"/>`),
   categorizedArt("globe", "Globe", "Symbols", `<circle cx="50" cy="50" r="43" fill="none" stroke="#141414" stroke-width="6"/><ellipse cx="50" cy="50" rx="19" ry="43" fill="none" stroke="#141414" stroke-width="5"/><path d="M9 39h82M9 61h82" fill="none" stroke="#141414" stroke-width="5"/>`),
+  categorizedArt("infinity", "Infinity", "Symbols", `<path d="M17 64c-13-12-7-32 8-32 19 0 31 37 50 37 15 0 21-20 8-32-14-13-28 5-42 22S24 77 17 64z" fill="none" stroke="#141414" stroke-width="8" stroke-linecap="round"/>`),
+  categorizedArt("laurel", "Laurel Wreath", "Symbols", `<path d="M50 86c-23-8-36-26-34-52 16 2 27 11 34 24 7-13 18-22 34-24 2 26-11 44-34 52zM50 86V37m-1 35L30 50m21 11 19-24" fill="none" stroke="#141414" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>`),
+  categorizedArt("compass", "Compass", "Symbols", `<circle cx="50" cy="50" r="43" fill="none" stroke="#141414" stroke-width="6"/><path d="m64 34-9 23-21 9 9-23zM50 7v9m0 68v9M7 50h9m68 0h9" fill="none" stroke="#141414" stroke-width="5" stroke-linejoin="round"/>`),
+  categorizedArt("volleyball", "Volleyball", "Sports", `<circle cx="50" cy="50" r="43" fill="none" stroke="#141414" stroke-width="6"/><path d="M50 7c3 23-7 40-31 48M89 31C66 26 49 34 40 58m7 35c-3-23 7-40 31-48M11 69c23 5 40-3 49-27m-49 5c9-15 24-28 43-34" fill="none" stroke="#141414" stroke-width="5" stroke-linecap="round"/>`),
+  categorizedArt("tennis", "Tennis Racket", "Sports", `<ellipse cx="43" cy="39" rx="25" ry="34" transform="rotate(-35 43 39)" fill="none" stroke="#141414" stroke-width="7"/><path d="m60 61 25 29M28 15l31 45M18 37l42 5M25 58l31-34" fill="none" stroke="#141414" stroke-width="4" stroke-linecap="round"/><circle cx="78" cy="23" r="10"/>`),
+  categorizedArt("whistle", "Whistle", "Sports", `<path d="M15 43h47c19 0 30 12 30 27S80 96 62 96H41C20 96 8 82 8 64c0-9 2-15 7-21zM58 43l15-24h20v25M20 42V25h22v18" fill="none" stroke="#141414" stroke-width="7" stroke-linejoin="round"/><circle cx="62" cy="69" r="11" fill="none" stroke="#141414" stroke-width="5"/>`),
+  categorizedArt("prayer-hands", "Prayer Hands", "Faith", `<path d="M25 91 8 73l20-32c4-6 12-3 10 4l-7 15 20-39c4-7 14-3 10 5L48 57l22-37c4-7 14-2 10 5L61 62l15-20c5-6 14 0 9 7L64 83c-8 11-24 15-39 8zm50 0 17-18-14-21" fill="none" stroke="#141414" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>`),
+  categorizedArt("flame", "Faith Flame", "Faith", `<path d="M51 7c10 18 7 27 0 37-4-12-11-18-17-23-2 16-18 28-18 47 0 17 14 29 34 29s34-12 34-31C84 43 60 32 51 7zm0 76c-8 0-13-5-13-13 0-7 6-14 12-20 4 7 14 14 14 22 0 7-5 11-13 11z"/>`),
+  categorizedArt("cactus", "Cactus", "Nature", `<path d="M42 91V35c0-12 7-21 17-21s17 9 17 21v16h8c7 0 11-5 11-12V28M42 55H29c-7 0-11-5-11-12V31" fill="none" stroke="#141414" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/><path d="M31 91h43" fill="none" stroke="#141414" stroke-width="7" stroke-linecap="round"/>`),
+  categorizedArt("pine-tree", "Pine Tree", "Nature", `<path d="m50 7 25 29H61l24 27H62l24 26H14l24-26H15l24-27H25zM50 89v8" stroke="#141414" stroke-width="6" stroke-linejoin="round"/>`),
+  categorizedArt("moon", "Moon & Stars", "Nature", `<path d="M70 12c-5 5-8 12-8 20 0 17 14 31 31 31 2 0 4 0 6-1-5 20-23 34-45 34-26 0-47-21-47-47S28 2 54 2c6 0 11 1 16 3z"/><path d="m77 72 3 8 9 1-7 6 2 9-7-5-7 5 2-9-7-6 9-1zm-38-42 2 6 7 1-6 4 2 7-5-4-6 4 2-7-6-4 7-1z"/>`),
+  categorizedArt("fireworks", "Fireworks", "Celebration", `<path d="M27 25 12 12m18 23L9 34m28-17-2-15m18 27 13-18m-8 25 28-12M72 60l18-3m-23 13 13 18m-27-8 2 17M34 69 20 88m8-31L5 63" fill="none" stroke="#141414" stroke-width="7" stroke-linecap="round"/><circle cx="48" cy="48" r="9"/><circle cx="80" cy="25" r="5"/>`),
+  categorizedArt("party-hat", "Party Hat", "Celebration", `<path d="m15 85 34-75 38 75z"/><path d="M13 87c18 7 54 7 75 0" fill="none" stroke="#141414" stroke-width="6" stroke-linecap="round"/><circle cx="49" cy="10" r="7" fill="#141414"/><circle cx="39" cy="52" r="4" fill="#fff"/><circle cx="61" cy="70" r="4" fill="#fff"/>`),
+  categorizedArt("gift", "Gift Box", "Celebration", `<path d="M12 43h76v49H12zM7 29h86v18H7zM50 29c-14 0-27-3-27-13 0-8 13-9 20-2l7 15zm0 0c14 0 27-3 27-13 0-8-13-9-20-2l-7 15zM50 30v62" fill="none" stroke="#141414" stroke-width="6" stroke-linejoin="round" stroke-linecap="round"/>`),
+  categorizedArt("graduation-cap", "Graduation Cap", "School & Work", `<path d="m4 39 46-25 46 25-46 25zM20 48v23c17 15 43 15 60 0V48M96 40v27" fill="none" stroke="#141414" stroke-width="7" stroke-linejoin="round" stroke-linecap="round"/><circle cx="96" cy="72" r="5"/>`),
+  categorizedArt("pencil", "Pencil", "School & Work", `<path d="m18 70 48-51c6-6 15-6 21 0s6 15 0 21L36 91 12 97zM18 70l18 21m-8-57 21 21m-29 37 8 8" fill="none" stroke="#141414" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>`),
+  categorizedArt("open-book", "Open Book", "School & Work", `<path d="M50 29C37 17 20 15 7 21v57c15-5 30-2 43 9 13-11 28-14 43-9V21c-13-6-30-4-43 8zm0 0v58M17 35c8-2 18 0 26 5m-26 7c8-2 18 0 26 5m40-17c-8-2-18 0-26 5m26 7c-8-2-18 0-26 5" fill="none" stroke="#141414" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>`),
+  categorizedArt("lightbulb", "Lightbulb", "School & Work", `<path d="M32 67c-8-7-13-17-13-28 0-18 14-32 31-32s31 14 31 32c0 11-5 21-13 28-4 4-6 9-6 14H38c0-5-2-10-6-14zm7 23h22m-19 7h16" fill="none" stroke="#141414" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/><path d="M50 20v20m-15-5 8 8m22-8-8 8" fill="none" stroke="#141414" stroke-width="5" stroke-linecap="round"/>`),
 ];

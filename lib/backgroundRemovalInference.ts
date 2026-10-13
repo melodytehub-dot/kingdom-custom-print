@@ -3,7 +3,7 @@ import type { AutoModel, AutoProcessor, ProgressInfo } from "@huggingface/transf
 const MODEL_ID = "studioludens/birefnet-lite-512";
 
 export interface BackgroundRemovalProgress {
-  phase: "download" | "processing" | "compatibility";
+  phase: "prepare" | "download" | "processing" | "compatibility";
   percent?: number;
 }
 
@@ -22,6 +22,25 @@ export type BackgroundRemovalPixels = {
 };
 
 let modelPromise: Promise<LoadedModel> | null = null;
+
+function isConstrainedDevice() {
+  const userAgent = typeof navigator === "undefined" ? "" : navigator.userAgent;
+  const iPadOs = typeof navigator !== "undefined"
+    && /Macintosh/i.test(userAgent)
+    && navigator.maxTouchPoints > 1;
+  const deviceMemory = typeof navigator === "undefined"
+    ? undefined
+    : (navigator as Navigator & { deviceMemory?: number }).deviceMemory;
+  return /Android|iPhone|iPad|iPod/i.test(userAgent) || iPadOs || (deviceMemory !== undefined && deviceMemory <= 4);
+}
+
+async function disposeModel(loaded: LoadedModel) {
+  try {
+    await loaded.model.dispose();
+  } catch {
+    // Some browser runtimes release the session themselves after an execution error.
+  }
+}
 
 async function loadModel(
   onProgress?: (progress: BackgroundRemovalProgress) => void,
@@ -85,40 +104,51 @@ export async function removeBackgroundPixels(
   onProgress?: (progress: BackgroundRemovalProgress) => void,
 ): Promise<BackgroundRemovalPixels> {
   const { RawImage } = await import("@huggingface/transformers");
-  const [image, initialModel] = await Promise.all([RawImage.read(src), loadModel(onProgress)]);
-
-  onProgress?.({ phase: "processing" });
-  const { pixel_values } = await initialModel.processor(image);
-  let activeModel = initialModel;
-  let output;
+  const constrainedDevice = isConstrainedDevice();
+  onProgress?.({ phase: "prepare" });
+  const image = await RawImage.read(src);
+  let activeModel: LoadedModel = await loadModel(onProgress);
   try {
-    output = await activeModel.model({ input_image: pixel_values });
-  } catch (error) {
-    if (activeModel.device !== "webgpu") throw error;
-    modelPromise = null;
-    onProgress?.({ phase: "compatibility" });
-    activeModel = await loadModel(onProgress, true);
-    output = await activeModel.model({ input_image: pixel_values });
-  }
-  const logits = output.output_image;
-  if (!logits) throw new Error("The background-removal model returned no mask.");
+    const { pixel_values } = await activeModel.processor(image);
+    onProgress?.({ phase: "processing" });
+    let output;
+    try {
+      output = await activeModel.model({ input_image: pixel_values });
+    } catch (error) {
+      if (activeModel.device !== "webgpu") throw error;
+      const failedGpuModel = activeModel;
+      if (modelPromise) modelPromise = null;
+      await disposeModel(failedGpuModel);
+      onProgress?.({ phase: "compatibility" });
+      activeModel = await loadModel(onProgress, true);
+      output = await activeModel.model({ input_image: pixel_values });
+    }
 
-  const lowResolutionMask = RawImage.fromTensor(logits[0].sigmoid().mul(255).to("uint8"));
-  const mask = await lowResolutionMask.resize(image.width, image.height, { resample: "bilinear" });
-  const rgba = image.rgba();
-  const sourceAlpha = rgba.channels === 4
-    ? Uint8Array.from({ length: rgba.width * rgba.height }, (_, i) => rgba.data[i * 4 + 3])
-    : null;
-  rgba.putAlpha(mask);
-  if (sourceAlpha) {
-    for (let i = 0; i < sourceAlpha.length; i++) {
-      rgba.data[i * 4 + 3] = Math.round((rgba.data[i * 4 + 3] * sourceAlpha[i]) / 255);
+    const logits = output.output_image;
+    if (!logits) throw new Error("The background-removal model returned no mask.");
+
+    const lowResolutionMask = RawImage.fromTensor(logits[0].sigmoid().mul(255).to("uint8"));
+    const mask = await lowResolutionMask.resize(image.width, image.height, { resample: "bilinear" });
+    const rgba = image.rgba();
+    const sourceAlpha = rgba.channels === 4
+      ? Uint8Array.from({ length: rgba.width * rgba.height }, (_, i) => rgba.data[i * 4 + 3])
+      : null;
+    rgba.putAlpha(mask);
+    if (sourceAlpha) {
+      for (let i = 0; i < sourceAlpha.length; i++) {
+        rgba.data[i * 4 + 3] = Math.round((rgba.data[i * 4 + 3] * sourceAlpha[i]) / 255);
+      }
+    }
+
+    return {
+      width: rgba.width,
+      height: rgba.height,
+      pixels: new Uint8ClampedArray(rgba.data).buffer,
+    };
+  } finally {
+    if (constrainedDevice) {
+      await disposeModel(activeModel);
+      modelPromise = null;
     }
   }
-
-  return {
-    width: rgba.width,
-    height: rgba.height,
-    pixels: new Uint8ClampedArray(rgba.data).buffer,
-  };
 }

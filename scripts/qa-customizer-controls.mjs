@@ -210,7 +210,21 @@ try {
   await tool("art").evaluate((button) => button.click());
   await page.locator("select[aria-label='Artwork category']").selectOption("Sports");
   const sportsArtwork = await page.locator(".rot-artgrid button").allTextContents();
-  check("clipart library offers categorized sports artwork", sportsArtwork.some((name) => name.includes("Basketball")) && sportsArtwork.some((name) => name.includes("Football")), sportsArtwork.join(", "));
+  check("clipart library offers an expanded sports set", sportsArtwork.length >= 7 && sportsArtwork.some((name) => name.includes("Basketball")) && sportsArtwork.some((name) => name.includes("Volleyball")), sportsArtwork.join(", "));
+  await page.locator("select[aria-label='Artwork category']").selectOption("School & Work");
+  const schoolArtwork = await page.locator(".rot-artgrid button").allTextContents();
+  check("clipart library adds useful school and work graphics", schoolArtwork.length >= 4 && schoolArtwork.some((name) => name.includes("Graduation Cap")) && schoolArtwork.some((name) => name.includes("Lightbulb")), schoolArtwork.join(", "));
+  await page.locator("select[aria-label='Artwork category']").selectOption("All");
+  const allArtCount = await page.locator(".rot-artgrid button").count();
+  const brokenArtPreviews = await page.locator(".rot-artgrid img").evaluateAll(async (images) => {
+    const loaded = await Promise.all(images.map(async (image) => {
+      try { await image.decode(); return image.naturalWidth > 0; } catch { return false; }
+    }));
+    return loaded.filter(Boolean).length;
+  });
+  check("clipart library now has more than forty original graphics", allArtCount >= 45, `${allArtCount} graphics`);
+  check("all expanded clipart previews decode", brokenArtPreviews === allArtCount, `${brokenArtPreviews}/${allArtCount}`);
+  await page.locator("select[aria-label='Artwork category']").selectOption("Sports");
   await page.locator(".rot-artgrid button").first().evaluate((button) => button.click());
   const configuredPriceLabel = await page.locator(".rot-bar-price strong").innerText();
   check("configured order price is distinguished from the blank catalog price", configuredPriceLabel.startsWith("Order $") && configuredPriceLabel.includes(" total"), configuredPriceLabel);
@@ -236,9 +250,22 @@ try {
   const beforeTemplateLabel = await page.locator(".rot-canvas-svg").first().getAttribute("aria-label") ?? "";
   const beforeTemplateCount = Number(beforeTemplateLabel.match(/with (\d+) design element/)?.[1] ?? "0");
   await tool("templates").evaluate((button) => button.click());
-  check("template gallery offers a varied ready-made set", await page.locator(".rot-template-card").count() >= 8);
+  const templateCount = await page.locator(".rot-template-card").count();
+  const templatePreviewImages = await page.locator(".rot-template-preview img").evaluateAll(async (images) => {
+    const loaded = await Promise.all(images.map(async (image) => {
+      try { await image.decode(); return image.naturalWidth > 0; } catch { return false; }
+    }));
+    return loaded.filter(Boolean).length;
+  });
+  check("template gallery offers an expanded ready-made set", templateCount >= 28, `${templateCount} templates`);
+  check("template artwork thumbnails decode", templatePreviewImages === templateCount, `${templatePreviewImages}/${templateCount}`);
   await page.locator("select[aria-label='Template category']").selectOption("Nature");
-  check("template categories narrow the gallery", await page.locator(".rot-template-card").count() === 2);
+  check("template categories narrow the gallery", await page.locator(".rot-template-card").count() >= 5);
+  await page.locator("select[aria-label='Template category']").selectOption("Celebration");
+  check("template gallery includes a dedicated celebration category", await page.locator(".rot-template-card").count() === 3);
+  await page.locator("select[aria-label='Template category']").selectOption("School & Work");
+  check("template gallery includes a dedicated school and work category", await page.locator(".rot-template-card").count() === 3);
+  await page.locator("select[aria-label='Template category']").selectOption("Nature");
   await page.getByRole("searchbox", { name: "Search templates" }).fill("ocean");
   check("template search matches names and tags", await page.locator(".rot-template-card").count() === 1);
   await page.getByRole("button", { name: "Use Ocean Club template" }).click();
@@ -265,6 +292,28 @@ try {
       && await page.locator('.rot-canvas-svg g[role="button"][aria-label="Edit artwork"]').count() === 1
       && await page.locator('.rot-canvas-svg g[role="button"][aria-label="Delete"]').count() === 1,
   );
+  const imagePanel = page.locator(".rot-panel");
+  const mobileViewport = page.viewportSize();
+  const imagePanelBounds = await imagePanel.boundingBox();
+  check(
+    "mobile image editing opens a larger working panel",
+    await imagePanel.evaluate((element) => element.classList.contains("is-image-editor"))
+      && Boolean(imagePanelBounds && mobileViewport && imagePanelBounds.height > mobileViewport.height * 0.65),
+    imagePanelBounds && mobileViewport ? `${Math.round(imagePanelBounds.height)}px panel in ${mobileViewport.height}px viewport` : "missing panel bounds",
+  );
+  await page.getByRole("button", { name: "Close", exact: true }).click();
+  const workspaceArtwork = '<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512"><rect width="512" height="512" fill="#e7e7e7"/><path d="M152 110h208l46 70-42 32v190H148V212l-42-32z" fill="#245a86"/><circle cx="256" cy="238" r="44" fill="#f1b13b"/></svg>';
+  await page.locator("input[type=file]").setInputFiles({ name: "workspace-test.svg", mimeType: "image/svg+xml", buffer: Buffer.from(workspaceArtwork) });
+  await page.getByRole("button", { name: /Select Object/ }).click();
+  await page.locator(".rot-subject-target > img").waitFor({ state: "visible", timeout: 10000 });
+  await page.waitForFunction(() => {
+    const image = document.querySelector(".rot-subject-target > img");
+    return image instanceof HTMLImageElement && image.naturalWidth > 0;
+  }, null, { timeout: 10000 });
+  const objectWorkspace = await page.locator(".rot-subject-target").boundingBox();
+  check("mobile object-selection preview has room for precise edits", Boolean(objectWorkspace && objectWorkspace.height >= 180), objectWorkspace ? `${Math.round(objectWorkspace.height)}px preview` : "missing image preview");
+  await page.getByRole("button", { name: "Back", exact: true }).click();
+  await page.getByRole("button", { name: "Close", exact: true }).click();
 
   await page.goto(`${BASE}/customize/v-neck-tee?qa=lock`, {
     waitUntil: "commit",
