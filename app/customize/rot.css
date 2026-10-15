@@ -3218,3 +3218,97 @@
   .rot-actbtn,
   .rot-actpair .rot-actbtn { width: 42px; min-width: 42px; }
 }
+
+/* --------------------------------------------------------------------------
+   Portrait phone: the inspector floats over a full-size canvas
+
+   Selecting or editing an element must never shrink the artwork, so the stage
+   keeps the exact size it has when nothing is open. The inspector becomes a
+   bottom sheet above it and the garment is panned (never scaled) so the element
+   being edited stays in the strip that is still visible. Landscape phones keep
+   their side-by-side layout because it already leaves the canvas full height.
+   -------------------------------------------------------------------------- */
+
+@media (max-width: 900px) and (min-height: 501px) {
+  .rot[data-step="design"][data-layout="split"] .rot-body,
+  .rot[data-step="design"][data-layout="full"] .rot-body {
+    position: relative;
+    display: block;
+    overflow: hidden;
+  }
+
+  .rot[data-step="design"][data-layout="split"] .rot-main,
+  .rot[data-step="design"][data-layout="full"] .rot-main {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    width: 100%;
+    min-height: 0;
+    flex: none;
+  }
+
+  .rot[data-step="design"][data-layout="split"] .rot-preview,
+  .rot[data-step="design"][data-layout="full"] .rot-preview {
+    flex: 1 1 auto;
+    min-height: 0;
+  }
+
+  .rot[data-step="design"][data-layout="split"] .rot-stage-top,
+  .rot[data-step="design"][data-layout="full"] .rot-stage-top {
+    box-sizing: border-box;
+    height: 58px;
+    min-height: 58px;
+    max-height: 58px;
+    flex: 0 0 58px;
+  }
+
+  .rot[data-step="design"][data-layout="split"] .rot-panel,
+  .rot[data-step="design"][data-layout="full"] .rot-panel {
+    position: absolute;
+    z-index: 8;
+    inset: auto 0 0;
+    width: 100%;
+    height: min(52%, 46dvh, 420px);
+    min-height: 0;
+    max-height: none;
+    flex: none;
+    border-top: 1px solid var(--rot-line);
+    border-radius: 18px 18px 0 0;
+    box-shadow: 0 -8px 26px rgba(20, 20, 24, 0.16);
+    padding-top: 20px;
+    padding-bottom: env(safe-area-inset-bottom);
+    overscroll-behavior: contain;
+  }
+
+  .rot[data-step="design"][data-layout="split"] .rot-panel-dismiss,
+  .rot[data-step="design"][data-layout="full"] .rot-panel-dismiss {
+    position: absolute;
+    z-index: 12;
+    top: 6px;
+    left: 50%;
+    display: grid;
+    place-items: center;
+    width: 64px;
+    height: 24px;
+    padding: 0;
+    transform: translateX(-50%);
+    background: transparent;
+    touch-action: manipulation;
+  }
+
+  .rot[data-step="design"][data-layout="split"] .rot-editor,
+  .rot[data-step="design"][data-layout="full"] .rot-editor {
+    height: 100%;
+    min-height: 0;
+  }
+
+  .rot[data-step="design"][data-layout="split"] .rot-editor-scroll {
+    flex: 1 1 0;
+    min-height: 0;
+    padding: 0 16px 16px;
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+  }
+}

@@ -104,11 +104,16 @@ try {
 
   const stageWithInspector = await page.locator(".rot-stage").boundingBox();
   const garmentWithInspector = await page.locator(".rot-shirt").boundingBox();
+  const inspectorPanelBox = await page.locator(".rot-panel").boundingBox();
+  const selectedBox = await page.locator('.rot-canvas-svg rect[stroke="#2f7bff"]').first().boundingBox();
   const svgBox = await page.locator(".rot-canvas-svg").boundingBox();
   const viewport = page.viewportSize();
-  if (svgBox && viewport) {
-    const tapX = Math.min(viewport.width - 8, Math.max(8, svgBox.x + 12));
-    const tapY = Math.min(viewport.height - 8, Math.max(8, svgBox.y + 12));
+  // Tap inside the visible stage: with a floating inspector the canvas can be
+  // panned up, so the SVG's own box may start above the stage.
+  const emptySpot = (await page.locator(".rot-stage").boundingBox()) ?? svgBox;
+  if (emptySpot && viewport) {
+    const tapX = Math.min(viewport.width - 8, Math.max(8, emptySpot.x + 12));
+    const tapY = Math.min(viewport.height - 8, Math.max(8, emptySpot.y + 12));
     await page.mouse.click(tapX, tapY);
   }
   await page.waitForFunction(() => document.querySelector(".rot")?.getAttribute("data-layout") === "none", { timeout: 5000 }).catch(() => {});
@@ -120,19 +125,26 @@ try {
   const stageWithoutInspector = await page.locator(".rot-stage").boundingBox();
   const garmentWithoutInspector = await page.locator(".rot-shirt").boundingBox();
   const viewportHeight = viewport?.height ?? 0;
-  const viewportWidth = viewport?.width ?? 0;
   check(
-    "mobile editor shares the screen and keeps the garment visible",
+    "mobile editor keeps the artwork at full size instead of shrinking it",
     Boolean(stageWithInspector && stageWithoutInspector && garmentWithInspector && garmentWithoutInspector)
-      && stageWithoutInspector.height > stageWithInspector.height
-      && garmentWithInspector.y >= 0
-      && garmentWithInspector.y + garmentWithInspector.height <= viewportHeight
-      && garmentWithInspector.x >= 0
-      && garmentWithInspector.x + garmentWithInspector.width <= viewportWidth
+      && stageWithInspector.height === stageWithoutInspector.height
+      && Math.abs(garmentWithInspector.width - garmentWithoutInspector.width) < 1
+      && Math.abs(garmentWithInspector.height - garmentWithoutInspector.height) < 1
       && garmentWithInspector.width >= 120,
     stageWithInspector && stageWithoutInspector && garmentWithInspector && garmentWithoutInspector
-      ? `stage ${Math.round(stageWithInspector.height)}->${Math.round(stageWithoutInspector.height)}px; garment ${Math.round(garmentWithInspector.x)},${Math.round(garmentWithInspector.y)},${Math.round(garmentWithInspector.width)}px (viewport ${viewportWidth}x${viewportHeight})`
+      ? `stage ${Math.round(stageWithInspector.height)}=${Math.round(stageWithoutInspector.height)}px; garment ${Math.round(garmentWithInspector.width)}px`
       : "missing layout bounds",
+  );
+  check(
+    "the floating inspector leaves the selected element on screen",
+    Boolean(selectedBox && inspectorPanelBox)
+      && selectedBox.y >= 0
+      && selectedBox.y + selectedBox.height <= inspectorPanelBox.y + 1
+      && selectedBox.y + selectedBox.height <= viewportHeight,
+    selectedBox && inspectorPanelBox
+      ? `selected bottom ${Math.round(selectedBox.y + selectedBox.height)}px, sheet top ${Math.round(inspectorPanelBox.y)}px (viewport ${viewportHeight}px)`
+      : "missing selection or inspector bounds",
   );
 
   const headline = page.locator(".rot-canvas-svg text").filter({ hasText: "QA HEADLINE" }).first();

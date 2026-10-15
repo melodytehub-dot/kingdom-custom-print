@@ -1,9 +1,11 @@
 /**
  * Background removal smoke test.
  *
- * The "Remove Background" control must work on phones as well as desktop. This
- * uploads a logo that sits on a plain background and verifies the instant
- * on-device cutout actually clears the border pixels in both layouts.
+ * The "Remove Background" control must work on phones as well as desktop, and
+ * it must cope with more than one flat colour: an artwork sitting on a gradient
+ * used to come back with its backdrop still attached. It must also refuse
+ * cleanly (instead of pasting a half-removed mess onto the shirt) when the
+ * picture is a busy photo with no discoverable backdrop.
  */
 import { chromium } from "playwright";
 
@@ -17,6 +19,13 @@ const check = (name, ok, detail = "") => {
   if (!ok) failures += 1;
 };
 
+/** Deterministic 420x420 artworks drawn in the page. */
+const ARTWORKS = {
+  "flat logo": `x.fillStyle="#ffffff";x.fillRect(0,0,420,420);x.fillStyle="#c0392b";x.beginPath();x.arc(210,210,130,0,7);x.fill();`,
+  "gradient logo": `const g=x.createLinearGradient(0,0,420,420);g.addColorStop(0,"#ffffff");g.addColorStop(1,"#c8ccd2");x.fillStyle=g;x.fillRect(0,0,420,420);x.fillStyle="#1b2a4a";x.beginPath();x.arc(210,210,130,0,7);x.fill();`,
+  "busy photo": `for(let i=0;i<420;i+=14){for(let j=0;j<420;j+=14){x.fillStyle="rgb("+(60+((i*7+j*13)%150))+","+(70+((i*11+j*3)%140))+","+(90+((i*5+j*17)%130))+")";x.fillRect(i,j,14,14);}}x.fillStyle="#202020";x.beginPath();x.ellipse(210,210,120,150,0,0,7);x.fill();`,
+};
+
 const browser = await chromium.launch({ channel: BROWSER, headless: true });
 
 try {
@@ -25,83 +34,119 @@ try {
     ["mobile", { width: 390, height: 844 }],
   ]) {
     const mobile = viewport.width <= 900;
-    const context = await browser.newContext({ viewport, hasTouch: mobile, isMobile: mobile });
-    const page = await context.newPage();
-    page.setDefaultTimeout(30000);
-    const errors = [];
-    page.on("pageerror", (error) => errors.push(error.message));
+    const context = await browser.newContext({
+      viewport,
+      hasTouch: mobile,
+      isMobile: mobile,
+      // A phone user agent matters: it is what keeps the ~180 MB AI model off
+      // phones, so the instant on-device cutout is the only path under test here.
+      userAgent: mobile
+        ? "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1"
+        : undefined,
+    });
 
-    await page.goto(`${BASE}/customize/crown-classic-tee?color=black&sizes=M%3A1`, { waitUntil: "commit", timeout: 30000 });
-    await page.locator(".rot-canvas-svg").waitFor();
+    for (const [artwork, draw] of Object.entries(ARTWORKS)) {
+      const shouldRemove = artwork !== "busy photo";
+      // A busy photo is only refused on phones — desktop sends it to the AI model,
+      // which would mean downloading ~180 MB inside a smoke test.
+      if (!shouldRemove && !mobile) continue;
+      const page = await context.newPage();
+      page.setDefaultTimeout(30000);
+      const errors = [];
+      page.on("pageerror", (error) => errors.push(error.message));
 
-    const png = Buffer.from(
-      await page.evaluate(() => {
-        const c = document.createElement("canvas");
-        c.width = 420;
-        c.height = 420;
-        const x = c.getContext("2d");
-        x.fillStyle = "#ffffff";
-        x.fillRect(0, 0, 420, 420);
-        x.fillStyle = "#c0392b";
-        x.beginPath();
-        x.arc(210, 210, 130, 0, Math.PI * 2);
-        x.fill();
-        return c.toDataURL("image/png").split(",")[1];
-      }),
-      "base64",
-    );
+      await page.goto(`${BASE}/customize/crown-classic-tee?color=black&sizes=M%3A1`, { waitUntil: "commit", timeout: 30000 });
+      await page.locator(".rot-canvas-svg").waitFor();
 
-    await page.locator('input[type="file"]').setInputFiles({ name: "logo.png", mimeType: "image/png", buffer: png });
-    await page.locator(".rot-editor").waitFor({ state: "visible" });
-    await page.waitForTimeout(300);
+      const png = Buffer.from(
+        await page.evaluate((src) => {
+          const c = document.createElement("canvas");
+          c.width = 420;
+          c.height = 420;
+          const x = c.getContext("2d");
+          // eslint-disable-next-line no-new-func
+          new Function("x", src)(x);
+          return c.toDataURL("image/png").split(",")[1];
+        }, draw),
+        "base64",
+      );
 
-    const toggle = page.getByRole("switch", { name: "Remove Background" });
-    await toggle.scrollIntoViewIfNeeded();
-    const started = Date.now();
-    await toggle.click();
-    await page.waitForFunction(
-      (key) => {
-        const design = JSON.parse(localStorage.getItem(key) ?? "null")?.design;
-        const layer = design?.front?.[design.front.length - 1];
-        return Boolean(layer?.backgroundRemovedSrc);
-      },
-      DRAFT_KEY,
-      { timeout: 30000 },
-    );
-    const elapsed = Date.now() - started;
+      await page.locator('input[type="file"]').setInputFiles({ name: `${artwork}.png`, mimeType: "image/png", buffer: png });
+      await page.locator(".rot-editor").waitFor({ state: "visible" });
+      await page.waitForTimeout(300);
 
-    const probe = await page.evaluate(async (key) => {
-      const design = JSON.parse(localStorage.getItem(key)).design;
-      const layer = design.front[design.front.length - 1];
-      const image = new Image();
-      image.src = layer.src;
-      await image.decode();
-      const canvas = document.createElement("canvas");
-      canvas.width = image.naturalWidth;
-      canvas.height = image.naturalHeight;
-      const ctx = canvas.getContext("2d");
-      ctx.drawImage(image, 0, 0);
-      const data = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
-      const alpha = (x, y) => data[(y * canvas.width + x) * 4 + 3];
-      return {
-        corner: Math.max(
-          alpha(2, 2),
-          alpha(canvas.width - 3, 2),
-          alpha(2, canvas.height - 3),
-          alpha(canvas.width - 3, canvas.height - 3),
-        ),
-        center: alpha(Math.floor(canvas.width / 2), Math.floor(canvas.height / 2)),
-        removeBg: Boolean(layer.fx?.removeBg),
-      };
-    }, DRAFT_KEY);
+      const toggle = page.getByRole("switch", { name: "Remove Background" });
+      await toggle.scrollIntoViewIfNeeded();
+      const started = Date.now();
+      await toggle.click();
+      // Grab the toast as soon as it appears: it is the customer-facing answer.
+      const toast = await page
+        .locator(".rot-toast")
+        .first()
+        .textContent({ timeout: 20000 })
+        .catch(() => "");
+      const elapsed = Date.now() - started;
+      // The layer is patched just before the toast, but the draft save is debounced.
+      await page
+        .waitForFunction(
+          (key) => {
+            const design = JSON.parse(localStorage.getItem(key) ?? "null")?.design;
+            const layer = design?.front?.[design.front.length - 1];
+            return Boolean(layer?.fx?.removeBg);
+          },
+          DRAFT_KEY,
+          { timeout: 10000 },
+        )
+        .catch(() => {});
 
-    const toast = await page.locator(".rot-toast").innerText().catch(() => "");
-    check(`${label} background removal is instant`, elapsed < 15000, `${elapsed}ms (instant local cutout, no model download)`);
-    check(`${label} clears the border pixels`, probe.corner === 0, `corner alpha ${probe.corner}`);
-    check(`${label} keeps the artwork`, probe.center > 128, `center alpha ${probe.center}`);
-    check(`${label} records the removal on the layer`, probe.removeBg);
-    check(`${label} confirms to the customer`, /background removed/i.test(toast), toast.replace(/\s+/g, " ").trim() || "no toast");
-    check(`${label} produces no browser errors`, errors.length === 0, errors.join(" | "));
+      const probe = await page.evaluate(async (key) => {
+        const design = JSON.parse(localStorage.getItem(key)).design;
+        const layer = design.front[design.front.length - 1];
+        const image = new Image();
+        image.src = layer.src;
+        await image.decode();
+        const canvas = document.createElement("canvas");
+        canvas.width = image.naturalWidth;
+        canvas.height = image.naturalHeight;
+        const ctx = canvas.getContext("2d");
+        ctx.drawImage(image, 0, 0);
+        const data = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+        const alpha = (x, y) => data[(y * canvas.width + x) * 4 + 3];
+        let clear = 0;
+        for (let i = 3; i < data.length; i += 4) if (data[i] === 0) clear++;
+        return {
+          corner: Math.max(
+            alpha(2, 2),
+            alpha(canvas.width - 3, 2),
+            alpha(2, canvas.height - 3),
+            alpha(canvas.width - 3, canvas.height - 3),
+          ),
+          center: alpha(Math.floor(canvas.width / 2), Math.floor(canvas.height / 2)),
+          clearPct: +((100 * clear) / (canvas.width * canvas.height)).toFixed(1),
+          removeBg: Boolean(layer.fx?.removeBg),
+          hasCutout: Boolean(layer.backgroundRemovedSrc),
+        };
+      }, DRAFT_KEY);
+
+      const name = `${label} ${artwork}`;
+      if (shouldRemove) {
+        check(`${name}: removal is instant`, elapsed < 15000, `${elapsed}ms (instant local cutout, no model download)`);
+        check(`${name}: backdrop is fully cleared`, probe.corner === 0, `corner alpha ${probe.corner}, ${probe.clearPct}% cleared`);
+        check(`${name}: artwork survives`, probe.center > 128, `center alpha ${probe.center}`);
+        check(`${name}: removal is recorded on the layer`, probe.removeBg && probe.hasCutout);
+        check(`${name}: customer is told it worked`, /background removed/i.test(toast), toast.replace(/\s+/g, " ").trim() || "no toast");
+      } else {
+        check(`${name}: no cutout is invented`, !probe.hasCutout);
+        check(`${name}: every pixel is kept`, probe.corner === 255 && probe.center === 255 && probe.clearPct === 0, `${probe.clearPct}% cleared`);
+        check(
+          `${name}: customer is pointed at Select Object`,
+          /could not detect a background/i.test(toast),
+          toast.replace(/\s+/g, " ").trim() || "no toast",
+        );
+      }
+      check(`${name}: no browser errors`, errors.length === 0, errors.join(" | "));
+      await page.close();
+    }
 
     await context.close();
   }

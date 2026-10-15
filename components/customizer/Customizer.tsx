@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import DesignCanvas from "./DesignCanvas";
+import DesignCanvas, { printAreaView } from "./DesignCanvas";
 import { fitStage } from "./stageGeometry";
 import {
   ArtPanel,
@@ -112,15 +112,13 @@ const SPLIT_PANELS: Panel[] = ["text", "image"];
 
 /**
  * Background removal runs instantly on-device everywhere. The AI model is an
- * optional refinement for busy photos: it is used where it runs quickly (WebGPU)
- * and on desktop-class browsers, but never on phones, where the ~180 MB model
- * download is far too heavy.
+ * optional refinement for busy photos: it only runs on desktop-class browsers,
+ * because the ~180 MB model download is far too heavy for a phone. The check
+ * comes first so a phone that happens to expose WebGPU is still skipped.
  */
 function shouldRefineWithAi(): boolean {
   if (typeof navigator === "undefined") return false;
-  if ((navigator as Navigator & { gpu?: unknown }).gpu) return true;
-  const agent = navigator.userAgent || "";
-  return !/Android|iPhone|iPad|iPod|Mobile|Windows Phone/i.test(agent);
+  return !/Android|iPhone|iPad|iPod|Mobile|Windows Phone/i.test(navigator.userAgent || "");
 }
 
 const NN_FONT_SIZES: Record<NNSize, { name: number; number: number; sub: number }> = {
@@ -242,11 +240,14 @@ export default function Customizer({
 
   const fileInput = useRef<HTMLInputElement>(null);
   const stageRef = useRef<HTMLElement>(null);
+  const panelRef = useRef<HTMLElement>(null);
   const openFilePicker = useCallback(() => {
     fileInput.current?.click();
   }, []);
   const [stageBox, setStageBox] = useState({ w: 0, h: 0 });
   const [compact, setCompact] = useState(true);
+  const [shortViewport, setShortViewport] = useState(false);
+  const [panelHeight, setPanelHeight] = useState(0);
 
   const draftKey = `kcp.draft.v3.${product.slug}`;
   const [ready, setReady] = useState(false);
@@ -414,19 +415,34 @@ export default function Customizer({
     const el = stageRef.current;
     if (!el) return;
     const mq = window.matchMedia("(max-width: 900px)");
+    const mqShort = window.matchMedia("(max-height: 500px)");
     const read = () => {
       setCompact(mq.matches);
+      setShortViewport(mqShort.matches);
       setStageBox({ w: el.clientWidth, h: el.clientHeight });
     };
     read();
     const ro = new ResizeObserver(read);
     ro.observe(el);
     mq.addEventListener("change", read);
+    mqShort.addEventListener("change", read);
     return () => {
       ro.disconnect();
       mq.removeEventListener("change", read);
+      mqShort.removeEventListener("change", read);
     };
   }, [step]);
+
+  /* ---- the floating inspector's height, so the garment can pan around it ---- */
+  useEffect(() => {
+    const el = panelRef.current;
+    if (!el) return;
+    const read = () => setPanelHeight(el.offsetHeight);
+    read();
+    const ro = new ResizeObserver(read);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
 
   /* ---- review step: render the flattened previews ---- */
   useEffect(() => {
@@ -1137,7 +1153,21 @@ export default function Customizer({
 
   /* ---- stage fit ---- */
   const split = SPLIT_PANELS.includes(panel);
-  const fit = useMemo(() => fitStage(stageBox.w, stageBox.h, zoom), [stageBox, zoom]);
+  /**
+   * On portrait phones the inspector floats over the canvas, so the stage keeps
+   * its full size and the garment is only panned to stay clear of the sheet.
+   */
+  const overlayPanel = compact && !shortViewport && step === "design" && panel !== "none";
+  const visibleStageH = overlayPanel ? Math.max(120, stageBox.h - panelHeight) : stageBox.h;
+  const focusY = useMemo(() => {
+    if (!overlayPanel) return null;
+    const pa = printAreaView(side, product.printArea);
+    return pa.y + ((selected?.y ?? 50) / 100) * pa.h;
+  }, [overlayPanel, side, product.printArea, selected?.y]);
+  const fit = useMemo(
+    () => fitStage(stageBox.w, stageBox.h, zoom, { visibleH: visibleStageH, focusY }),
+    [stageBox, zoom, visibleStageH, focusY]
+  );
 
   /* ---- what the rail highlights ---- */
   const railActive =
@@ -1660,8 +1690,8 @@ export default function Customizer({
           </nav>
         </div>
 
-        <aside className="rot-panel" aria-label="Design controls">
-          {split ? (
+        <aside className="rot-panel" aria-label="Design controls" ref={panelRef}>
+          {split || overlayPanel ? (
             <button
               type="button"
               className="rot-panel-dismiss"

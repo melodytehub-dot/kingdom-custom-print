@@ -200,58 +200,246 @@ export async function applyImageFx(origSrc: string, fx: ImageFx): Promise<FxResu
   return { dataUrl: encoded.dataUrl, aspect: encoded.width / encoded.height };
 }
 
-/**
- * Flood-fills the border-connected background colour to transparent.
- * Works entirely from pixels so it runs instantly on any device — no model,
- * no network, no WebGPU. Returns the fraction of pixels that were cleared.
- */
-function floodFillBackground(img: ImageData, tolerance = 46, soft = 32): number {
-  const { data: d, width: w, height: h } = img;
-  const bg = borderColour(d, w, h);
-  if (!bg) return 0;
+export interface CutoutStats {
+  /** Fraction of the image that became transparent. */
+  ratio: number;
+  /** Fraction of the outer border ring that became transparent. */
+  borderClear: number;
+  /** True when the background looked convincingly like one flat backdrop. */
+  uniform: boolean;
+}
 
-  const seen = new Uint8Array(w * h);
-  const stack = new Int32Array(w * h);
-  let top = 0;
-  const seed = (p: number) => {
-    if (!seen[p]) {
-      seen[p] = 1;
-      stack[top++] = p;
+/**
+ * Cuts the backdrop out of an uploaded artwork, using pixels only — no model,
+ * no network, no WebGPU — so it runs instantly on every device.
+ *
+ * The backdrop is every colour reachable from the edge of the picture without
+ * crossing a strong edge. Each pixel is compared with its *neighbour* rather
+ * than with one global colour, which is what lets gradients, vignettes and
+ * photographic shadows fall away while the artwork's own outline stops the
+ * fill. Background families are sampled from the four corners so a subject that
+ * runs off one edge can never be mistaken for the backdrop.
+ */
+export function cutoutBackground(img: ImageData): CutoutStats {
+  const { data: d, width: w, height: h } = img;
+  const n = w * h;
+  if (n < 16) return { ratio: 0, borderClear: 0, uniform: false };
+
+  /* ---- 1. Background colour families, sampled from the four corners ------ */
+  const patch = Math.max(2, Math.min(20, Math.round(Math.min(w, h) * 0.06)));
+  const bins = new Map<number, { n: number; r: number; g: number; b: number }>();
+  let samples = 0;
+  const samplePixel = (x: number, y: number) => {
+    const i = (y * w + x) * 4;
+    if (d[i + 3] < 200) return;
+    samples++;
+    const key = (d[i] >> 4) * 256 + (d[i + 1] >> 4) * 16 + (d[i + 2] >> 4);
+    const e = bins.get(key);
+    if (e) {
+      e.n++;
+      e.r += d[i];
+      e.g += d[i + 1];
+      e.b += d[i + 2];
+    } else {
+      bins.set(key, { n: 1, r: d[i], g: d[i + 1], b: d[i + 2] });
     }
   };
+  for (let py = 0; py < patch; py++) {
+    for (let px = 0; px < patch; px++) {
+      samplePixel(px, py);
+      samplePixel(w - 1 - px, py);
+      samplePixel(px, h - 1 - py);
+      samplePixel(w - 1 - px, h - 1 - py);
+    }
+  }
+  if (!samples) return { ratio: 0, borderClear: 0, uniform: false };
+
+  const minCount = Math.max(2, samples * 0.03);
+  const families = [...bins.values()]
+    .filter((e) => e.n >= minCount)
+    .sort((a, b) => b.n - a.n)
+    .slice(0, 8)
+    .map((e) => [e.r / e.n, e.g / e.n, e.b / e.n] as const);
+  if (!families.length) return { ratio: 0, borderClear: 0, uniform: false };
+
+  // How far a colour may sit from the backdrop families before it is treated as
+  // artwork. Wide enough for a vignette or a soft shadow, tight enough that a
+  // blurred edge cannot let the walk creep into a saturated subject.
+  const globalTol = 135;
+  // How big a step between touching pixels still counts as "the same surface".
+  // This is the first line of defence at the artwork's outline.
+  const localTol = 30;
+  // Seeds must match a corner colour closely so a noisy photo border cannot
+  // trick the walk into starting.
+  const seedTol = 44;
+  const backgroundDistance = (i: number) => {
+    let best = Infinity;
+    for (const f of families) {
+      const dr = d[i] - f[0];
+      const dg = d[i + 1] - f[1];
+      const db = d[i + 2] - f[2];
+      const dd = dr * dr + dg * dg + db * db;
+      if (dd < best) best = dd;
+      if (best === 0) break;
+    }
+    return Math.sqrt(best);
+  };
+
+  /* ---- 2. Flood outwards from the edge ---------------------------------- */
+  const visited = new Uint8Array(n);
+  const isBackground = new Uint8Array(n);
+  const stack = new Int32Array(n);
+  let top = 0;
+  const push = (p: number) => {
+    if (visited[p]) return;
+    const i = p * 4;
+    if (d[i + 3] > 8 && backgroundDistance(i) > seedTol) return;
+    visited[p] = 1;
+    stack[top++] = p;
+  };
   for (let x = 0; x < w; x++) {
-    seed(x);
-    seed((h - 1) * w + x);
+    push(x);
+    push((h - 1) * w + x);
   }
   for (let y = 0; y < h; y++) {
-    seed(y * w);
-    seed(y * w + w - 1);
+    push(y * w);
+    push(y * w + w - 1);
   }
 
-  const limit = tolerance + soft;
   let cleared = 0;
   while (top > 0) {
     const p = stack[--top];
     const i = p * 4;
-    const dd = Math.sqrt(
-      (d[i] - bg[0]) ** 2 + (d[i + 1] - bg[1]) ** 2 + (d[i + 2] - bg[2]) ** 2,
-    );
-    if (dd > limit) continue;
-
-    // Soft edge: fully clear the core, feather the boundary band.
-    const alpha = dd <= tolerance ? 0 : Math.round((255 * (dd - tolerance)) / soft);
-    if (alpha < d[i + 3]) d[i + 3] = alpha;
+    if (d[i + 3] > 8 && backgroundDistance(i) > globalTol) continue;
+    isBackground[p] = 1;
     cleared++;
-
     const x = p % w;
     const y = (p - x) / w;
-    if (x > 0) seed(p - 1);
-    if (x < w - 1) seed(p + 1);
-    if (y > 0) seed(p - w);
-    if (y < h - 1) seed(p + w);
+    const visit = (q: number) => {
+      if (visited[q]) return;
+      const qi = q * 4;
+      if (d[qi + 3] <= 8) {
+        // Already transparent: keep walking without touching it.
+        visited[q] = 1;
+        stack[top++] = q;
+        return;
+      }
+      const dr = d[qi] - d[i];
+      const dg = d[qi + 1] - d[i + 1];
+      const db = d[qi + 2] - d[i + 2];
+      if (Math.sqrt(dr * dr + dg * dg + db * db) > localTol) return;
+      visited[q] = 1;
+      stack[top++] = q;
+    };
+    if (x > 0) visit(p - 1);
+    if (x < w - 1) visit(p + 1);
+    if (y > 0) visit(p - w);
+    if (y < h - 1) visit(p + w);
   }
 
-  return cleared / (w * h);
+  let ringTotal = 0;
+  let ringClear = 0;
+  const checkRing = (p: number) => {
+    ringTotal++;
+    // Already-transparent artwork (a PNG cut-out) counts as backdrop too.
+    if (isBackground[p] || d[p * 4 + 3] <= 8) ringClear++;
+  };
+  for (let x = 0; x < w; x++) {
+    checkRing(x);
+    checkRing((h - 1) * w + x);
+  }
+  for (let y = 0; y < h; y++) {
+    checkRing(y * w);
+    checkRing(y * w + w - 1);
+  }
+  const borderClear = ringTotal ? ringClear / ringTotal : 0;
+
+  /* ---- 3. Soft matte on the boundary ------------------------------------ */
+  // A pixel that touches the backdrop is a blend of backdrop and artwork, so its
+  // alpha is the size of its colour step away from the backdrop. This kills the
+  // hard, aliased fringe that a binary mask leaves behind.
+  const featherInner = 14;
+  const featherOuter = 82;
+  const alpha = new Float32Array(n);
+  for (let p = 0; p < n; p++) alpha[p] = d[p * 4 + 3];
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      const p = y * w + x;
+      if (isBackground[p]) {
+        alpha[p] = 0;
+        continue;
+      }
+      let r = 0;
+      let g = 0;
+      let b = 0;
+      let count = 0;
+      if (x > 0 && isBackground[p - 1]) {
+        const i = (p - 1) * 4;
+        r += d[i];
+        g += d[i + 1];
+        b += d[i + 2];
+        count++;
+      }
+      if (x < w - 1 && isBackground[p + 1]) {
+        const i = (p + 1) * 4;
+        r += d[i];
+        g += d[i + 1];
+        b += d[i + 2];
+        count++;
+      }
+      if (y > 0 && isBackground[p - w]) {
+        const i = (p - w) * 4;
+        r += d[i];
+        g += d[i + 1];
+        b += d[i + 2];
+        count++;
+      }
+      if (y < h - 1 && isBackground[p + w]) {
+        const i = (p + w) * 4;
+        r += d[i];
+        g += d[i + 1];
+        b += d[i + 2];
+        count++;
+      }
+      if (!count) continue;
+      const i = p * 4;
+      const dd = Math.sqrt(
+        (d[i] - r / count) ** 2 + (d[i + 1] - g / count) ** 2 + (d[i + 2] - b / count) ** 2,
+      );
+      const soft = Math.round((255 * (dd - featherInner)) / (featherOuter - featherInner));
+      const clamped = Math.max(0, Math.min(255, soft));
+      if (clamped < alpha[p]) alpha[p] = clamped;
+    }
+  }
+
+  /* ---- 4. Despeckle: drop stray pixels with no opaque neighbours --------- */
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      const p = y * w + x;
+      if (alpha[p] <= 0) continue;
+      let opaque = 0;
+      for (let dy = -1; dy <= 1 && opaque === 0; dy++) {
+        const yy = y + dy;
+        if (yy < 0 || yy >= h) continue;
+        for (let dx = -1; dx <= 1; dx++) {
+          if (dx === 0 && dy === 0) continue;
+          const xx = x + dx;
+          if (xx < 0 || xx >= w) continue;
+          if (alpha[yy * w + xx] > 0) {
+            opaque++;
+            break;
+          }
+        }
+      }
+      if (opaque === 0) alpha[p] = 0;
+    }
+  }
+
+  for (let p = 0; p < n; p++) d[p * 4 + 3] = alpha[p];
+
+  const uniform =
+    borderClear >= 0.985 || (borderClear >= 0.8 && cleared / n >= 0.2);
+  return { ratio: cleared / n, borderClear, uniform };
 }
 
 export interface QuickCutout {
@@ -262,6 +450,11 @@ export interface QuickCutout {
   /** True when enough of the image was background for the result to look right. */
   confident: boolean;
 }
+
+/** Largest edge the backdrop analysis runs at. Bigger uploads are masked at a
+ * reduced resolution and the mask is scaled back up, which bounds the work on
+ * phones without softening the printed artwork. */
+const CUTOUT_MAX_EDGE = 1400;
 
 /**
  * Instant, dependency-free background removal. This is the guaranteed path on
@@ -280,17 +473,62 @@ export async function quickBackgroundRemoval(src: string): Promise<QuickCutout |
   ctx.imageSmoothingQuality = "high";
   ctx.drawImage(img, 0, 0, W, H);
 
-  const data = ctx.getImageData(0, 0, W, H);
-  const ratio = floodFillBackground(data);
-  if (ratio <= 0) return null;
-  ctx.putImageData(data, 0, 0);
+  const full = ctx.getImageData(0, 0, W, H);
+
+  const scale = Math.min(1, CUTOUT_MAX_EDGE / Math.max(W, H));
+  const w2 = Math.max(1, Math.round(W * scale));
+  const h2 = Math.max(1, Math.round(H * scale));
+  let work = full;
+  if (w2 !== W || h2 !== H) {
+    const small = document.createElement("canvas");
+    small.width = w2;
+    small.height = h2;
+    const sctx = small.getContext("2d", { willReadFrequently: true });
+    if (!sctx) return null;
+    sctx.imageSmoothingQuality = "high";
+    sctx.drawImage(img, 0, 0, w2, h2);
+    work = sctx.getImageData(0, 0, w2, h2);
+  }
+
+  const stats = cutoutBackground(work);
+  // Nothing matched, the frame came back empty, or the edge of the picture was
+  // mostly artwork (a busy photo) — either way there is no trustworthy cutout,
+  // so say so instead of pasting a half-removed mess onto the shirt.
+  if (stats.ratio <= 0 || stats.ratio >= 0.98 || stats.borderClear < 0.7) return null;
+
+  if (work === full) {
+    ctx.putImageData(full, 0, 0);
+  } else {
+    // Paint the low-resolution mask back over the full-resolution artwork so the
+    // printed file keeps every original pixel.
+    const mask = document.createElement("canvas");
+    mask.width = w2;
+    mask.height = h2;
+    const mctx = mask.getContext("2d");
+    if (!mctx) return null;
+    const mimg = mctx.createImageData(w2, h2);
+    for (let p = 0; p < w2 * h2; p++) {
+      mimg.data[p * 4] = 255;
+      mimg.data[p * 4 + 1] = 255;
+      mimg.data[p * 4 + 2] = 255;
+      mimg.data[p * 4 + 3] = work.data[p * 4 + 3];
+    }
+    mctx.putImageData(mimg, 0, 0);
+    ctx.clearRect(0, 0, W, H);
+    ctx.drawImage(img, 0, 0, W, H);
+    ctx.globalCompositeOperation = "destination-in";
+    ctx.imageSmoothingQuality = "high";
+    ctx.drawImage(mask, 0, 0, w2, h2, 0, 0, W, H);
+    ctx.globalCompositeOperation = "source-over";
+  }
 
   const encoded = encodeCanvasUnder(canvas);
   return {
     dataUrl: encoded.dataUrl,
     aspect: encoded.width / encoded.height,
-    ratio,
-    confident: ratio >= 0.04,
+    ratio: stats.ratio,
+    confident:
+      stats.uniform && stats.ratio >= 0.03 && stats.ratio <= 0.985,
   };
 }
 
