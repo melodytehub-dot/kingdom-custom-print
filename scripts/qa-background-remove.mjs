@@ -1,11 +1,15 @@
 /**
- * Background removal smoke test.
+ * Background removal: the instant, download-free path.
  *
- * The "Remove Background" control must work on phones as well as desktop, and
- * it must cope with more than one flat colour: an artwork sitting on a gradient
- * used to come back with its backdrop still attached. It must also refuse
- * cleanly (instead of pasting a half-removed mess onto the shirt) when the
- * picture is a busy photo with no discoverable backdrop.
+ * Flat artwork — a logo on white, artwork on a gradient — must be cut out
+ * instantly, on every device, without downloading a model: that is what keeps
+ * "Remove Background" usable on a phone with no wifi. Artwork that the instant
+ * pass cannot key out (a busy photo) must not be pasted onto the shirt with a
+ * half-removed backdrop; it goes to the AI models instead, and whatever happens
+ * there, the customer is told the truth.
+ *
+ * The AI models themselves are covered by `qa-cutout-ai.mjs` (real photo, both
+ * viewports) and `qa-cutout-mask.mjs` (the mask analyser).
  */
 import { chromium } from "playwright";
 
@@ -38,8 +42,8 @@ try {
       viewport,
       hasTouch: mobile,
       isMobile: mobile,
-      // A phone user agent matters: it is what keeps the ~180 MB AI model off
-      // phones, so the instant on-device cutout is the only path under test here.
+      // A phone user agent matters: phones only run the 6 MB portrait model, so
+      // the download this test waits for stays small.
       userAgent: mobile
         ? "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1"
         : undefined,
@@ -47,8 +51,9 @@ try {
 
     for (const [artwork, draw] of Object.entries(ARTWORKS)) {
       const shouldRemove = artwork !== "busy photo";
-      // A busy photo is only refused on phones — desktop sends it to the AI model,
-      // which would mean downloading ~180 MB inside a smoke test.
+      // The busy photo only runs on phones here, where the cascade stops at the
+      // 6 MB portrait model. Desktop's fallback to the 42 MB general model is
+      // covered against a real photo in qa-cutout-ai.mjs.
       if (!shouldRemove && !mobile) continue;
       const page = await context.newPage();
       page.setDefaultTimeout(30000);
@@ -83,7 +88,7 @@ try {
       const toast = await page
         .locator(".rot-toast")
         .first()
-        .textContent({ timeout: 20000 })
+        .textContent({ timeout: 240000 })
         .catch(() => "");
       const elapsed = Date.now() - started;
       // The layer is patched just before the toast, but the draft save is debounced.
@@ -125,24 +130,35 @@ try {
           clearPct: +((100 * clear) / (canvas.width * canvas.height)).toFixed(1),
           removeBg: Boolean(layer.fx?.removeBg),
           hasCutout: Boolean(layer.backgroundRemovedSrc),
+          cutoutSource: layer.cutoutSource ?? null,
         };
       }, DRAFT_KEY);
 
       const name = `${label} ${artwork}`;
       if (shouldRemove) {
-        check(`${name}: removal is instant`, elapsed < 15000, `${elapsed}ms (instant local cutout, no model download)`);
+        check(
+          `${name}: cut out instantly, with no model download`,
+          elapsed < 8000 && probe.cutoutSource === "quick",
+          `${elapsed}ms, source ${probe.cutoutSource}`,
+        );
         check(`${name}: backdrop is fully cleared`, probe.corner === 0, `corner alpha ${probe.corner}, ${probe.clearPct}% cleared`);
         check(`${name}: artwork survives`, probe.center > 128, `center alpha ${probe.center}`);
         check(`${name}: removal is recorded on the layer`, probe.removeBg && probe.hasCutout);
         check(`${name}: customer is told it worked`, /background removed/i.test(toast), toast.replace(/\s+/g, " ").trim() || "no toast");
       } else {
-        check(`${name}: no cutout is invented`, !probe.hasCutout);
-        check(`${name}: every pixel is kept`, probe.corner === 255 && probe.center === 255 && probe.clearPct === 0, `${probe.clearPct}% cleared`);
-        check(
-          `${name}: customer is pointed at Select Object`,
-          /could not detect a background/i.test(toast),
-          toast.replace(/\s+/g, " ").trim() || "no toast",
-        );
+        // A photo with no keyable backdrop: the instant pass must not invent a
+        // cut-out, and whatever the AI does, the layer and the message agree.
+        check(`${name}: the instant pass invents nothing`, probe.cutoutSource !== "quick", `source ${probe.cutoutSource}`);
+        if (probe.hasCutout) {
+          check(
+            `${name}: a model cut it out and said so`,
+            (probe.cutoutSource === "portrait" || probe.cutoutSource === "general") && /background removed/i.test(toast),
+            `source ${probe.cutoutSource} — ${toast.replace(/\s+/g, " ").trim() || "no toast"}`,
+          );
+        } else {
+          check(`${name}: refused honestly`, /could not find a subject|could not detect a background/i.test(toast), toast.replace(/\s+/g, " ").trim() || "no toast");
+        }
+        check(`${name}: nothing is pasted half-removed`, probe.corner === 255 || probe.hasCutout, `corner alpha ${probe.corner}`);
       }
       check(`${name}: no browser errors`, errors.length === 0, errors.join(" | "));
       await page.close();

@@ -263,7 +263,15 @@ const { default: Customizer } = load("components/customizer/Customizer.tsx", {
     emptyDesign: blank, usedSides: () => [], personalizationOf: () => "none", loadDrafts: () => [], removeLayers: d => d, selectionIsWholeGroup: () => false, selectionIds: (d, s, id) => [id], groupMembers: () => [],
     newTextLayer: () => ({ ...layer, type: "text" }),
   },
-  "@/lib/imageFx": {}, "@/lib/backgroundRemoval": { removeBackgroundLocally: async () => "" }, "./preview": {},
+  "@/lib/imageFx": {},
+  "@/lib/backgroundRemoval": {
+    removeBackgroundLocally: async () => ({ dataUrl: "", source: "portrait", report: {} }),
+    CutoutError: class CutoutError extends Error { constructor(reason, message) { super(message); this.reason = reason; } },
+  },
+  "@/lib/cutoutModels": {
+    CUTOUT_MAX_EDGE: 1400, DETAILED_PLAN: ["general"], cutoutPlan: () => ["portrait"], formatModelSize: () => "6 MB",
+  },
+  "./preview": {},
   "@/lib/mockups": { mockupsForProduct: () => [mockup], TEE_MOCKUPS: [mockup] },
   "@/lib/cart-context": { useCart: () => ({ items: [], addItem() {} }) },
   "@/lib/pricing": { quoteProduct: () => ({}), formatUSD: value => `$${value}` },

@@ -1,5 +1,6 @@
 import type { ImageFx } from "@/lib/types";
 import { encodeCanvasUnder } from "@/lib/design";
+import { CUTOUT_MAX_EDGE } from "@/lib/cutoutModels";
 
 /**
  * Non-destructive image edits for uploaded artwork. Every function starts from
@@ -449,17 +450,15 @@ export interface QuickCutout {
   ratio: number;
   /** True when enough of the image was background for the result to look right. */
   confident: boolean;
+  /** Share of the picture's border that came out as backdrop. */
+  borderClear: number;
 }
 
-/** Largest edge the backdrop analysis runs at. Bigger uploads are masked at a
- * reduced resolution and the mask is scaled back up, which bounds the work on
- * phones without softening the printed artwork. */
-const CUTOUT_MAX_EDGE = 1400;
-
 /**
- * Instant, dependency-free background removal. This is the guaranteed path on
- * phones and tablets (and any browser without WebGPU); the AI model is only
- * used afterwards to refine busy photos.
+ * Instant, dependency-free background removal. This is the guaranteed path for
+ * flat artwork (logos, screenshots, studio product shots) and the safety net
+ * when a model cannot be reached; the AI models in `lib/cutoutModels.ts` take
+ * over for photos, which no colour-based cutout can key out reliably.
  */
 export async function quickBackgroundRemoval(src: string): Promise<QuickCutout | null> {
   const img = await load(src);
@@ -529,12 +528,114 @@ export async function quickBackgroundRemoval(src: string): Promise<QuickCutout |
     ratio: stats.ratio,
     confident:
       stats.uniform && stats.ratio >= 0.03 && stats.ratio <= 0.985,
+    borderClear: stats.borderClear,
   };
 }
 
 /** True when the artwork should not be sent through the AI model. */
 export function isVectorSource(src: string): boolean {
   return src.startsWith("data:image/svg+xml") || src.startsWith("data:image/svg");
+}
+
+/**
+ * What a picture is made of: how much of it is flat fill, how much is hard
+ * edge, and how much detail it carries on average.
+ *
+ * Used to decide whether "Remove Background" needs a segmentation model at all.
+ * It cannot be the instant pass's own confidence: measured in
+ * `scripts/qa-cutout-lab.mjs` on the very photo the client sent, the
+ * colour-keying flood fill walked the whole low-contrast background, reported
+ * itself confident, and cleared **95.7%** of the picture — the exact "it just
+ * cropped out all the picture" complaint. What separates flat artwork from a
+ * photograph is not detail alone (a photograph of a blurry background is
+ * smoother than a wordmark) but *flatness*: artwork is flat fills and a few
+ * hard edges, a photograph is gradients and grain everywhere.
+ */
+export interface ArtworkProfile {
+  /** Mean neighbouring-pixel difference, 0-255. */
+  texture: number;
+  /** Share of neighbouring pixels differing by 2 or less (flat fills). */
+  flat: number;
+  /** Share differing by 24 or more (hard edges). */
+  edges: number;
+}
+
+/**
+ * Thresholds, calibrated in `scripts/qa-cutout-lab.mjs`
+ * (`CUTOUT_LAB_PHASE=instant`). Every row is measured, not guessed:
+ *
+ *   logo on white         flat 0.986 edges 0.009  → artwork
+ *   logo on a gradient    flat 0.986 edges 0.010  → artwork
+ *   sticker with shading  flat 0.972 edges 0.019  → artwork
+ *   b/w wordmark          flat 0.950 edges 0.038  → artwork
+ *   portrait, soft bokeh  flat 0.713 edges 0.033  → photograph
+ *   portrait, bare torso  flat 0.655 edges 0.053  → photograph
+ *   mug on a table        flat 0.621 edges 0.054  → photograph
+ *   client's photo        flat 0.454 edges 0.083  → photograph
+ *
+ * The closest case is the wordmark, and it is the one that matters: text is
+ * edges, so it must never be judged on texture alone. Flatness is what a
+ * photographer cannot fake — grain and shallow depth of field put a pixel on
+ * every value between the fills.
+ */
+export const FLAT_ARTWORK_MIN_FLAT = 0.9;
+export const FLAT_ARTWORK_MAX_EDGES = 0.06;
+
+/**
+ * Profiles a picture from a 256 px copy: 65 k pixels is enough to tell a fill
+ * from a photograph and cheap enough to run before every upload.
+ */
+export async function artworkProfile(src: string): Promise<ArtworkProfile> {
+  const img = await load(src);
+  const size = 256;
+  const ratio = (img.naturalWidth || 1) / (img.naturalHeight || 1);
+  const width = ratio >= 1 ? size : Math.max(16, Math.round(size * ratio));
+  const height = ratio >= 1 ? Math.max(16, Math.round(size / ratio)) : size;
+  const canvas = document.createElement("canvas");
+  canvas.width = width;
+  canvas.height = height;
+  const ctx = canvas.getContext("2d", { willReadFrequently: true });
+  if (!ctx) return { texture: 0, flat: 1, edges: 0 };
+  ctx.imageSmoothingQuality = "high";
+  ctx.drawImage(img, 0, 0, width, height);
+  const data = ctx.getImageData(0, 0, width, height).data;
+  const grey = new Float32Array(width * height);
+  for (let p = 0; p < grey.length; p++) {
+    const i = p * 4;
+    grey[p] = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
+  }
+  let sum = 0;
+  let flat = 0;
+  let edges = 0;
+  let pairs = 0;
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      const p = y * width + x;
+      const step = (q: number) => {
+        const difference = Math.abs(grey[q] - grey[p]);
+        sum += difference;
+        pairs++;
+        if (difference <= 2) flat++;
+        else if (difference >= 24) edges++;
+      };
+      if (x < width - 1) step(p + 1);
+      if (y < height - 1) step(p + width);
+    }
+  }
+  return {
+    texture: pairs ? sum / pairs : 0,
+    flat: pairs ? flat / pairs : 1,
+    edges: pairs ? edges / pairs : 0,
+  };
+}
+
+/**
+ * True when the instant pass is enough and no model should be downloaded.
+ * Deliberately strict: calling a photograph "flat artwork" is what produced the
+ * complaint, while calling artwork a photograph only costs one 6 MB download.
+ */
+export function isFlatArtwork(profile: ArtworkProfile): boolean {
+  return profile.flat >= FLAT_ARTWORK_MIN_FLAT && profile.edges <= FLAT_ARTWORK_MAX_EDGES;
 }
 
 /** Up to `count` dominant colours of an image (ignores transparent pixels). */

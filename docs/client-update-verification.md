@@ -103,6 +103,8 @@ too narrow, and more graphics and templates were requested.
 - The AI model is only used to refine busy photos, and only on desktop where it
   runs quickly. If it is unavailable or fails, the instant cutout is kept and the
   customer never sees a hard error.
+  *(Superseded on October 15 — background removal was rebuilt around on-device
+  models for phones as well. See "Background removal, taken seriously" below.)*
 - Vector (SVG) uploads skip the AI model, which cannot decode them, and use the
   instant cutout instead. Object selection flattens vectors first.
 - When nothing resembles a background the notice now says so and points to
@@ -178,7 +180,55 @@ mobile".
 - Groups are a flat `groupId` tag on the existing layers, so previews, cart
   artwork, saved drafts and the share image all keep working unchanged.
 
+### Background removal, taken seriously
+
+- **What was wrong.** "Remove Background" had a fast, download-free pass that
+  keyed out a background colour, and it was allowed to declare victory and skip
+  the AI. On the client's own photo that pass walked the whole low-contrast
+  outdoor background, reported itself *confident* and cleared **95.7% of the
+  picture** — the person included. That is the "it didn't even recognise
+  anything, it just cropped out all the picture" result, reproduced and measured
+  in `scripts/qa-cutout-lab.mjs`.
+- **The instant pass is now only trusted for flat artwork, and the decision is
+  measured rather than guessed.** Every upload is profiled (`artworkProfile` in
+  `lib/imageFx.ts`) for how much of it is flat fill versus hard edge. A logo,
+  sticker or wordmark is flat fills plus a few edges (0.99 of its pixels are
+  flat), so it still cuts out instantly with nothing downloaded. A photograph is
+  gradient and grain everywhere — the client's photo scores 0.45 — so it always
+  goes to the models, however confident the colour key feels.
+- **The AI runs on the device, in the browser.** Two segmentation models run in a
+  web worker in the customer's browser: a 6 MB portrait matting model first, then
+  a 42 MB detailed model. No server, no API key, no upload — only the model
+  weights are downloaded, once, and the browser caches them.
+- **Nothing is pasted on the shirt unverified.** Every mask is scored
+  (`lib/cutoutMask.ts`) before use: a mask that found nothing, kept everything, is
+  a sieve of holes, or has no solid core is thrown away rather than handed to the
+  customer.
+- **Phones.** The 6 MB model runs automatically on phones — the one that keeps
+  hair and soft edges — and the 42 MB detailed model is offered as a button
+  ("Try the Detailed Model") instead of being forced onto a phone CPU.
+- **Honest messages.** If the model has run and its mask was rejected, the notice
+  says the subject could not be made out and points at Select Object. If the AI
+  cannot be reached, the fast cut-out is used and the notice says that. A photo
+  is never presented as "done" when it is not.
+
 ### Verification
+
+- `npm run qa-cutout-ai` is new: it uploads a real photograph of a person against
+  a busy sea-and-sky backdrop on desktop (1440x900) and on a phone (390x844 with
+  an iPhone user agent), turns Remove Background on and judges the saved layer —
+  backdrop corners fully transparent, sky band cleared, subject intact (centre
+  opaque, 74% of the body row and 44% of the frame kept), 4% of pixels soft-edged
+  rather than posterised, the customer told it worked, the detailed-model button
+  offered, no browser errors. Both viewports pass, phone included.
+- `npm run qa-cutout-mask` is new: 18 checks on the mask analyser against real
+  failure shapes — matted portrait, mug with its handle hole, empty mask,
+  everything-kept mask, sieve, mush, hair and degenerate input. No browser needed.
+- `npm run qa-background-remove` passes on both viewports: a flat logo and a
+  gradient logo still cut out instantly with no model download, and a busy photo
+  is never pasted half-removed.
+
+### Verification (previous work, still green)
 
 - `npm run qa-grouping` unit-tests the grouping model (reading a group, pruning
   blank and orphaned tags, merging picks, releasing leftovers, deletions and

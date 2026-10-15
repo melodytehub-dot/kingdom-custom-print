@@ -25,6 +25,7 @@ function load(file, dependencies, globals = {}) {
 
 const { cutoutBackground } = load("lib/imageFx.ts", {
   "@/lib/design": { encodeCanvasUnder: () => ({ dataUrl: "", width: 1, height: 1 }) },
+  "@/lib/cutoutModels": { CUTOUT_MAX_EDGE: 1400 },
 });
 
 const W = 420;

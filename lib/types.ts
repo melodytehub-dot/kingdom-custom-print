@@ -133,6 +133,12 @@ export interface ImageFx {
   recolors: { from: string; to: string }[];
 }
 
+/**
+ * Where a layer's cut-out came from: the instant on-device pass, or one of the
+ * two AI models (see `lib/cutoutModels.ts`). Drives the "improve" affordances.
+ */
+export type CutoutSource = "quick" | "manual" | "portrait" | "general";
+
 export interface ImageLayer extends BaseLayer {
   type: "image";
   /** The pixels currently shown (original with `fx` applied). */
@@ -142,8 +148,10 @@ export interface ImageLayer extends BaseLayer {
   aspect: number;
   /** Untouched upload, kept so edits can be re-applied or undone. */
   origSrc?: string;
-  /** Cached local-AI cutout used when other artwork edits are reapplied. */
+  /** Cached background cut-out used when other artwork edits are reapplied. */
   backgroundRemovedSrc?: string;
+  /** Which pass produced `backgroundRemovedSrc`. */
+  cutoutSource?: CutoutSource;
   fx?: ImageFx;
 }
 

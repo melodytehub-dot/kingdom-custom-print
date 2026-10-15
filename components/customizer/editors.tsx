@@ -760,6 +760,7 @@ export function ImageEditor({
   progress,
   eyebrow,
   actions,
+  cutoutAction,
   onFx,
   onApplySelection,
   onChange,
@@ -772,6 +773,8 @@ export function ImageEditor({
   progress: number | null;
   eyebrow: string;
   actions: LayerActionsProps;
+  /** Offer to re-cut the photo with the AI models, when there is something to gain. */
+  cutoutAction?: { label: string; hint: string; onRun: () => void };
   onFx: (next: Partial<ImageFx>) => void;
   onApplySelection: (layer: ImageLayer, cutout: string) => Promise<void>;
   onChange: (patch: Partial<ImageLayer>) => void;
@@ -936,6 +939,27 @@ export function ImageEditor({
             <span>{busyLabel ?? "Working on your artwork…"}</span>
             {progress !== null ? <progress max={100} value={progress} aria-label="AI model download progress" /> : null}
           </div>
+        ) : null}
+        {cutoutAction ? (
+          <button
+            type="button"
+            className="rot-row is-link rot-subject-link"
+            onClick={cutoutAction.onRun}
+            disabled={busy}
+          >
+            <span className="rot-row-label">
+              <span>
+                {cutoutAction.label}
+                <small>{cutoutAction.hint}</small>
+              </span>
+            </span>
+            <span className="rot-row-value">
+              <span className="rot-badge">AI</span>
+              <span className="rot-chev">
+                <ChevronRightIcon size={16} />
+              </span>
+            </span>
+          </button>
         ) : null}
 
         <Row

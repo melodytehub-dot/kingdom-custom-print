@@ -78,13 +78,28 @@ import {
   validateUpload,
   type SavedDraft,
 } from "@/lib/design";
-import { applyImageFx, DEFAULT_FX, isVectorSource, quickBackgroundRemoval } from "@/lib/imageFx";
-import { removeBackgroundLocally, type BackgroundRemovalProgress } from "@/lib/backgroundRemoval";
+import {
+  applyImageFx,
+  artworkProfile,
+  DEFAULT_FX,
+  isFlatArtwork,
+  isVectorSource,
+  quickBackgroundRemoval,
+} from "@/lib/imageFx";
+import { removeBackgroundLocally, CutoutError, type BackgroundRemovalProgress } from "@/lib/backgroundRemoval";
+import {
+  CUTOUT_MAX_EDGE,
+  DETAILED_PLAN,
+  cutoutPlan,
+  formatModelSize,
+  type CutoutModelKind,
+} from "@/lib/cutoutModels";
 import { drawPreview } from "./preview";
 import { mockupByCode, mockupsForProduct, TEE_MOCKUPS, type TeeMockup } from "@/lib/mockups";
 import { useCart } from "@/lib/cart-context";
 import { quoteProduct, formatUSD } from "@/lib/pricing";
 import type {
+  CutoutSource,
   Design,
   DesignLayer,
   GarmentSide,
@@ -126,14 +141,87 @@ const STEP_LABEL: Record<Step, string> = {
 const SPLIT_PANELS: Panel[] = ["text", "image"];
 
 /**
- * Background removal runs instantly on-device everywhere. The AI model is an
- * optional refinement for busy photos: it only runs on desktop-class browsers,
- * because the ~180 MB model download is far too heavy for a phone. The check
- * comes first so a phone that happens to expose WebGPU is still skipped.
+ * Background removal runs instantly on-device everywhere; so do the AI models,
+ * which is what makes this work on a phone at all. What is device-dependent is
+ * the 42 MB detailed model: on a phone it means tens of seconds of CPU, so it
+ * is only run automatically on desktop-class browsers and is otherwise offered
+ * as a button the customer can choose.
  */
-function shouldRefineWithAi(): boolean {
+function canAutoRunDetailedModel(): boolean {
   if (typeof navigator === "undefined") return false;
   return !/Android|iPhone|iPad|iPod|Mobile|Windows Phone/i.test(navigator.userAgent || "");
+}
+
+/** What the customer reads while a model downloads or works. */
+function cutoutStatus(progress: BackgroundRemovalProgress): string {
+  const name = progress.model?.name ?? "cut-out";
+  if (progress.phase === "download") {
+    const size = progress.model ? formatModelSize(progress.model.bytes) : "";
+    const slow = progress.model?.kind === "general" ? " This one is slower." : "";
+    return `Downloading the ${name} model… ${progress.percent ?? 0}% (${size}, downloads once).${slow}`;
+  }
+  return `Cutting out the subject with the ${name} model…`;
+}
+
+/**
+ * The answer to "did my background go away?". This has to stay honest: when a
+ * busy photo could not be cut out, saying so (and pointing at the two ways
+ * forward) beats pasting a half-removed picture onto the shirt.
+ */
+function cutoutNotice({
+  removeBg,
+  failure,
+  hasCutout,
+}: {
+  removeBg: boolean;
+  failure: "no-subject" | "unavailable" | null;
+  hasCutout: boolean;
+}): { tone: "ok" | "warn" | "error"; text: string } {
+  if (!removeBg) return { tone: "ok", text: "Original background restored." };
+  if (failure === "no-subject") {
+    return hasCutout
+      ? {
+          tone: "warn",
+          text: "We could not make out a clear subject, so the fast cut-out is applied. Try the detailed model or Select Object.",
+        }
+      : { tone: "warn", text: "We could not find a subject in that photo. Try Select Object to pick it out by hand." };
+  }
+  if (failure === "unavailable") {
+    return hasCutout
+      ? { tone: "warn", text: "Background removed with the fast cut-out — the AI model could not load. Check your connection and try again." }
+      : { tone: "warn", text: "The cut-out model could not load. Check your connection and try again." };
+  }
+  if (!hasCutout) return { tone: "warn", text: "We could not detect a background to remove. Try Select Object for busy photos." };
+  return { tone: "ok", text: "Background removed." };
+}
+
+/** The "keep going" button offered in the artwork editor. */
+function cutoutActionFor(
+  layer: ImageLayer,
+  onRun: (layer: ImageLayer) => void,
+): { label: string; hint: string; onRun: () => void } | undefined {
+  if (!layer.fx?.removeBg) {
+    return {
+      label: "Remove Background with AI",
+      hint: "Cuts a person or product out of any photo",
+      onRun: () => onRun(layer),
+    };
+  }
+  if (layer.cutoutSource === "quick" || layer.cutoutSource === "manual") {
+    return {
+      label: "Improve Cut-out with AI",
+      hint: "Reads the photo and keeps hair and soft edges",
+      onRun: () => onRun(layer),
+    };
+  }
+  if (layer.cutoutSource === "portrait") {
+    return {
+      label: "Try the Detailed Model",
+      hint: "Slower, but copes with pets, products and groups",
+      onRun: () => onRun(layer),
+    };
+  }
+  return undefined;
 }
 
 const NN_FONT_SIZES: Record<NNSize, { name: number; number: number; sub: number }> = {
@@ -669,42 +757,65 @@ export default function Customizer({
   };
 
   /* ---- image editing ---- */
+
+  /** Runs the AI cut-out models and reports what won. */
+  const runCutoutModels = async (orig: string, plan: CutoutModelKind[]) => {
+    return removeBackgroundLocally(orig, {
+      plan,
+      maxEdge: CUTOUT_MAX_EDGE,
+      onProgress: (progress) => {
+        setFxStatus(cutoutStatus(progress));
+        setFxProgress(progress.phase === "download" ? progress.percent ?? null : null);
+      },
+    });
+  };
+
   const applyFx = async (layer: ImageLayer, next: Partial<ImageFx>) => {
     const fx: ImageFx = { ...(layer.fx ?? DEFAULT_FX), ...next };
     const orig = layer.origSrc ?? layer.src;
     let backgroundRemovedSrc = layer.backgroundRemovedSrc;
+    let cutoutSource: CutoutSource | undefined = layer.cutoutSource;
     setFxBusy(true);
     setFxProgress(null);
     setFxStatus(fx.removeBg ? "Preparing background removal…" : "Applying artwork edits…");
     try {
-      let removedNothing = false;
+      let cutoutFailure: "no-subject" | "unavailable" | null = null;
       if (fx.removeBg && !backgroundRemovedSrc) {
-        // 1) Instant, on-device cutout — guaranteed to work on phones.
-        setFxStatus("Removing background…");
-        const quick = await quickBackgroundRemoval(orig).catch(() => null);
-        if (quick) backgroundRemovedSrc = quick.dataUrl;
+        // Decide what this upload *is* before touching it. Flat artwork — a
+        // logo, a sticker, a screenshot — has no background colour to argue
+        // with, so the instant key is exact and downloads nothing. A
+        // photograph has to be recognised instead, because a busy backdrop has
+        // no colour to key out and guessing one is what ate the customer's
+        // photo: it reported itself confident having cleared 95.7% of it.
+        const profile = await artworkProfile(orig).catch(() => null);
+        const flatArtwork = isVectorSource(orig) || (profile ? isFlatArtwork(profile) : false);
 
-        // 2) Refine busy photos with the AI model on capable devices.
-        const canRefine = shouldRefineWithAi() && !isVectorSource(orig);
-        if (canRefine && !quick?.confident) {
-          setFxStatus("Refining the cutout…");
+        const quickCut = async () => quickBackgroundRemoval(orig).catch(() => null);
+        const keepQuick = (quick: Awaited<ReturnType<typeof quickCut>>) => {
+          if (!quick) return;
+          backgroundRemovedSrc = quick.dataUrl;
+          cutoutSource = "quick";
+        };
+
+        if (flatArtwork) {
+          setFxStatus("Removing background…");
+          keepQuick(await quickCut());
+        } else {
           try {
-            const refined = await removeBackgroundLocally(orig, (progress: BackgroundRemovalProgress) => {
-              setFxStatus(
-                progress.phase === "download"
-                  ? "Downloading AI model…"
-                  : progress.phase === "compatibility"
-                    ? "Using compatibility mode; this may take longer…"
-                    : "Refining the cutout…",
-              );
-              setFxProgress(progress.phase === "download" ? progress.percent ?? null : null);
-            });
-            backgroundRemovedSrc = refined;
-          } catch {
-            // Keep whatever the instant cutout produced — never block the user.
+            const result = await runCutoutModels(orig, cutoutPlan(canAutoRunDetailedModel()));
+            backgroundRemovedSrc = result.dataUrl;
+            cutoutSource = result.source;
+          } catch (error) {
+            cutoutFailure = error instanceof CutoutError ? error.reason : "unavailable";
+            // One last resort for a photo the models could not handle: the
+            // colour key, but only when it is sure of itself *and* left a
+            // subject behind. Both halves matter — on the customer's own photo
+            // the key was sure of itself having kept 4% of the picture.
+            setFxStatus("Removing background…");
+            const quick = await quickCut();
+            if (quick?.confident && quick.ratio <= 0.85) keepQuick(quick);
           }
         }
-        if (!backgroundRemovedSrc) removedNothing = true;
       }
       setFxStatus("Applying artwork edits…");
       const source = fx.removeBg ? backgroundRemovedSrc ?? orig : orig;
@@ -713,22 +824,68 @@ export default function Customizer({
         fx,
         origSrc: orig,
         backgroundRemovedSrc,
+        cutoutSource,
         src: res.dataUrl,
         aspect: res.aspect,
       } as Partial<ImageLayer>);
       if (next.removeBg !== undefined) {
         setNotice(
-          fx.removeBg
-            ? removedNothing
-              ? { tone: "warn", text: "We could not detect a background to remove. Try Select Object for busy photos." }
-              : { tone: "ok", text: "Background removed." }
-            : { tone: "ok", text: "Original background restored." },
+          cutoutNotice({
+            removeBg: fx.removeBg,
+            failure: cutoutFailure,
+            hasCutout: Boolean(backgroundRemovedSrc),
+          }),
         );
       }
     } catch (err) {
       setNotice({
         tone: "error",
         text: err instanceof Error ? err.message : "That edit could not be applied.",
+      });
+    } finally {
+      setFxBusy(false);
+      setFxStatus(null);
+      setFxProgress(null);
+    }
+  };
+
+  /**
+   * Re-cuts the layer with the AI models on request: the portrait model first
+   * (a 6 MB download), or the detailed model directly when the portrait model
+   * has already had its turn.
+   */
+  const refineCutout = async (layer: ImageLayer) => {
+    const orig = layer.origSrc ?? layer.src;
+    const fx: ImageFx = { ...(layer.fx ?? DEFAULT_FX), removeBg: true };
+    const plan = layer.cutoutSource === "portrait" ? DETAILED_PLAN : cutoutPlan(true);
+    setFxBusy(true);
+    setFxProgress(null);
+    setFxStatus("Preparing the AI cut-out…");
+    try {
+      const result = await runCutoutModels(orig, plan);
+      setFxStatus("Applying artwork edits…");
+      const res = await applyImageFx(result.dataUrl, { ...fx, removeBg: false });
+      patch(side, layer.id, {
+        fx,
+        origSrc: orig,
+        backgroundRemovedSrc: result.dataUrl,
+        cutoutSource: result.source,
+        src: res.dataUrl,
+        aspect: res.aspect,
+      } as Partial<ImageLayer>);
+      setNotice(
+        result.report.reject
+          ? { tone: "warn", text: "AI cut-out applied best effort — zoom in and check the edges." }
+          : { tone: "ok", text: `Background removed with the ${result.source === "general" ? "detailed" : "portrait"} model.` },
+      );
+    } catch (error) {
+      const reason = error instanceof CutoutError ? error.reason : "unavailable";
+      setNotice({
+        tone: "warn",
+        text:
+          reason === "no-subject"
+            ? "The AI could not find a subject in that photo. Use Select Object instead."
+            : "The cut-out model could not load. Check your connection and try again.",
       });
     } finally {
       setFxBusy(false);
@@ -746,6 +903,7 @@ export default function Customizer({
         fx: { ...DEFAULT_FX },
         origSrc: orig,
         backgroundRemovedSrc: undefined,
+        cutoutSource: undefined,
         src: res.dataUrl,
         aspect: res.aspect,
         x: 50,
@@ -1191,6 +1349,7 @@ export default function Customizer({
         fx,
         origSrc: orig,
         backgroundRemovedSrc: cutout,
+        cutoutSource: "manual",
         src: result.dataUrl,
         aspect: result.aspect,
       } as Partial<ImageLayer>);
@@ -1403,6 +1562,7 @@ export default function Customizer({
             progress={fxProgress}
             eyebrow={ART_LIBRARY.some((a) => a.src === selected.origSrc) ? "Add Art" : "Upload Art"}
             actions={actionsFor(selected)}
+            cutoutAction={cutoutActionFor(selected, (layer) => void refineCutout(layer))}
             onFx={(next) => void applyFx(selected, next)}
             onApplySelection={applySubjectSelection}
             onChange={(changes) => patchActive(selected.id, changes)}
