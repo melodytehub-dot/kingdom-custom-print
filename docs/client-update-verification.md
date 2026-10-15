@@ -230,6 +230,11 @@ mobile".
 - `npm run qa-cutout-mask` is new: 18 checks on the mask analyser against real
   failure shapes — matted portrait, mug with its handle hole, empty mask,
   everything-kept mask, sieve, mush, hair and degenerate input. No browser needed.
+- `npm run qa-cutout-actions` is new: 28 checks pinning every message the customer
+  can see around the cut-out ("Background removed.", "We could not find a subject
+  in that photo…", "…the AI model could not load") and every button the artwork
+  editor can offer, including the retry that used to be missing, plus which
+  devices are allowed to run the 42 MB model unprompted. No browser needed.
 - `npm run qa-background-remove` passes on both viewports: a flat logo and a
   gradient logo still cut out instantly with no model download, and a busy photo
   is never pasted half-removed.

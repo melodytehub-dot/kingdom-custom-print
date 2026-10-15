@@ -263,11 +263,19 @@ const { default: Customizer } = load("components/customizer/Customizer.tsx", {
     emptyDesign: blank, usedSides: () => [], personalizationOf: () => "none", loadDrafts: () => [], removeLayers: d => d, selectionIsWholeGroup: () => false, selectionIds: (d, s, id) => [id], groupMembers: () => [],
     newTextLayer: () => ({ ...layer, type: "text" }),
   },
-  "@/lib/imageFx": {},
+  "@/lib/imageFx": {
+    DEFAULT_FX: {},
+    artworkProfile: async () => ({ texture: 0, flat: 1, edges: 0 }),
+    isFlatArtwork: () => false,
+    isVectorSource: () => false,
+    quickBackgroundRemoval: async () => null,
+    applyImageFx: async (_src, fx) => ({ dataUrl: "", aspect: 1, fx }),
+  },
   "@/lib/backgroundRemoval": {
     removeBackgroundLocally: async () => ({ dataUrl: "", source: "portrait", report: {} }),
     CutoutError: class CutoutError extends Error { constructor(reason, message) { super(message); this.reason = reason; } },
   },
+  "@/lib/cutoutActions": load("lib/cutoutActions.ts", { "@/lib/cutoutModels": { formatModelSize: () => "6 MB" } }),
   "@/lib/cutoutModels": {
     CUTOUT_MAX_EDGE: 1400, DETAILED_PLAN: ["general"], cutoutPlan: () => ["portrait"], formatModelSize: () => "6 MB",
   },

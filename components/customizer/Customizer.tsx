@@ -86,12 +86,12 @@ import {
   isVectorSource,
   quickBackgroundRemoval,
 } from "@/lib/imageFx";
-import { removeBackgroundLocally, CutoutError, type BackgroundRemovalProgress } from "@/lib/backgroundRemoval";
+import { removeBackgroundLocally, CutoutError } from "@/lib/backgroundRemoval";
+import { canAutoRunDetailedModel, cutoutActionFor, cutoutNotice, cutoutStatus } from "@/lib/cutoutActions";
 import {
   CUTOUT_MAX_EDGE,
   DETAILED_PLAN,
   cutoutPlan,
-  formatModelSize,
   type CutoutModelKind,
 } from "@/lib/cutoutModels";
 import { drawPreview } from "./preview";
@@ -139,90 +139,6 @@ const STEP_LABEL: Record<Step, string> = {
 
 /** Layer editors share selection state; all design panels keep a mobile preview visible. */
 const SPLIT_PANELS: Panel[] = ["text", "image"];
-
-/**
- * Background removal runs instantly on-device everywhere; so do the AI models,
- * which is what makes this work on a phone at all. What is device-dependent is
- * the 42 MB detailed model: on a phone it means tens of seconds of CPU, so it
- * is only run automatically on desktop-class browsers and is otherwise offered
- * as a button the customer can choose.
- */
-function canAutoRunDetailedModel(): boolean {
-  if (typeof navigator === "undefined") return false;
-  return !/Android|iPhone|iPad|iPod|Mobile|Windows Phone/i.test(navigator.userAgent || "");
-}
-
-/** What the customer reads while a model downloads or works. */
-function cutoutStatus(progress: BackgroundRemovalProgress): string {
-  const name = progress.model?.name ?? "cut-out";
-  if (progress.phase === "download") {
-    const size = progress.model ? formatModelSize(progress.model.bytes) : "";
-    const slow = progress.model?.kind === "general" ? " This one is slower." : "";
-    return `Downloading the ${name} model… ${progress.percent ?? 0}% (${size}, downloads once).${slow}`;
-  }
-  return `Cutting out the subject with the ${name} model…`;
-}
-
-/**
- * The answer to "did my background go away?". This has to stay honest: when a
- * busy photo could not be cut out, saying so (and pointing at the two ways
- * forward) beats pasting a half-removed picture onto the shirt.
- */
-function cutoutNotice({
-  removeBg,
-  failure,
-  hasCutout,
-}: {
-  removeBg: boolean;
-  failure: "no-subject" | "unavailable" | null;
-  hasCutout: boolean;
-}): { tone: "ok" | "warn" | "error"; text: string } {
-  if (!removeBg) return { tone: "ok", text: "Original background restored." };
-  if (failure === "no-subject") {
-    return hasCutout
-      ? {
-          tone: "warn",
-          text: "We could not make out a clear subject, so the fast cut-out is applied. Try the detailed model or Select Object.",
-        }
-      : { tone: "warn", text: "We could not find a subject in that photo. Try Select Object to pick it out by hand." };
-  }
-  if (failure === "unavailable") {
-    return hasCutout
-      ? { tone: "warn", text: "Background removed with the fast cut-out — the AI model could not load. Check your connection and try again." }
-      : { tone: "warn", text: "The cut-out model could not load. Check your connection and try again." };
-  }
-  if (!hasCutout) return { tone: "warn", text: "We could not detect a background to remove. Try Select Object for busy photos." };
-  return { tone: "ok", text: "Background removed." };
-}
-
-/** The "keep going" button offered in the artwork editor. */
-function cutoutActionFor(
-  layer: ImageLayer,
-  onRun: (layer: ImageLayer) => void,
-): { label: string; hint: string; onRun: () => void } | undefined {
-  if (!layer.fx?.removeBg) {
-    return {
-      label: "Remove Background with AI",
-      hint: "Cuts a person or product out of any photo",
-      onRun: () => onRun(layer),
-    };
-  }
-  if (layer.cutoutSource === "quick" || layer.cutoutSource === "manual") {
-    return {
-      label: "Improve Cut-out with AI",
-      hint: "Reads the photo and keeps hair and soft edges",
-      onRun: () => onRun(layer),
-    };
-  }
-  if (layer.cutoutSource === "portrait") {
-    return {
-      label: "Try the Detailed Model",
-      hint: "Slower, but copes with pets, products and groups",
-      onRun: () => onRun(layer),
-    };
-  }
-  return undefined;
-}
 
 const NN_FONT_SIZES: Record<NNSize, { name: number; number: number; sub: number }> = {
   small: { name: 4.5, number: 12, sub: 3.2 },
