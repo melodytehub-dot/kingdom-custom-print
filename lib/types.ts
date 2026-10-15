@@ -90,6 +90,11 @@ export interface BaseLayer {
   flipV: boolean;
   /** Locked layers cannot be dragged, stretched or rotated until unlocked. */
   locked?: boolean;
+  /**
+   * Layers that share a group id behave as one object: they select, move,
+   * scale, rotate, duplicate and delete together.
+   */
+  groupId?: string;
   /** Distress level 0 (clean) to 3 (heavy) — knocks speckles out of the print. */
   distress?: number;
 }

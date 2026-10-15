@@ -11,6 +11,7 @@ import {
   AddTextPanel,
   TextIdeasPanel,
   DistressPanel,
+  LayersPanel,
   NamesIntro,
   NamesTools,
   NN_DEFAULTS,
@@ -29,11 +30,16 @@ import {
   ArtIcon,
   CartGlyph,
   CheckGlyph,
+  CloseIcon,
   CloudUploadIcon,
   DistressIcon,
   ChevronRightIcon,
   DollarIcon,
+  DuplicateIcon,
+  GroupIcon,
   HeadsetIcon,
+  LayersIcon,
+  LockIcon,
   PersonalizeIcon,
   RedoIcon,
   RotateShirtIcon,
@@ -42,14 +48,19 @@ import {
   ShirtIcon,
   TextBoxIcon,
   TemplatesIcon,
+  TrashIcon,
   UndoIcon,
+  UngroupIcon,
   UserIcon,
 } from "./icons";
 import { type ArtItem, ART_LIBRARY } from "./art";
 import type { DesignTemplate } from "./templates";
 import {
   duplicateLayer,
+  duplicateSelection,
   emptyDesign,
+  groupMembers,
+  groupSelection,
   loadDrafts,
   newImageLayer,
   newTextLayer,
@@ -57,8 +68,11 @@ import {
   persistDrafts,
   personalizationOf,
   readImageFile,
-  removeLayer,
+  removeLayers,
   reorderLayer,
+  selectionIds,
+  selectionIsWholeGroup,
+  ungroupSelection,
   updateLayer,
   usedSides,
   validateUpload,
@@ -98,6 +112,7 @@ type Panel =
   | "names"
   | "roster"
   | "distress"
+  | "layers"
   | "saved";
 
 const STEP_ORDER: Step[] = ["design", "quantity", "review"];
@@ -217,7 +232,10 @@ export default function Customizer({
   });
   const [design, setDesign] = useState<Design>(emptyDesign);
   const [lines, setLines] = useState<Record<string, number>>(initialLines);
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  /** The selection is a list: one layer, a whole group, or a multi-pick. */
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  /** While on, canvas taps add to and remove from the selection. */
+  const [multiSelect, setMultiSelect] = useState(false);
   const [drafts, setDrafts] = useState<SavedDraft[]>([]);
   const [notice, setNotice] = useState<{ tone: "ok" | "warn" | "error"; text: string } | null>(null);
   const [productSwitchPrompt, setProductSwitchPrompt] = useState<ProductSwitchPrompt | null>(null);
@@ -283,7 +301,13 @@ export default function Customizer({
   const personalization = personalizationOf(design);
   const quote = quoteProduct(product, { sides, lines: sizeLines, personalization });
   const layers = design[side];
+  // Panels and editors belong to one layer; a group or multi-pick has no editor.
+  const selectedId = selectedIds.length === 1 ? selectedIds[0] : null;
   const selected = selectedId ? layers.find((l) => l.id === selectedId) : undefined;
+  const selectedLayers = useMemo(
+    () => layers.filter((l) => selectedIds.includes(l.id)),
+    [layers, selectedIds]
+  );
   const cartCount = items.reduce((n, i) => n + i.quantity, 0);
   const rosterLocked = roster.length > 0 && personalization !== "none";
 
@@ -471,24 +495,55 @@ export default function Customizer({
   );
 
   /* ---- selection + panel routing ---- */
-  const handleSelect = useCallback(
-    (id: string | null) => {
-      setSelectedId(id);
-      if (!id) setPanel("none");
-    },
-    []
-  );
+  const handleSelect = useCallback((ids: string[]) => {
+    setSelectedIds(ids);
+    if (!ids.length) setPanel("none");
+  }, []);
 
   const closePanel = () => {
-    setSelectedId(null);
+    setSelectedIds([]);
     setPanel("none");
   };
 
   const openLayerPanel = (id: string) => {
     const layer = design[side].find((l) => l.id === id);
     if (!layer) return;
-    setSelectedId(id);
+    setSelectedIds([id]);
     setPanel(layer.type === "text" ? "text" : "image");
+  };
+
+  /**
+   * A tap on the canvas. A plain element opens its editor straight away, like
+   * before. A grouped element is picked up as a whole group first (so it can be
+   * moved as one object), and tapping it again steps inside the group and opens
+   * that element's editor.
+   */
+  const handleTap = (id: string) => {
+    const layer = layers.find((l) => l.id === id);
+    if (!layer) return;
+
+    if (multiSelect) {
+      setSelectedIds((prev) =>
+        prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
+      );
+      setPanel("none");
+      return;
+    }
+
+    const groupIds = layer.groupId
+      ? groupMembers(design, side, layer.groupId).map((l) => l.id)
+      : [];
+    const groupSelected =
+      groupIds.length > 1 &&
+      selectedIds.length === groupIds.length &&
+      groupIds.every((gid) => selectedIds.includes(gid));
+
+    if (groupIds.length > 1 && !groupSelected) {
+      setSelectedIds(groupIds);
+      setPanel("none");
+      return;
+    }
+    openLayerPanel(id);
   };
 
   const editLayer = (id: string) => {
@@ -500,7 +555,7 @@ export default function Customizer({
     setFlipping(true);
     window.setTimeout(() => setFlipping(false), 320);
     setSide((s) => (s === "front" ? "back" : "front"));
-    setSelectedId(null);
+    setSelectedIds([]);
     setPanel((p) => (SPLIT_PANELS.includes(p) ? "none" : p));
   };
 
@@ -540,14 +595,14 @@ export default function Customizer({
   const addText = (style: Partial<TextLayer> = {}) => {
     const layer = newTextLayer({ ...(darkShirt ? { color: "#FFFFFF" } : {}), ...style });
     setDesign((prev) => ({ ...prev, [side]: [...prev[side], layer] }));
-    setSelectedId(layer.id);
+    setSelectedIds([layer.id]);
     setPanel("text");
   };
 
   const addImageLayer = (src: string, name: string, aspect: number) => {
     const layer = newImageLayer(src, name, aspect, { origSrc: src, fx: { ...DEFAULT_FX } });
     setDesign((prev) => ({ ...prev, [side]: [...prev[side], layer] }));
-    setSelectedId(layer.id);
+    setSelectedIds([layer.id]);
     setPanel("image");
   };
 
@@ -584,7 +639,7 @@ export default function Customizer({
 
     if (!additions.length) return;
     setDesign((prev) => ({ ...prev, [side]: [...prev[side], ...additions] }));
-    setSelectedId(null);
+    setSelectedIds([]);
     setPanel("none");
     setNotice({ tone: "ok", text: `${template.name} added to the ${side}. Tap a part to edit it.` });
   };
@@ -709,7 +764,7 @@ export default function Customizer({
     }
   };
 
-  /* ---- layer actions (shared by both editors) ---- */
+  /* ---- layer actions (shared by the editors and the group bar) ---- */
   const actionsFor = (layer: DesignLayer): LayerActionsProps => {
     const index = layers.findIndex((l) => l.id === layer.id);
     return {
@@ -723,24 +778,77 @@ export default function Customizer({
       onForward: () => setDesign((prev) => reorderLayer(prev, side, layer.id, "forward")),
       onFlipH: () => patchActive(layer.id, { flipH: !layer.flipH }),
       onFlipV: () => patchActive(layer.id, { flipV: !layer.flipV }),
-      onLock: () => patchActive(layer.id, { locked: !layer.locked }),
-      onDelete: () => deleteLayer(layer.id),
+      onLock: () => {
+        // A group locks as one object, so the lock always means the same thing.
+        const ids = layer.groupId
+          ? groupMembers(design, side, layer.groupId).map((l) => l.id)
+          : [layer.id];
+        for (const id of ids) patchActive(id, { locked: !layer.locked });
+      },
+      onDelete: () => deleteLayers([layer.id]),
       onDuplicate: () => {
         const res = duplicateLayer(design, side, layer.id);
         if (res) {
           setDesign(res.design);
-          setSelectedId(res.id);
+          setSelectedIds([res.id]);
         }
       },
     };
   };
 
-  const deleteLayer = (id: string) => {
-    setDesign((prev) => removeLayer(prev, side, id));
-    if (selectedId === id) {
-      setSelectedId(null);
+  const deleteLayers = (ids: string[]) => {
+    if (!ids.length) return;
+    setDesign((prev) => removeLayers(prev, side, ids));
+    if (ids.some((id) => selectedIds.includes(id))) {
+      setSelectedIds([]);
       setPanel((p) => (SPLIT_PANELS.includes(p) ? "none" : p));
     }
+  };
+
+  /* ---- grouping: several layers that behave as one object ---- */
+  const groupSelected = () => {
+    if (selectedIds.length < 2) return;
+    const count = selectedIds.length;
+    setDesign((prev) => groupSelection(prev, side, selectedIds));
+    setMultiSelect(false);
+    setNotice({ tone: "ok", text: `${count} elements grouped. Move them as one.` });
+  };
+
+  const ungroupSelected = (ids: string[] = selectedIds) => {
+    if (!ids.length) return;
+    setDesign((prev) => ungroupSelection(prev, side, ids));
+    if (ids.some((id) => selectedIds.includes(id))) setSelectedIds([]);
+    setNotice({ tone: "ok", text: "Group released." });
+  };
+
+  const duplicateSelected = () => {
+    if (!selectedIds.length) return;
+    const res = duplicateSelection(design, side, selectedIds);
+    if (!res) return;
+    setDesign(res.design);
+    setSelectedIds(res.ids);
+  };
+
+  /** True when every selected layer is locked (the bar then offers Unlock). */
+  const allLocked = selectedLayers.length > 0 && selectedLayers.every((l) => l.locked);
+
+  const toggleLockSelected = () => {
+    const next = !allLocked;
+    for (const id of selectedIds) patchActive(id, { locked: next });
+    setNotice({ tone: "ok", text: next ? "Locked. Unlock to move again." : "Unlocked." });
+  };
+
+  /** Adds or removes one layer from the selection (Layers panel checkboxes). */
+  const toggleSelected = (id: string) => {
+    setSelectedIds((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
+    );
+    setPanel("layers");
+  };
+
+  const clearSelection = () => {
+    setSelectedIds([]);
+    setMultiSelect(false);
   };
 
   /* ---- distress ---- */
@@ -787,13 +895,13 @@ export default function Customizer({
   };
 
   const startNames = () => {
-    setSelectedId(null);
+    setSelectedIds([]);
     setPanel(personalization === "none" ? "names-intro" : "names");
   };
 
   const addTextIdeaLayers = (created: DesignLayer[], summary: string) => {
     setDesign((prev) => ({ ...prev, [side]: [...prev[side], ...created] }));
-    setSelectedId(null);
+    setSelectedIds([]);
     setPanel("none");
     setNotice({ tone: "ok", text: `Added ${summary}. You can edit each layer now.` });
   };
@@ -856,7 +964,7 @@ export default function Customizer({
     setRoster(rows);
     syncLinesFromRoster(rows);
     setSide(nn.side);
-    setSelectedId(null);
+    setSelectedIds([]);
     setPanel("none");
     setNotice({
       tone: "ok",
@@ -875,7 +983,7 @@ export default function Customizer({
   const startOver = () => {
     setDesign(emptyDesign());
     setRoster([]);
-    setSelectedId(null);
+    setSelectedIds([]);
     setPanel("none");
     setZoom(1);
     setNotice({ tone: "ok", text: "Started a fresh design." });
@@ -892,7 +1000,7 @@ export default function Customizer({
     historyRef.current = pending ? h : h.slice(0, -1);
     applyingHistory.current = true;
     setDesign(prev);
-    setSelectedId(null);
+    setSelectedIds([]);
     setPanel((p) => (SPLIT_PANELS.includes(p) ? "none" : p));
     syncHist();
   };
@@ -905,7 +1013,7 @@ export default function Customizer({
     historyRef.current = [...historyRef.current, next].slice(-30);
     applyingHistory.current = true;
     setDesign(next);
-    setSelectedId(null);
+    setSelectedIds([]);
     setPanel((p) => (SPLIT_PANELS.includes(p) ? "none" : p));
     syncHist();
   };
@@ -960,7 +1068,7 @@ export default function Customizer({
     }
     applyingHistory.current = true;
     setDesign(normalizeDesign(found.design));
-    setSelectedId(null);
+    setSelectedIds([]);
     const m = productMockups.find((candidate) => candidate.slug === found.colorSlug);
     if (m) setColorCode(m.code);
     setLines(Object.fromEntries(product.sizes.map((size) => [size.label, found.lines?.[size.label] ?? 0])));
@@ -1031,7 +1139,7 @@ export default function Customizer({
       setAddedCount((n) => n + 1);
       setNotice({ tone: "ok", text: "Added to cart." });
       setLines(Object.fromEntries(product.sizes.map((s) => [s.label, 0])));
-      setSelectedId(null);
+      setSelectedIds([]);
     } catch {
       setNotice({
         tone: "error",
@@ -1052,7 +1160,7 @@ export default function Customizer({
       return;
     }
     setStep(next);
-    setSelectedId(null);
+    setSelectedIds([]);
     setPanel("none");
   };
 
@@ -1349,6 +1457,23 @@ export default function Customizer({
             onClose={closePanel}
           />
         );
+      case "layers":
+        return (
+          <LayersPanel
+            layers={layers}
+            selectedIds={selectedIds}
+            multiSelect={multiSelect}
+            canUngroup={selectionIsWholeGroup(design, side, selectedIds)}
+            onPick={(id) => setSelectedIds(selectionIds(design, side, id))}
+            onToggle={toggleSelected}
+            onMultiSelect={setMultiSelect}
+            onGroup={groupSelected}
+            onUngroup={() => ungroupSelected()}
+            onDuplicate={duplicateSelected}
+            onDelete={() => deleteLayers(selectedIds)}
+            onClose={closePanel}
+          />
+        );
       case "saved":
         return (
           <SavedPanel
@@ -1369,13 +1494,21 @@ export default function Customizer({
   const layout =
     step !== "design" ? "full" : panel === "none" ? "none" : split ? "split" : "full";
 
+  /* Grouping state for the floating selection bar. */
+  const wholeGroup = selectionIsWholeGroup(design, side, selectedIds);
+  const canGroup = selectedIds.length >= 2 && !wholeGroup;
+  const canUngroup = wholeGroup;
+  // On phones the editor is a bottom sheet that covers the bar, so it steps
+  // aside; the sheet's own action bar handles the focused element.
+  const showSelectionBar = step === "design" && selectedIds.length > 0 && !overlayPanel;
+
   const tools: { id: string; label: string; icon: React.ReactNode; onClick: () => void }[] = [
     {
       id: "products",
       label: "Product",
       icon: <ShirtIcon size={38} />,
       onClick: () => {
-        setSelectedId(null);
+        setSelectedIds([]);
         setPanel("products");
       },
     },
@@ -1383,20 +1516,20 @@ export default function Customizer({
       id: "upload",
       label: "Upload",
       icon: <CloudUploadIcon size={38} />,
-      onClick: () => { setSelectedId(null); setPanel("upload"); },
+      onClick: () => { setSelectedIds([]); setPanel("upload"); },
     },
     {
       id: "text",
       label: "Add Text",
       icon: <TextBoxIcon size={38} />,
-      onClick: () => { setSelectedId(null); setPanel("text-add"); },
+      onClick: () => { setSelectedIds([]); setPanel("text-add"); },
     },
     {
       id: "art",
       label: "Add Graphics",
       icon: <ArtIcon size={38} />,
       onClick: () => {
-        setSelectedId(null);
+        setSelectedIds([]);
         setPanel("art");
       },
     },
@@ -1405,9 +1538,16 @@ export default function Customizer({
       label: "Templates",
       icon: <TemplatesIcon size={38} />,
       onClick: () => {
-        setSelectedId(null);
+        setSelectedIds([]);
         setPanel("templates");
       },
+    },
+    {
+      id: "layers",
+      label: "Layers",
+      icon: <LayersIcon size={38} />,
+      // Keeps whatever is picked, so a canvas pick can be grouped from here.
+      onClick: () => setPanel("layers"),
     },
     {
       id: "names",
@@ -1420,7 +1560,7 @@ export default function Customizer({
       label: "Saved Designs",
       icon: <UserIcon size={38} />,
       onClick: () => {
-        setSelectedId(null);
+        setSelectedIds([]);
         setDrafts(loadDrafts());
         setPanel("saved");
       },
@@ -1430,7 +1570,7 @@ export default function Customizer({
       label: "Text Ideas",
       icon: <TextBoxIcon size={38} />,
       onClick: () => {
-        setSelectedId(null);
+        setSelectedIds([]);
         setPanel("ideas");
       },
     },
@@ -1439,7 +1579,7 @@ export default function Customizer({
       label: "Distress",
       icon: <DistressIcon size={38} />,
       onClick: () => {
-        setSelectedId(null);
+        setSelectedIds([]);
         setPanel("distress");
       },
     },
@@ -1481,7 +1621,7 @@ export default function Customizer({
       onPointerDownCapture={(event) => {
         if (step !== "design" || panel === "none") return;
         const target = event.target;
-        if (target instanceof Element && target.closest(".rot-panel, .rot-rail, .rot-quickadd, .rot-canvas")) return;
+        if (target instanceof Element && target.closest(".rot-panel, .rot-rail, .rot-quickadd, .rot-canvas, .rot-selbar")) return;
         closePanel();
       }}
       style={{ ["--step" as string]: stepIndex }}
@@ -1577,7 +1717,7 @@ export default function Customizer({
                       className={`rot-side-thumb${side === view ? " is-active" : ""}`}
                       onClick={() => {
                         setSide(view);
-                        setSelectedId(null);
+                        setSelectedIds([]);
                         setPanel((p) => (SPLIT_PANELS.includes(p) ? "none" : p));
                       }}
                       aria-pressed={side === view}
@@ -1627,11 +1767,11 @@ export default function Customizer({
                   side={side}
                   printArea={product.printArea}
                   design={design}
-                  selectedId={selectedId}
+                  selectedIds={selectedIds}
                   compact={compact}
                   renderSize={fit.size}
                   onSelect={handleSelect}
-                  onTap={openLayerPanel}
+                  onTap={handleTap}
                   onChange={patch}
                   onGestureStart={() => {
                     if (historyRef.current.at(-1) !== design) historyRef.current = [...historyRef.current.slice(-29), design];
@@ -1639,8 +1779,9 @@ export default function Customizer({
                     if (compact && SPLIT_PANELS.includes(panel)) setPanel("none");
                   }}
                   onCommit={() => setTransforming(false)}
-                  onDelete={deleteLayer}
+                  onDelete={deleteLayers}
                   onEdit={editLayer}
+                  onUngroup={ungroupSelected}
                 />
               </div>
             ) : null}
@@ -1662,6 +1803,103 @@ export default function Customizer({
                 <button type="button" onClick={startNames}>
                   <PersonalizeIcon size={26} />
                   <span>Names & Numbers</span>
+                </button>
+              </div>
+            ) : null}
+
+            {showSelectionBar ? (
+              <div
+                className="rot-selbar"
+                role="toolbar"
+                aria-label="Selection actions"
+                data-mode={multiSelect ? "pick" : "select"}
+              >
+                <span className="rot-selcount" role="status" aria-live="polite">
+                  {selectedIds.length} selected
+                </span>
+
+                {canGroup ? (
+                  <button
+                    type="button"
+                    className="rot-selbtn is-primary"
+                    onClick={groupSelected}
+                    aria-label={`Group ${selectedIds.length} elements`}
+                    title="Group"
+                  >
+                    <GroupIcon size={20} />
+                    <span>Group</span>
+                  </button>
+                ) : null}
+
+                {canUngroup ? (
+                  <button
+                    type="button"
+                    className="rot-selbtn"
+                    onClick={() => ungroupSelected()}
+                    aria-label="Ungroup"
+                    title="Ungroup"
+                  >
+                    <UngroupIcon size={20} />
+                    <span>Ungroup</span>
+                  </button>
+                ) : null}
+
+                {!canGroup && !canUngroup ? (
+                  <button
+                    type="button"
+                    className={`rot-selbtn${multiSelect ? " is-on" : ""}`}
+                    aria-pressed={multiSelect}
+                    aria-label="Select more elements"
+                    title="Select more"
+                    onClick={() => setMultiSelect((m) => !m)}
+                  >
+                    <GroupIcon size={20} />
+                    <span>Select more</span>
+                  </button>
+                ) : null}
+
+                <button
+                  type="button"
+                  className="rot-selbtn"
+                  onClick={duplicateSelected}
+                  aria-label="Duplicate selection"
+                  title="Duplicate"
+                >
+                  <DuplicateIcon size={20} />
+                  <span>Duplicate</span>
+                </button>
+
+                <button
+                  type="button"
+                  className={`rot-selbtn${allLocked ? " is-on" : ""}`}
+                  onClick={toggleLockSelected}
+                  aria-label={allLocked ? "Unlock selection" : "Lock selection"}
+                  title={allLocked ? "Unlock" : "Lock"}
+                >
+                  <LockIcon size={20} open={!allLocked} />
+                  <span>{allLocked ? "Unlock" : "Lock"}</span>
+                </button>
+
+                <button
+                  type="button"
+                  className="rot-selbtn is-danger"
+                  onClick={() => deleteLayers(selectedIds)}
+                  aria-label="Delete selection"
+                  title="Delete"
+                >
+                  <TrashIcon size={20} />
+                  <span>Delete</span>
+                </button>
+
+                <button
+                  type="button"
+                  className="rot-selbtn is-done"
+                  onClick={clearSelection}
+                  aria-label="Clear selection"
+                  title="Done"
+                >
+                  <CloseIcon size={20} />
+                  <span>Done</span>
                 </button>
               </div>
             ) : null}

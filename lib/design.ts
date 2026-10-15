@@ -171,6 +171,7 @@ export function normalizeLayer(layer: DesignLayer): DesignLayer {
   const isImage = layer.type === "image";
   const patched = {
     ...layer,
+    groupId: typeof layer.groupId === "string" && layer.groupId ? layer.groupId : undefined,
     scaleX: Number.isFinite(layer.scaleX) ? layer.scaleX : isImage ? 0.6 : 1,
     scaleY: Number.isFinite(layer.scaleY) ? layer.scaleY : isImage ? 0.6 : 1,
     opacity: Number.isFinite(layer.opacity) ? layer.opacity : 1,
@@ -257,7 +258,23 @@ export function removeLayer(
   side: GarmentSide,
   id: string
 ): Design {
-  return { ...design, [side]: design[side].filter((l) => l.id !== id) };
+  return {
+    ...design,
+    [side]: pruneGroups(design[side].filter((l) => l.id !== id)),
+  };
+}
+
+/** Removes several layers at once, used by group delete. */
+export function removeLayers(
+  design: Design,
+  side: GarmentSide,
+  ids: string[]
+): Design {
+  const set = new Set(ids);
+  return {
+    ...design,
+    [side]: pruneGroups(design[side].filter((l) => !set.has(l.id))),
+  };
 }
 
 export function updateLayer(
@@ -278,6 +295,124 @@ export function findLayer(
   id: string
 ): DesignLayer | undefined {
   return design[side].find((l) => l.id === id);
+}
+
+/* -------------------------------------------------------------------------
+   Grouping - several layers that behave like one object
+   ------------------------------------------------------------------------- */
+
+/** Layers sharing a group id (always at least two, or the tag is dropped). */
+export function groupMembers(
+  design: Design,
+  side: GarmentSide,
+  groupId: string
+): DesignLayer[] {
+  return design[side].filter((l) => l.groupId === groupId);
+}
+
+/** The whole group a layer belongs to, or just the layer when it is alone. */
+export function groupPeers(
+  design: Design,
+  side: GarmentSide,
+  id: string
+): DesignLayer[] {
+  const layer = findLayer(design, side, id);
+  if (!layer) return [];
+  if (!layer.groupId) return [layer];
+  const peers = groupMembers(design, side, layer.groupId);
+  return peers.length > 1 ? peers : [layer];
+}
+
+/** The selection a tap on `id` should produce: the whole group, or one layer. */
+export function selectionIds(design: Design, side: GarmentSide, id: string): string[] {
+  return groupPeers(design, side, id).map((l) => l.id);
+}
+
+/** True when every id belongs to the same group and that group is complete. */
+export function selectionIsWholeGroup(
+  design: Design,
+  side: GarmentSide,
+  ids: string[]
+): boolean {
+  if (ids.length < 2) return false;
+  const layer = findLayer(design, side, ids[0]);
+  if (!layer?.groupId) return false;
+  const members = groupMembers(design, side, layer.groupId);
+  return members.length === ids.length && members.every((m) => ids.includes(m.id));
+}
+
+/** A group of one is not a group: drop tags that no longer have company. */
+export function pruneGroups(list: DesignLayer[]): DesignLayer[] {
+  const counts = new Map<string, number>();
+  for (const layer of list) {
+    if (layer.groupId) counts.set(layer.groupId, (counts.get(layer.groupId) ?? 0) + 1);
+  }
+  let changed = false;
+  const next = list.map((layer) => {
+    if (layer.groupId && (counts.get(layer.groupId) ?? 0) < 2) {
+      changed = true;
+      return { ...layer, groupId: undefined };
+    }
+    return layer;
+  });
+  return changed ? next : list;
+}
+
+/** Tags the given layers as one group, absorbing any groups they came from. */
+export function groupSelection(
+  design: Design,
+  side: GarmentSide,
+  ids: string[]
+): Design {
+  if (ids.length < 2) return design;
+  const set = new Set(ids);
+  // Pulling one member out of an existing group splits that group, so any
+  // leftovers are pruned as well.
+  const groupId = nextId("g");
+  const next = design[side].map((layer) =>
+    set.has(layer.id) ? { ...layer, groupId } : layer
+  );
+  return { ...design, [side]: pruneGroups(next) };
+}
+
+/** Removes the given layers from their groups; the rest stay grouped. */
+export function ungroupSelection(
+  design: Design,
+  side: GarmentSide,
+  ids: string[]
+): Design {
+  const set = new Set(ids);
+  if (!design[side].some((layer) => set.has(layer.id) && layer.groupId)) return design;
+  const next = design[side].map((layer) =>
+    set.has(layer.id) ? { ...layer, groupId: undefined } : layer
+  );
+  return { ...design, [side]: pruneGroups(next) };
+}
+
+/** Duplicates every layer of a group, keeping the copies in one new group. */
+export function duplicateSelection(
+  design: Design,
+  side: GarmentSide,
+  ids: string[]
+): { design: Design; ids: string[] } | null {
+  if (!ids.length) return null;
+  const set = new Set(ids);
+  const sources = design[side].filter((l) => set.has(l.id));
+  if (!sources.length) return null;
+  const groupId = sources.length > 1 ? nextId("g") : undefined;
+  const copies = sources.map((src) =>
+    normalizeLayer({
+      ...src,
+      id: nextId(src.type === "text" ? "t" : "i"),
+      x: Math.min(100, src.x + 5),
+      y: Math.min(100, src.y + 5),
+      groupId,
+    })
+  );
+  const lastIndex = Math.max(...sources.map((src) => design[side].indexOf(src)));
+  const layers = [...design[side]];
+  layers.splice(lastIndex + 1, 0, ...copies);
+  return { design: { ...design, [side]: layers }, ids: copies.map((c) => c.id) };
 }
 
 /* -------------------------------------------------------------------------

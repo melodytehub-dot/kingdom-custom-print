@@ -3312,3 +3312,304 @@
     -webkit-overflow-scrolling: touch;
   }
 }
+
+
+/* ==========================================================================
+   Grouping � floating selection bar + Layers panel
+   ========================================================================== */
+
+.rot-selbar {
+  position: absolute;
+  z-index: 9;
+  left: 50%;
+  bottom: 14px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  max-width: calc(100% - 20px);
+  padding: 5px 6px;
+  transform: translateX(-50%);
+  border: 1px solid var(--rot-line);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.97);
+  box-shadow: 0 10px 26px rgba(17, 17, 17, 0.18);
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+  animation: rot-selbar-in 0.16s ease-out;
+}
+
+@keyframes rot-selbar-in {
+  from { opacity: 0; transform: translateX(-50%) translateY(6px); }
+  to { opacity: 1; transform: translateX(-50%) translateY(0); }
+}
+
+.rot-selcount {
+  flex: none;
+  padding: 0 10px;
+  color: var(--rot-muted);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.rot-selbtn {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 6px;
+  min-height: 40px;
+  padding: 0 12px;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--rot-text);
+  font-size: 12.5px;
+  font-weight: 500;
+  white-space: nowrap;
+  touch-action: manipulation;
+  transition: background 0.14s ease, color 0.14s ease;
+}
+
+.rot-selbtn svg { flex: none; }
+
+.rot-selbtn:hover { background: var(--rot-accent-soft); }
+
+.rot-selbtn.is-primary {
+  background: var(--rot-accent);
+  color: #fff;
+}
+
+.rot-selbtn.is-primary:hover { background: #333; }
+
+.rot-selbtn.is-danger { color: #a3191a; }
+
+.rot-selbtn.is-danger:hover { background: rgba(163, 25, 26, 0.09); }
+
+.rot-selbtn.is-on {
+  border-color: var(--rot-accent);
+  background: var(--rot-accent-soft);
+  color: var(--rot-accent);
+}
+
+.rot-selbtn.is-done {
+  border-color: var(--rot-line);
+  background: #fff;
+}
+
+/* ---- Layers panel ---- */
+
+.rot-layerbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 2px 0 10px;
+}
+
+.rot-layerswitch {
+  display: flex;
+  flex: 1 1 auto;
+  align-items: center;
+  gap: 9px;
+  min-width: 0;
+  min-height: 46px;
+  padding: 0 12px;
+  border: 1px solid var(--rot-line);
+  border-radius: 8px;
+  background: #fff;
+  color: var(--rot-text);
+  font-size: 13px;
+  text-align: left;
+}
+
+.rot-layerswitch.is-on {
+  border-color: var(--rot-accent);
+  color: var(--rot-accent);
+}
+
+.rot-layerswitch-dot {
+  position: relative;
+  flex: none;
+  width: 36px;
+  height: 21px;
+  border-radius: 999px;
+  background: #d5d7dc;
+  transition: background 0.15s ease;
+}
+
+.rot-layerswitch-dot::after {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 17px;
+  height: 17px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(17, 17, 17, 0.25);
+  transition: transform 0.15s ease;
+}
+
+.rot-layerswitch.is-on .rot-layerswitch-dot { background: var(--rot-accent); }
+.rot-layerswitch.is-on .rot-layerswitch-dot::after { transform: translateX(15px); }
+
+.rot-layer-group {
+  flex: none;
+  width: auto;
+  min-height: 46px;
+  margin: 0;
+  padding: 0 16px;
+  gap: 7px;
+  font-size: 13px;
+  letter-spacing: 0;
+}
+
+.rot-layerhint {
+  margin: 0 0 10px;
+  color: #6b6d75;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.rot-layerlist {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.rot-layerrow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 8px 4px 5px;
+  border: 1px solid var(--rot-line);
+  border-radius: 8px;
+  background: #fff;
+}
+
+.rot-layerrow.is-on {
+  border-color: var(--rot-accent);
+  background: var(--rot-accent-soft);
+}
+
+.rot-layercheck {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border: 2px solid #c9cbd1;
+  border-radius: 7px;
+  background: #fff;
+  color: #fff;
+}
+
+.rot-layerrow.is-on .rot-layercheck {
+  border-color: var(--rot-accent);
+  background: var(--rot-accent);
+}
+
+.rot-layerpick {
+  display: flex;
+  flex: 1 1 auto;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  min-height: 46px;
+  padding: 2px 0;
+  border: 0;
+  background: transparent;
+  text-align: left;
+}
+
+.rot-layerthumb {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  overflow: hidden;
+  border: 1px solid var(--rot-line);
+  border-radius: 6px;
+  background: #f6f6f7;
+}
+
+.rot-layerthumb img { width: 100%; height: 100%; object-fit: contain; }
+
+.rot-layerthumb-text { font-size: 18px; font-weight: 700; }
+
+.rot-layerlabel {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.rot-layerlabel strong {
+  overflow: hidden;
+  color: var(--rot-text);
+  font-size: 13px;
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rot-layerlabel small { color: #6b6d75; font-size: 11px; line-height: 1.3; }
+
+.rot-layeractions {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+  margin-top: 14px;
+}
+
+.rot-layeractions .rot-cta {
+  width: auto;
+  min-height: 46px;
+  margin: 0;
+  padding: 0 8px;
+  gap: 6px;
+  font-size: 12px;
+  letter-spacing: 0;
+  box-shadow: none;
+}
+
+.rot-layeractions .rot-cta-ghost { border-width: 1px; }
+
+.rot-layeractions .rot-layer-delete {
+  border-color: #e2b4b4;
+  color: #a3191a !important;
+}
+
+@media (max-width: 900px) and (min-height: 501px) {
+  .rot[data-step="design"] .rot-selbar {
+    bottom: calc(58px + env(safe-area-inset-bottom) + 12px);
+    max-width: calc(100% - 16px);
+    gap: 2px;
+    padding: 4px 5px;
+  }
+
+  .rot[data-step="design"] .rot-selbtn {
+    min-height: 38px;
+    padding: 0 10px;
+    font-size: 12px;
+  }
+
+  .rot[data-step="design"] .rot-selcount {
+    padding: 0 7px;
+    font-size: 11px;
+  }
+}
+
+@media (max-width: 900px) and (max-height: 500px) {
+  .rot[data-step="design"] .rot-selbar { bottom: 8px; }
+  .rot[data-step="design"] .rot-selbtn { min-height: 36px; padding: 0 9px; font-size: 11.5px; }
+}
+
+@media (max-width: 900px) {
+  /* Icon-only buttons keep the bar on one line on the narrowest phones. */
+  .rot-selbtn span { display: none; }
+  .rot-selbtn { padding: 0 11px; }
+  .rot-selbtn svg { width: 21px; height: 21px; }
+}

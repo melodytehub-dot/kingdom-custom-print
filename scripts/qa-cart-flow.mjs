@@ -43,11 +43,16 @@ const addText = page.getByRole("button", { name: /^add text$/i }).first();
 await addText.click();
 await page.waitForTimeout(400);
 
+// The text tool opens a small entry panel; the layer is added from there.
+await page.locator(".rot-panel .rot-textarea").first().fill("QA E2E");
+await page.locator(".rot-panel").getByRole("button", { name: /\+\s*add text/i }).first().click();
+await page.waitForTimeout(400);
+
 const layerPreview = page.locator('.rot-canvas-svg[aria-label*="1 design element"]');
 check("text layer appears in preview", await layerPreview.count() > 0, `${await page.locator('.rot-canvas-svg').count()} preview`);
 
 // Sizes live behind the Quantity step on this flow.
-await page.getByRole("button", { name: /^next$/i }).first().click();
+await page.getByRole("button", { name: /^next step$/i }).first().click();
 await page.waitForTimeout(800);
 const qtyInput = page.locator('input[id^="q-"]').first();
 await qtyInput.waitFor({ state: "visible", timeout: 15000 });
@@ -57,7 +62,7 @@ await page.waitForTimeout(600);
 const canvas = await page.locator(".rot-canvas").first().boundingBox();
 check("design canvas rendered", !!canvas && canvas.width > 200, canvas ? `${Math.round(canvas.width)}×${Math.round(canvas.height)}` : "missing");
 
-await page.getByRole("button", { name: /^next$/i }).first().click();
+await page.getByRole("button", { name: /^review$/i }).first().click();
 await page.waitForTimeout(700);
 await page.getByRole("button", { name: /^add to cart$/i }).first().click();
 await page.waitForTimeout(1800);

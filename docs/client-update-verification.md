@@ -87,12 +87,22 @@ too narrow, and more graphics and templates were requested.
 
 ### Background removal now works everywhere
 
-- A fast, on-device cutout (flood-fill from the artwork border, `quickBackgroundRemoval`
-  in `lib/imageFx.ts`) runs first for every upload. It needs no model download,
-  no WebGPU and no network, so phones get a result in well under a second.
-- The AI model is only used to refine busy photos, and only where it runs quickly
-  (WebGPU present). If it is unavailable or fails, the instant cutout is kept and
-  the customer never sees a hard error.
+- The cutout (`cutoutBackground` in `lib/imageFx.ts`) no longer assumes one flat
+  backdrop colour. It samples the four corners, keeps up to eight backdrop
+  colour families, then floods in from the border preferring pixels close to the
+  corner it started from (`seedTol` 44, `localTol` 30 per step, `globalTol` 135
+  distance bound). Gradients, vignettes and studio shadows come out cleanly and
+  the walk can no longer creep across a blurred subject outline.
+- The result is a soft matte: the fringe is feathered by how far a pixel sits
+  from the backdrop, and single-pixel speckle is removed, so edges stay smooth
+  at print size instead of showing a hard stair-step.
+- A fast, on-device pass (`quickBackgroundRemoval`) runs first for every upload.
+  It needs no model download, no WebGPU and no network, so phones get a result in
+  well under a second. It works at up to 1400px on the long edge and scales the
+  mask back up, so a 4000px upload cannot stall a phone.
+- The AI model is only used to refine busy photos, and only on desktop where it
+  runs quickly. If it is unavailable or fails, the instant cutout is kept and the
+  customer never sees a hard error.
 - Vector (SVG) uploads skip the AI model, which cannot decode them, and use the
   instant cutout instead. Object selection flattens vectors first.
 - When nothing resembles a background the notice now says so and points to
@@ -100,9 +110,11 @@ too narrow, and more graphics and templates were requested.
 
 ### More room to edit on phones
 
-- Portrait phones now share the screen: the canvas keeps a visible artwork strip
-  and the inspector takes the rest, so the garment no longer hides behind the
-  panel. The layer action bar is a single compact row.
+- Portrait phones now keep the artwork at its full size while editing. The
+  inspector slides up as a sheet over the canvas instead of shrinking it, and the
+  garment is panned (never scaled) to stay clear of the sheet, so an element no
+  longer visibly shrinks the moment it is selected. Landscape phones keep the
+  side-by-side columns.
 
 ### More graphics and templates
 
@@ -129,4 +141,58 @@ too narrow, and more graphics and templates were requested.
   narrows by category).
 - `npm run qa-customizer-interactions` passes.
 - `npm run typecheck`, `npm run lint` and `npm run build` pass.
+
+## October 15 Client Feedback
+
+Client notes: selected items still shrank the artwork, and objects, text and
+images need to be grouped so they can be moved as one, "very responsive on
+mobile".
+
+### Selecting an element no longer shrinks it
+
+- On portrait phones the design step now keeps `.rot-main` absolutely filling the
+  body and shows the inspector as a bottom sheet over it, so the stage height
+  never changes when a panel opens. The garment is re-fitted by panning only.
+- Verified by `npm run qa-customizer-controls`, which measures the stage and the
+  garment before and after selecting an element and asserts both are unchanged
+  (within 1px) at 390x844.
+
+### Grouping, like Canva
+
+- **Select more.** The Layers panel has a "Select multiple" switch; the canvas
+  itself gets a single tap budget: the first tap on a grouped element picks up
+  the whole group, the next tap steps inside and opens that element's editor.
+  Plain elements still open their editor on the first tap, as before.
+- **Group / Ungroup.** The floating selection bar over the canvas and the Layers
+  panel both group the picked elements (two or more) and release them again.
+  Removing a layer prunes the group, so a group of one never lingers.
+- **One object.** A group draws a single frame with delete, proportional resize,
+  axis stretch and rotate grips. Dragging anywhere inside the frame, or any
+  member, moves every member by the same amount and keeps their spacing;
+  resizing and rotating pivot on the group's centre.
+- **Lock, duplicate, delete.** The bar locks or unlocks a whole group at once,
+  duplicates every member into a new group and deletes the lot. Stepping into a
+  member shows the group as locked, so a lock always means the same thing.
+- **Layers panel.** Every element on the side is listed top of stack first, with
+  a text/artwork thumbnail, its group number and its lock state.
+- Groups are a flat `groupId` tag on the existing layers, so previews, cart
+  artwork, saved drafts and the share image all keep working unchanged.
+
+### Verification
+
+- `npm run qa-grouping` unit-tests the grouping model (reading a group, pruning
+  blank and orphaned tags, merging picks, releasing leftovers, deletions and
+  duplication, with no browser).
+- `npm run qa-customizer-grouping` drives the real customizer on desktop
+  (1366x900) and on a phone (390x844, iPhone user agent): it groups two text
+  layers from the Layers panel, checks one frame and two member outlines, drags
+  a member and asserts both outlines moved by the same delta, locks and unlocks
+  the group, steps into an element and back out, duplicates the group into a
+  second group and ungroups only the copies. It also asserts no sideways scroll
+  and no runtime errors on the phone.
+- `npm run qa-customizer-interactions` covers the same gestures at the geometry
+  level (group drag, group rotate at 90°, proportional group resize, ungroup).
+- `npm run qa-cart-flow` passes end to end again: the design → quantity → review →
+  add to cart → reprice → checkout path was re-checked in a real browser after
+  the text-entry panel and the footer button labels changed.
 

@@ -324,3 +324,32 @@ export const RotateShirtIcon = () => (
     />
   </svg>
 );
+
+/** Two shapes joined by a bracket: "group these". */
+export const GroupIcon = ({ size }: P) => (
+  <Svg size={size}>
+    <rect x="3" y="3.5" width="8" height="8" rx="1.6" />
+    <rect x="13" y="12.5" width="8" height="8" rx="1.6" />
+    <path d="M13 7.5h4.5a2 2 0 0 1 2 2V12" />
+    <path d="M11 16.5H6.5a2 2 0 0 1-2-2V12" />
+  </Svg>
+);
+
+/** Two shapes pulled apart: "ungroup". */
+export const UngroupIcon = ({ size }: P) => (
+  <Svg size={size}>
+    <rect x="2.5" y="2.5" width="9" height="9" rx="1.6" />
+    <rect x="12.5" y="12.5" width="9" height="9" rx="1.6" />
+    <path d="M14 4.5h3.5a2 2 0 0 1 2 2V10" />
+    <path d="M10 19.5H6.5a2 2 0 0 1-2-2V14" />
+  </Svg>
+);
+
+/** Stacked sheets: the layers list. */
+export const LayersIcon = ({ size }: P) => (
+  <Svg size={size}>
+    <path d="m12 3 9 5-9 5-9-5 9-5Z" />
+    <path d="m4.5 12.5 7.5 4.2 7.5-4.2" />
+    <path d="m4.5 16.5 7.5 4.2 7.5-4.2" />
+  </Svg>
+);

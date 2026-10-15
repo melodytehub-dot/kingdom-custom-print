@@ -63,13 +63,13 @@ const { default: Canvas } = load("components/customizer/DesignCanvas.tsx", {
 } });
 
 const layer = { id: "selected", type: "image", src: "test.png", x: 50, y: 50, scaleX: 1, scaleY: 1, rotation: 0, opacity: 1 };
-let selections = [], changes = [], taps = [], commits = 0;
+let selections = [], changes = [], taps = [], commits = 0, ungroups = [];
 const props = {
   frontSrc: "front.png", backSrc: "back.png", side: "front", compact: true, renderSize: 200,
-  design: { front: [layer, { ...layer, id: "above" }], back: [] }, selectedId: "selected",
-  onSelect: id => selections.push(id), onChange: (...args) => changes.push(args),
+  design: { front: [layer, { ...layer, id: "above" }], back: [] }, selectedIds: ["selected"],
+  onSelect: ids => selections.push(ids), onChange: (...args) => changes.push(args),
   onTap: id => taps.push(id),
-  onCommit: () => commits++, onDelete() {}, onEdit() {},
+  onCommit: () => commits++, onDelete() {}, onEdit() {}, onUngroup: ids => ungroups.push(ids),
 };
 function render(overrides = {}) {
   cleanups.forEach(fn => fn?.());
@@ -101,11 +101,11 @@ const scale = Number(resizeControl.props.transform.match(/scale\(([^)]+)\)/)[1])
 assert.ok(Math.abs(68 * scale * 200 / 900 - 44) < .001);
 console.log("PASS selected hit area is topmost; mobile exposes a 44px resize target");
 
-overlays = render({ selectedId: null });
+overlays = render({ selectedIds: [] });
 overlays[0].props.onPointerDown(event(1), layer, "move");
 assert.equal(selections.length, 0);
 assert.equal(taps.length, 0);
-render({ selectedId: null });
+render({ selectedIds: [] });
 listeners.get("pointermove")(event(1, 103, 102));
 assert.equal(changes.length, 0);
 listeners.get("pointerup")(event(1, 103, 102));
@@ -114,15 +114,15 @@ assert.equal(slots[1].current, null);
 assert.equal(commits, 0);
 console.log("PASS mobile tap opens editor only on release; small finger motion does not drag");
 
-overlays = render({ selectedId: null });
+overlays = render({ selectedIds: [] });
 overlays.at(-1).props.onPointerDown(event(7), layer, "move");
-render({ selectedId: null });
+render({ selectedIds: [] });
 listeners.get("pointermove")(event(8, 120, 120));
 assert.equal(changes.length, 0);
 listeners.get("pointerup")(event(8));
 assert.equal(commits, 0);
 listeners.get("pointermove")(event(7, 120, 120));
-assert.equal(selections.at(-1), layer.id);
+assert.deepEqual([...selections.at(-1)], [layer.id]);
 assert.equal(changes.length, 1);
 assert.equal(changes[0][2].x, 75);
 assert.equal(changes[0][2].y, 70);
@@ -156,6 +156,72 @@ render();
 listeners.get("pointercancel")(event(11, 100, 100, "pointercancel"));
 assert.equal(taps.length, 1);
 console.log("PASS proportional resize, pointer cancellation, and locked-layer movement guard");
+
+/* ---- grouping: several layers that behave as one object ---- */
+const grpA = { ...layer, id: "a", groupId: "grp", x: 30, y: 40 };
+const grpB = { ...layer, id: "b", groupId: "grp", x: 70, y: 60 };
+const loneC = { ...layer, id: "c", x: 10, y: 10 };
+const groupDesign = { front: [grpA, grpB, loneC], back: [] };
+const stage900 = () => {
+  slots[0].current = { getBoundingClientRect: () => ({ left: 0, top: 0, width: 900, height: 900 }) };
+};
+
+selections = []; changes = []; taps = []; commits = 0;
+overlays = render({ design: groupDesign, selectedIds: [] });
+overlays.find(o => o.props.layer.id === "a").props.onPointerDown(event(20), grpA, "move");
+render({ design: groupDesign, selectedIds: [] });
+listeners.get("pointermove")(event(20, 110, 110));
+assert.deepEqual([...selections.at(-1)], ["a", "b"], "grabbing a grouped element selects the whole group");
+assert.deepEqual(changes.map(c => c[1]), ["a", "b"], "both members of the group move together");
+assert.deepEqual([changes[0][2].x, changes[0][2].y], [42.5, 50]);
+assert.deepEqual([changes[1][2].x, changes[1][2].y], [82.5, 70]);
+listeners.get("pointerup")(event(20, 110, 110));
+assert.equal(commits, 1);
+assert.equal(taps.length, 0, "dragging a group never opens an editor");
+console.log("PASS dragging one grouped element carries the whole group");
+
+selections = []; changes = []; taps = []; commits = 0;
+overlays = render({ design: groupDesign, selectedIds: ["a", "b"], compact: false });
+const groupNodes = nodes(overlays);
+assert.ok(groupNodes.some(n => n.props?.["data-group-frame"]), "a multi-selection draws one group frame");
+assert.ok(groupNodes.some(n => n.props?.["data-group-hit"]), "the group has a grab area over empty space");
+const groupLabels = groupNodes.filter(n => n.props?.role === "button").map(n => n.props["aria-label"]);
+for (const label of ["Ungroup", "Resize group", "Rotate group"]) {
+  assert.ok(groupLabels.includes(label), `group frame offers ${label} (got: ${groupLabels.join(", ")})`);
+}
+assert.ok(!groupLabels.some(l => l === "Edit artwork"), "a group has no single-element edit button");
+
+const rotate = groupNodes.find(n => n.props?.["aria-label"] === "Rotate group");
+stage900();
+rotate.props.onPointerDown(event(21, 550, 423));
+render({ design: groupDesign, selectedIds: ["a", "b"], compact: false });
+listeners.get("pointermove")(event(21, 450, 523));
+const turned = changes.filter(c => c[2].rotation !== undefined);
+assert.equal(turned.length, 2, "rotating a group turns every member");
+assert.deepEqual(turned.map(c => c[2].rotation), [90, 90]);
+assert.equal(turned[0][2].x + turned[1][2].x, 100, "members stay balanced about the group centre");
+assert.equal(turned[0][2].y + turned[1][2].y, 100);
+listeners.get("pointerup")(event(21, 450, 523));
+
+changes = [];
+const groupResize = nodes(render({ design: groupDesign, selectedIds: ["a", "b"], compact: false }))
+  .find(n => n.props?.["aria-label"] === "Resize group");
+stage900();
+groupResize.props.onPointerDown(event(22, 572, 498));
+render({ design: groupDesign, selectedIds: ["a", "b"], compact: false });
+listeners.get("pointermove")(event(22, 700, 600));
+const scaled = changes.filter(c => c[2].scaleX !== undefined);
+assert.equal(scaled.length, 2, "resizing a group scales every member");
+assert.ok(scaled.every(c => c[2].scaleX > 1 && c[2].scaleX === c[2].scaleY), "group resize stays proportional");
+assert.ok(scaled.every(c => c[2].x > 0), "members follow the group box");
+listeners.get("pointerup")(event(22, 700, 600));
+
+const ungroup = nodes(render({ design: groupDesign, selectedIds: ["a", "b"], compact: false }))
+  .find(n => n.props?.["aria-label"] === "Ungroup");
+ungroup.props.onPointerDown({ preventDefault() {}, stopPropagation() {} });
+assert.deepEqual([...ungroups.at(-1)], ["a", "b"]);
+console.log("PASS group frame resizes and rotates as one, and offers ungroup");
+
 cleanups.forEach(fn => fn?.());
 
 const { TextIdeasPanel } = load("components/customizer/panels.tsx", {
@@ -192,9 +258,9 @@ const { default: Customizer } = load("components/customizer/Customizer.tsx", {
   } },
   "react/jsx-runtime": jsx, "next/link": {}, "next/image": {}, "next/navigation": { useRouter: () => ({ push() {} }) }, "../ProductPhotography": {},
   "./DesignCanvas": { default: Canvas, printAreaView: () => ({ w: 360, h: 450, x: 90, y: 100 }) }, "./stageGeometry": { fitStage },
-  "./panels": { NN_DEFAULTS: {} }, "./editors": {}, "./icons": {}, "./art": { ART_LIBRARY: [] },
+  "./panels": { NN_DEFAULTS: {}, LayersPanel: () => null }, "./editors": {}, "./icons": {}, "./art": { ART_LIBRARY: [] },
   "@/lib/design": {
-    emptyDesign: blank, usedSides: () => [], personalizationOf: () => "none", loadDrafts: () => [],
+    emptyDesign: blank, usedSides: () => [], personalizationOf: () => "none", loadDrafts: () => [], removeLayers: d => d, selectionIsWholeGroup: () => false, selectionIds: (d, s, id) => [id], groupMembers: () => [],
     newTextLayer: () => ({ ...layer, type: "text" }),
   },
   "@/lib/imageFx": {}, "@/lib/backgroundRemoval": { removeBackgroundLocally: async () => "" }, "./preview": {},
@@ -241,11 +307,11 @@ root = renderStudio();
 tool(root, "art").props.onClick();
 root = renderStudio();
 let canvas = rawNodes(root).find(node => node.props?.onTap && node.props?.onSelect);
-canvas.props.onSelect(null);
+canvas.props.onSelect([]);
 assert.equal(renderStudio().props["data-layout"], "none");
 root = renderStudio();
 canvas = rawNodes(root).find(node => node.props?.onTap && node.props?.onSelect);
-canvas.props.onSelect(layer.id);
+canvas.props.onSelect([layer.id]);
 assert.equal(renderStudio().props["data-layout"], "none");
 root = renderStudio();
 canvas = rawNodes(root).find(node => node.props?.onTap && node.props?.onSelect);

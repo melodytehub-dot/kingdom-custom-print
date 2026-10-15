@@ -3,7 +3,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import type { ReactNode } from "react";
-import type { GarmentSide, Product, RosterEntry, TextLayer } from "@/lib/types";
+import type { DesignLayer, GarmentSide, ImageLayer, Product, RosterEntry, TextLayer } from "@/lib/types";
 import { newTextLayer } from "@/lib/design";
 import { sizeDisplayLabel, splitSizeGroups } from "@/lib/sizes";
 import type { SavedDraft } from "@/lib/design";
@@ -19,7 +19,7 @@ import {
   Swatch,
   inkName,
 } from "./editors";
-import { CheckGlyph, MinusGlyph, PlusGlyph, TrashIcon } from "./icons";
+import { CheckGlyph, DuplicateIcon, GroupIcon, MinusGlyph, PlusGlyph, TrashIcon, UngroupIcon } from "./icons";
 import { useState } from "react";
 
 /* -------------------------------------------------------------------------
@@ -274,6 +274,149 @@ export function ArtPanel({ onAdd, onClose }: { onAdd: (item: ArtItem) => void; o
           </li>
         ))}
       </ul>
+    </div>
+  );
+}
+
+export function LayersPanel({
+  layers,
+  selectedIds,
+  multiSelect,
+  canUngroup,
+  onPick,
+  onToggle,
+  onMultiSelect,
+  onGroup,
+  onUngroup,
+  onDuplicate,
+  onDelete,
+  onClose,
+}: {
+  layers: DesignLayer[];
+  selectedIds: string[];
+  multiSelect: boolean;
+  canUngroup: boolean;
+  onPick: (id: string) => void;
+  onToggle: (id: string) => void;
+  onMultiSelect: (on: boolean) => void;
+  onGroup: () => void;
+  onUngroup: () => void;
+  onDuplicate: () => void;
+  onDelete: () => void;
+  onClose: () => void;
+}) {
+  const chosen = selectedIds.length;
+  // Top of the stack first, like every other design tool.
+  const rows = [...layers].reverse();
+  const groupNames = new Map<string, number>();
+  for (const layer of layers) {
+    if (layer.groupId && !groupNames.has(layer.groupId)) groupNames.set(layer.groupId, groupNames.size + 1);
+  }
+
+  return (
+    <div className="rot-scroll">
+      <PanelHeader
+        eyebrow="Layers"
+        title="Elements"
+        hint={chosen < 2 ? "Group two or more elements so they move as one." : `${chosen} elements selected.`}
+        onClose={onClose}
+      />
+
+      <div className="rot-layerbar">
+        <button
+          type="button"
+          role="switch"
+          aria-checked={multiSelect}
+          className={`rot-layerswitch${multiSelect ? " is-on" : ""}`}
+          onClick={() => onMultiSelect(!multiSelect)}
+        >
+          <span className="rot-layerswitch-dot" aria-hidden="true" />
+          <span>Select multiple</span>
+        </button>
+        <button type="button" className="rot-cta rot-layer-group" disabled={chosen < 2} onClick={onGroup}>
+          <GroupIcon size={20} />
+          <span>Group{chosen >= 2 ? ` ${chosen}` : ""}</span>
+        </button>
+      </div>
+
+      {multiSelect ? (
+        <p className="rot-layerhint" role="status">
+          Tap elements on the shirt or tick them below, then press Group.
+        </p>
+      ) : null}
+
+      {!rows.length ? <p role="status">Nothing on this side yet.</p> : null}
+
+      <ul className="rot-layerlist" aria-label="Design elements">
+        {rows.map((layer) => {
+          const picked = selectedIds.includes(layer.id);
+          const isText = layer.type === "text";
+          const label = isText ? (layer.text.trim() || "Text") : layer.name || "Artwork";
+          const groupNumber = layer.groupId ? groupNames.get(layer.groupId) : undefined;
+          return (
+            <li key={layer.id} className={`rot-layerrow${picked ? " is-on" : ""}`}>
+              <button
+                type="button"
+                role="checkbox"
+                aria-checked={picked}
+                aria-label={`Add ${label} to the selection`}
+                className="rot-layercheck"
+                onClick={() => onToggle(layer.id)}
+              >
+                {picked ? <CheckGlyph size={16} /> : null}
+              </button>
+              <button
+                type="button"
+                className="rot-layerpick"
+                aria-label={`Select ${label}`}
+                onClick={() => onPick(layer.id)}
+              >
+                <span className="rot-layerthumb" aria-hidden="true">
+                  {isText ? (
+                    <span className="rot-layerthumb-text">T</span>
+                  ) : (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={(layer as ImageLayer).src} alt="" />
+                  )}
+                </span>
+                <span className="rot-layerlabel">
+                  <strong>{isText && layer.uppercase ? label.toUpperCase() : label}</strong>
+                  <small>
+                    {isText ? "Text" : "Artwork"}
+                    {groupNumber ? ` · Group ${groupNumber}` : ""}
+                    {layer.locked ? " · Locked" : ""}
+                  </small>
+                </span>
+              </button>
+            </li>
+          );
+        })}
+      </ul>
+
+      <div className="rot-layeractions">
+        <button
+          type="button"
+          className="rot-cta rot-cta-ghost"
+          disabled={!canUngroup}
+          onClick={onUngroup}
+        >
+          <UngroupIcon size={18} />
+          <span>Ungroup</span>
+        </button>
+        <button type="button" className="rot-cta rot-cta-ghost" disabled={!chosen} onClick={onDuplicate}>
+          <DuplicateIcon size={18} />
+          <span>Duplicate</span>
+        </button>
+        <button
+          type="button"
+          className="rot-cta rot-cta-ghost rot-layer-delete"
+          disabled={!chosen}
+          onClick={onDelete}
+        >
+          <TrashIcon size={18} />
+          <span>Delete</span>
+        </button>
+      </div>
     </div>
   );
 }
