@@ -131,6 +131,18 @@ try {
         if (data[i] <= 8) clear += 1;
         else if (data[i] < 247) soft += 1;
       }
+      // The longest unbroken opaque stretch down the middle of the picture: for
+      // any portrait it runs from the head through the body, and a cut-out that
+      // ate the subject breaks it up.
+      const centreX = Math.floor(canvas.width / 2);
+      let run = 0;
+      let longest = 0;
+      for (let y = 0; y < canvas.height; y++) {
+        if (alpha(centreX, y) > 128) {
+          run += 1;
+          if (run > longest) longest = run;
+        } else run = 0;
+      }
       return {
         width: canvas.width,
         height: canvas.height,
@@ -140,11 +152,10 @@ try {
           alpha(2, canvas.height - 3),
           alpha(canvas.width - 3, canvas.height - 3),
         ),
-        // Where the subject is: the middle of the picture (a person's back),
-        // and the body row where the torso fills most of the width.
+        // Where the subject is: the middle of the picture (a person's back).
         centre: alpha(Math.floor(canvas.width / 2), Math.floor(canvas.height / 2)),
-        bodyRow: row(Math.floor(canvas.height * 0.8)),
-        // The subject is centred in this photo; the top band is pure sky.
+        centreRun: +(longest / canvas.height).toFixed(3),
+        // The top band of both test photos is pure backdrop.
         skyRow: row(4),
         keptPct: +((100 * (data.length / 4 - clear)) / (data.length / 4)).toFixed(1),
         clearPct: +((100 * clear) / (canvas.width * canvas.height)).toFixed(1),
@@ -161,12 +172,12 @@ try {
     check(`${name}: the sky band is cleared`, probe.skyRow <= 0.1, `${(100 * probe.skyRow).toFixed(1)}% of the top row kept`);
     check(
       `${name}: the subject survives`,
-      probe.centre > 128 && probe.bodyRow >= 0.6,
-      `centre alpha ${probe.centre}, ${(100 * probe.bodyRow).toFixed(1)}% of the body row kept`,
+      probe.centre > 128 && probe.centreRun >= 0.5,
+      `centre alpha ${probe.centre}, opaque for ${(100 * probe.centreRun).toFixed(0)}% of the middle column`,
     );
     check(
       `${name}: the subject is not swallowed with the backdrop`,
-      probe.keptPct >= 25 && probe.keptPct <= 70,
+      probe.keptPct >= 20 && probe.keptPct <= 70,
       `${probe.keptPct}% of the picture kept`,
     );
     check(

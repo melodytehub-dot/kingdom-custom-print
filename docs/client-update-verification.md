@@ -218,9 +218,15 @@ mobile".
   a busy sea-and-sky backdrop on desktop (1440x900) and on a phone (390x844 with
   an iPhone user agent), turns Remove Background on and judges the saved layer —
   backdrop corners fully transparent, sky band cleared, subject intact (centre
-  opaque, 74% of the body row and 44% of the frame kept), 4% of pixels soft-edged
-  rather than posterised, the customer told it worked, the detailed-model button
-  offered, no browser errors. Both viewports pass, phone included.
+  opaque and opaque down 74% of the middle column, 44% of the frame kept), 4% of
+  pixels soft-edged rather than posterised, the customer told it worked, the
+  detailed-model button offered, no browser errors. Both viewports pass.
+- The same script run against the client's own photo
+  (`QA_CUTOUT_PHOTO=<photo> npm run qa-cutout-ai`) passes on desktop and phone:
+  corners and the top band fully cleared, 72.7% of the picture removed — the
+  street, the building and the watermark banner with it — the subject intact
+  (opaque down 77% of the middle column) and 1.9% soft edges. That photo is the
+  one the instant pass cleared 95.7% of.
 - `npm run qa-cutout-mask` is new: 18 checks on the mask analyser against real
   failure shapes — matted portrait, mug with its handle hole, empty mask,
   everything-kept mask, sieve, mush, hair and degenerate input. No browser needed.
