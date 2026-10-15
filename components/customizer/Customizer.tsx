@@ -64,7 +64,7 @@ import {
   validateUpload,
   type SavedDraft,
 } from "@/lib/design";
-import { applyImageFx, DEFAULT_FX } from "@/lib/imageFx";
+import { applyImageFx, DEFAULT_FX, isVectorSource, quickBackgroundRemoval } from "@/lib/imageFx";
 import { removeBackgroundLocally, type BackgroundRemovalProgress } from "@/lib/backgroundRemoval";
 import { drawPreview } from "./preview";
 import { mockupByCode, mockupsForProduct, TEE_MOCKUPS, type TeeMockup } from "@/lib/mockups";
@@ -109,6 +109,19 @@ const STEP_LABEL: Record<Step, string> = {
 
 /** Layer editors share selection state; all design panels keep a mobile preview visible. */
 const SPLIT_PANELS: Panel[] = ["text", "image"];
+
+/**
+ * Background removal runs instantly on-device everywhere. The AI model is an
+ * optional refinement for busy photos: it is used where it runs quickly (WebGPU)
+ * and on desktop-class browsers, but never on phones, where the ~180 MB model
+ * download is far too heavy.
+ */
+function shouldRefineWithAi(): boolean {
+  if (typeof navigator === "undefined") return false;
+  if ((navigator as Navigator & { gpu?: unknown }).gpu) return true;
+  const agent = navigator.userAgent || "";
+  return !/Android|iPhone|iPad|iPod|Mobile|Windows Phone/i.test(agent);
+}
 
 const NN_FONT_SIZES: Record<NNSize, { name: number; number: number; sub: number }> = {
   small: { name: 4.5, number: 12, sub: 3.2 },
@@ -593,17 +606,34 @@ export default function Customizer({
     setFxProgress(null);
     setFxStatus(fx.removeBg ? "Preparing background removal…" : "Applying artwork edits…");
     try {
+      let removedNothing = false;
       if (fx.removeBg && !backgroundRemovedSrc) {
-        backgroundRemovedSrc = await removeBackgroundLocally(orig, (progress: BackgroundRemovalProgress) => {
-          setFxStatus(
-            progress.phase === "download"
-              ? "Downloading AI model…"
-              : progress.phase === "compatibility"
-                ? "Using compatibility mode; this may take longer…"
-                : "Removing background…",
-          );
-          setFxProgress(progress.phase === "download" ? progress.percent ?? null : null);
-        });
+        // 1) Instant, on-device cutout — guaranteed to work on phones.
+        setFxStatus("Removing background…");
+        const quick = await quickBackgroundRemoval(orig).catch(() => null);
+        if (quick) backgroundRemovedSrc = quick.dataUrl;
+
+        // 2) Refine busy photos with the AI model on capable devices.
+        const canRefine = shouldRefineWithAi() && !isVectorSource(orig);
+        if (canRefine && !quick?.confident) {
+          setFxStatus("Refining the cutout…");
+          try {
+            const refined = await removeBackgroundLocally(orig, (progress: BackgroundRemovalProgress) => {
+              setFxStatus(
+                progress.phase === "download"
+                  ? "Downloading AI model…"
+                  : progress.phase === "compatibility"
+                    ? "Using compatibility mode; this may take longer…"
+                    : "Refining the cutout…",
+              );
+              setFxProgress(progress.phase === "download" ? progress.percent ?? null : null);
+            });
+            backgroundRemovedSrc = refined;
+          } catch {
+            // Keep whatever the instant cutout produced — never block the user.
+          }
+        }
+        if (!backgroundRemovedSrc) removedNothing = true;
       }
       setFxStatus("Applying artwork edits…");
       const source = fx.removeBg ? backgroundRemovedSrc ?? orig : orig;
@@ -616,7 +646,13 @@ export default function Customizer({
         aspect: res.aspect,
       } as Partial<ImageLayer>);
       if (next.removeBg !== undefined) {
-        setNotice({ tone: "ok", text: fx.removeBg ? "Background removed." : "Original background restored." });
+        setNotice(
+          fx.removeBg
+            ? removedNothing
+              ? { tone: "warn", text: "We could not detect a background to remove. Try Select Object for busy photos." }
+              : { tone: "ok", text: "Background removed." }
+            : { tone: "ok", text: "Original background restored." },
+        );
       }
     } catch (err) {
       setNotice({

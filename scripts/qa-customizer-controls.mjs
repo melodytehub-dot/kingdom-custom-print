@@ -119,16 +119,19 @@ try {
   }
   const stageWithoutInspector = await page.locator(".rot-stage").boundingBox();
   const garmentWithoutInspector = await page.locator(".rot-shirt").boundingBox();
+  const viewportHeight = viewport?.height ?? 0;
+  const viewportWidth = viewport?.width ?? 0;
   check(
-    "mobile layer selection keeps the canvas and garment at the same scale",
+    "mobile editor shares the screen and keeps the garment visible",
     Boolean(stageWithInspector && stageWithoutInspector && garmentWithInspector && garmentWithoutInspector)
-      && Math.abs(stageWithInspector.height - stageWithoutInspector.height) <= 1
-      && Math.abs(garmentWithInspector.x - garmentWithoutInspector.x) <= 1
-      && Math.abs(garmentWithInspector.y - garmentWithoutInspector.y) <= 1
-      && Math.abs(garmentWithInspector.width - garmentWithoutInspector.width) <= 1
-      && Math.abs(garmentWithInspector.height - garmentWithoutInspector.height) <= 1,
+      && stageWithoutInspector.height > stageWithInspector.height
+      && garmentWithInspector.y >= 0
+      && garmentWithInspector.y + garmentWithInspector.height <= viewportHeight
+      && garmentWithInspector.x >= 0
+      && garmentWithInspector.x + garmentWithInspector.width <= viewportWidth
+      && garmentWithInspector.width >= 120,
     stageWithInspector && stageWithoutInspector && garmentWithInspector && garmentWithoutInspector
-      ? `stage ${Math.round(stageWithInspector.height)}->${Math.round(stageWithoutInspector.height)}px; garment ${Math.round(garmentWithInspector.x)},${Math.round(garmentWithInspector.y)},${Math.round(garmentWithInspector.width)}->${Math.round(garmentWithoutInspector.x)},${Math.round(garmentWithoutInspector.y)},${Math.round(garmentWithoutInspector.width)}px`
+      ? `stage ${Math.round(stageWithInspector.height)}->${Math.round(stageWithoutInspector.height)}px; garment ${Math.round(garmentWithInspector.x)},${Math.round(garmentWithInspector.y)},${Math.round(garmentWithInspector.width)}px (viewport ${viewportWidth}x${viewportHeight})`
       : "missing layout bounds",
   );
 
@@ -236,9 +239,11 @@ try {
   const beforeTemplateLabel = await page.locator(".rot-canvas-svg").first().getAttribute("aria-label") ?? "";
   const beforeTemplateCount = Number(beforeTemplateLabel.match(/with (\d+) design element/)?.[1] ?? "0");
   await tool("templates").evaluate((button) => button.click());
-  check("template gallery offers a varied ready-made set", await page.locator(".rot-template-card").count() >= 8);
+  const totalTemplateCards = await page.locator(".rot-template-card").count();
+  check("template gallery offers a varied ready-made set", totalTemplateCards >= 8, `${totalTemplateCards} templates`);
   await page.locator("select[aria-label='Template category']").selectOption("Nature");
-  check("template categories narrow the gallery", await page.locator(".rot-template-card").count() === 2);
+  const natureTemplateCards = await page.locator(".rot-template-card").count();
+  check("template categories narrow the gallery", natureTemplateCards > 0 && natureTemplateCards < totalTemplateCards, `Nature ${natureTemplateCards} of ${totalTemplateCards}`);
   await page.getByRole("searchbox", { name: "Search templates" }).fill("ocean");
   check("template search matches names and tags", await page.locator(".rot-template-card").count() === 1);
   await page.getByRole("button", { name: "Use Ocean Club template" }).click();

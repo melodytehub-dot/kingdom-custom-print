@@ -21,6 +21,7 @@
     "qa-admin-flow": "node --env-file-if-exists=.env.local scripts/qa-admin-flow.mjs",
     "qa-customizer-controls": "node scripts/qa-customizer-controls.mjs",
     "qa-customizer-interactions": "node scripts/qa-customizer-interactions.mjs",
+    "qa-background-remove": "node scripts/qa-background-remove.mjs",
     "qa-price-tamper": "node scripts/qa-payments.mjs",
     "qa-garment-families": "node scripts/qa-garment-families.mjs",
     "qa-rt2000-variants": "node scripts/qa-rt2000-variants.mjs",

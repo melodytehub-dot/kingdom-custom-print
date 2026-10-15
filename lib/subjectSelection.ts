@@ -54,16 +54,40 @@ export function selectSubject(
   onProgress?: (progress: SubjectSelectionProgress) => void,
   box?: SubjectBox,
 ): Promise<SubjectMask> {
-  const id = ++nextRequestId;
-  return new Promise((resolve, reject) => {
-    pendingRequests.set(id, { onProgress, resolve, reject });
-    try {
-      getWorker().postMessage({ id, src, points, box });
-    } catch (error) {
-      pendingRequests.delete(id);
-      reject(error instanceof Error ? error : new Error("Could not start object selection."));
-    }
-  });
+  return (async () => {
+    // The segmentation model reads raster pixels only, so vector uploads are
+    // flattened first (otherwise the worker fails to decode them).
+    const raster = await rasterizeForModel(src).catch(() => src);
+    const id = ++nextRequestId;
+    return new Promise<SubjectMask>((resolve, reject) => {
+      pendingRequests.set(id, { onProgress, resolve, reject });
+      try {
+        getWorker().postMessage({ id, src: raster, points, box });
+      } catch (error) {
+        pendingRequests.delete(id);
+        reject(error instanceof Error ? error : new Error("Could not start object selection."));
+      }
+    });
+  })();
+}
+
+/** Flattens vector uploads into a PNG the AI workers can decode. */
+async function rasterizeForModel(src: string, maxEdge = 1024): Promise<string> {
+  if (!src.startsWith("data:image/svg")) return src;
+  const image = new Image();
+  image.decoding = "async";
+  image.src = src;
+  await image.decode();
+  const width = image.naturalWidth || image.width || 1000;
+  const height = image.naturalHeight || image.height || 1000;
+  const scale = Math.min(1, maxEdge / Math.max(width, height));
+  const canvas = document.createElement("canvas");
+  canvas.width = Math.max(1, Math.round(width * scale));
+  canvas.height = Math.max(1, Math.round(height * scale));
+  const context = canvas.getContext("2d");
+  if (!context) return src;
+  context.drawImage(image, 0, 0, canvas.width, canvas.height);
+  return canvas.toDataURL("image/png");
 }
 
 export async function createSubjectCutout(src: string, selection: SubjectMask): Promise<string> {

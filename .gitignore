@@ -16,6 +16,7 @@ next-env.d.ts
 
 # editor / OS
 .DS_Store
+*.log
 
 # agent tooling written by `next dev` and local editor plugins
 AGENTS.md

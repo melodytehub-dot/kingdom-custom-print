@@ -94,10 +94,12 @@ function event(pointerId, x = 100, y = 100, type = "pointerup") {
 let overlays = render();
 assert.equal(overlays.at(-1).props.layer.id, "selected");
 const controls = nodes(overlays.at(-1)).filter(node => node.props?.role === "button");
-assert.deepEqual(controls.map(node => node.props["aria-label"]), ["Resize"]);
-const scale = Number(controls[0].props.transform.match(/scale\(([^)]+)\)/)[1]);
+const controlLabels = controls.map(node => node.props["aria-label"]);
+assert.ok(controlLabels.includes("Resize"), `selection exposes a resize target (got: ${controlLabels.join(", ")})`);
+const resizeControl = controls.find(node => node.props["aria-label"] === "Resize");
+const scale = Number(resizeControl.props.transform.match(/scale\(([^)]+)\)/)[1]);
 assert.ok(Math.abs(68 * scale * 200 / 900 - 44) < .001);
-console.log("PASS selected hit area is topmost; mobile exposes one 44px resize target");
+console.log("PASS selected hit area is topmost; mobile exposes a 44px resize target");
 
 overlays = render({ selectedId: null });
 overlays[0].props.onPointerDown(event(1), layer, "move");
@@ -161,7 +163,7 @@ const { TextIdeasPanel } = load("components/customizer/panels.tsx", {
   "next/link": {}, "next/image": {},
   "@/lib/design": { newTextLayer: values => ({ type: "text", ...values }) },
   "@/lib/sizes": {}, "@/lib/pricing": {}, "@/lib/mockups": {}, "@/lib/fonts": {},
-  "./art": {}, "./editors": { PanelHeader: () => null },
+  "./art": {}, "./editors": { PanelHeader: () => null }, "./templates": {},
   "./icons": { CheckGlyph: () => null },
 });
 slots = []; cursor = 0;

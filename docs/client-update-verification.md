@@ -79,3 +79,54 @@ art/font catalogs, sleeve printing, embroidery, multi-product/multi-color batch
 orders, account-backed cloud designs, and live-agent chat are not implemented.
 Image AI remains excluded as previously requested. Physical-device keyboard
 behavior and OS-native share sheets still require device testing.
+
+## October 13 Client Feedback
+
+Client notes: background removal did not work on mobile, the editing space felt
+too narrow, and more graphics and templates were requested.
+
+### Background removal now works everywhere
+
+- A fast, on-device cutout (flood-fill from the artwork border, `quickBackgroundRemoval`
+  in `lib/imageFx.ts`) runs first for every upload. It needs no model download,
+  no WebGPU and no network, so phones get a result in well under a second.
+- The AI model is only used to refine busy photos, and only where it runs quickly
+  (WebGPU present). If it is unavailable or fails, the instant cutout is kept and
+  the customer never sees a hard error.
+- Vector (SVG) uploads skip the AI model, which cannot decode them, and use the
+  instant cutout instead. Object selection flattens vectors first.
+- When nothing resembles a background the notice now says so and points to
+  Select Object, instead of claiming success.
+
+### More room to edit on phones
+
+- Portrait phones now share the screen: the canvas keeps a visible artwork strip
+  and the inspector takes the rest, so the garment no longer hides behind the
+  panel. The layer action bar is a single compact row.
+
+### More graphics and templates
+
+- Clipart grew from 27 to 92 pieces and gained an Animals category
+  (shield, diamond, flame, skull, sparkle, target, compass, rocket, gear, clock,
+  camera, map pin, controller, infinity, key, eye, wifi, helmet, dumbbell, tennis,
+  golf, volleyball, boxing glove, skateboard, surfboard, medal, bowling, runner,
+  praying hands, angel wings, menorah, star of David, tree, pine, cactus, cloud,
+  rainbow, snowflake, campfire, palm tree, tent, sunset, bee, tulip, fish, cat,
+  dog, dragonfly, whale and more).
+- Templates grew from 9 to 44 across eight categories (Team & Sports, Faith,
+  Nature, Classic, Business, Events & Celebrations, Holidays, Pets).
+
+### Verification
+
+- `npm run qa-background-remove` uploads a plain-background logo on desktop
+  (1440x900) and mobile (390x844), removes the background and asserts the border
+  pixels are transparent, the artwork survives, the layer records the cutout and
+  no browser error occurs. Both viewports complete in under half a second.
+- The AI refinement path was exercised end to end with a busy photo: it finished
+  and reported success with no console or page errors.
+- `npm run qa-customizer-controls` passes (updated so the mobile editor sharing
+  the screen keeps the garment visible, and the larger template library still
+  narrows by category).
+- `npm run qa-customizer-interactions` passes.
+- `npm run typecheck`, `npm run lint` and `npm run build` pass.
+

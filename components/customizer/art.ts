@@ -9,6 +9,67 @@ function svg(inner: string, viewBox = "0 0 100 100"): string {
   return `data:image/svg+xml;utf8,${encodeURIComponent(doc)}`;
 }
 
+/** Outline path — the house style for line-art icons. */
+function line(d: string, width = 7): string {
+  return `<path d="${d}" fill="none" stroke="#141414" stroke-width="${width}" stroke-linecap="round" stroke-linejoin="round"/>`;
+}
+
+/** Evenly spaced radial spokes, used by sun, snowflake and gear icons. */
+function spokes(count: number, inner: number, outer: number, width = 7, offset = 0): string {
+  return Array.from({ length: count }, (_, i) => {
+    const a = ((i * (360 / count) + offset) * Math.PI) / 180;
+    const x1 = 50 + Math.cos(a) * inner;
+    const y1 = 50 + Math.sin(a) * inner;
+    const x2 = 50 + Math.cos(a) * outer;
+    const y2 = 50 + Math.sin(a) * outer;
+    return line(`M${x1.toFixed(1)} ${y1.toFixed(1)}L${x2.toFixed(1)} ${y2.toFixed(1)}`, width);
+  }).join("");
+}
+
+/** Small forked twigs at the tip of each spoke (snowflake arms). */
+function twigs(count: number, radius: number, length: number, width = 5, spread = 38): string {
+  return Array.from({ length: count }, (_, i) => {
+    const a = (i * (360 / count) * Math.PI) / 180;
+    const cx = 50 + Math.cos(a) * radius;
+    const cy = 50 + Math.sin(a) * radius;
+    return [-spread, spread]
+      .map((offset) => {
+        const b = a + (offset * Math.PI) / 180;
+        const x = cx + Math.cos(b) * length;
+        const y = cy + Math.sin(b) * length;
+        return line(`M${cx.toFixed(1)} ${cy.toFixed(1)}L${x.toFixed(1)} ${y.toFixed(1)}`, width);
+      })
+      .join("");
+  }).join("");
+}
+
+/** A filled circle subpath, for transparent holes via fill-rule="evenodd". */
+function hole(cx: number, cy: number, r: number): string {
+  return `M${cx} ${cy - r}a${r} ${r} 0 1 0 0 ${r * 2} ${r} ${r} 0 1 0 0 ${-r * 2}z`;
+}
+
+function evenodd(d: string): string {
+  return `<path fill-rule="evenodd" d="${d}"/>`;
+}
+
+/** Polygon cog (gear) outline, ready for fill-rule="evenodd". */
+function cog(teeth: number, outer: number, root: number): string {
+  const step = (Math.PI * 2) / teeth;
+  const halfTooth = step * 0.17;
+  const flare = step * 0.12;
+  const polar = (radius: number, angle: number) =>
+    `${(50 + Math.cos(angle) * radius).toFixed(1)} ${(50 + Math.sin(angle) * radius).toFixed(1)}`;
+  let d = "";
+  for (let i = 0; i < teeth; i++) {
+    const a = i * step;
+    d += `${i === 0 ? "M" : "L"}${polar(root, a - halfTooth - flare)}`;
+    d += `L${polar(outer, a - halfTooth)}`;
+    d += `L${polar(outer, a + halfTooth)}`;
+    d += `L${polar(root, a + halfTooth + flare)}`;
+  }
+  return `${d}Z`;
+}
+
 export interface ArtItem {
   id: string;
   name: string;
@@ -16,9 +77,9 @@ export interface ArtItem {
   category?: ArtCategory;
 }
 
-export type ArtCategory = "Symbols" | "Sports" | "Faith" | "Nature";
+export type ArtCategory = "Symbols" | "Sports" | "Faith" | "Nature" | "Animals";
 
-export const ART_CATEGORIES = ["All", "Symbols", "Sports", "Faith", "Nature"] as const;
+export const ART_CATEGORIES = ["All", "Symbols", "Sports", "Faith", "Nature", "Animals"] as const;
 
 function categorizedArt(id: string, name: string, category: ArtCategory, inner: string): ArtItem {
   return { id, name, category, src: svg(inner) };
@@ -127,4 +188,68 @@ export const ART_LIBRARY: ArtItem[] = [
   categorizedArt("anchor", "Anchor", "Symbols", `<circle cx="50" cy="21" r="10" fill="none" stroke="#141414" stroke-width="7"/><path d="M50 31v53M28 47h44M12 66c3 18 16 27 29 27 17 0 25-11 29-27l15 12M12 66l15 12" fill="none" stroke="#141414" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>`),
   categorizedArt("music", "Music Note", "Symbols", `<path d="M57 18v53m0-53 29-7v53M57 31l29-7M43 71c0 8-8 15-18 15S9 81 9 74s8-15 18-15 16 5 16 12zm43-3c0 8-8 15-18 15s-16-5-16-12 8-15 18-15 16 5 16 12z"/>`),
   categorizedArt("globe", "Globe", "Symbols", `<circle cx="50" cy="50" r="43" fill="none" stroke="#141414" stroke-width="6"/><ellipse cx="50" cy="50" rx="19" ry="43" fill="none" stroke="#141414" stroke-width="5"/><path d="M9 39h82M9 61h82" fill="none" stroke="#141414" stroke-width="5"/>`),
+  categorizedArt("shield", "Shield", "Symbols", `<path d="M50 6 88 20v30c0 24-16 37-38 44C28 87 12 74 12 50V20z"/>`),
+  categorizedArt("shield-check", "Protected", "Symbols", `<g>${line("M50 6 88 20v30c0 24-16 37-38 44C28 87 12 74 12 50V20z", 7)}${line("M32 50l12 12 24-26", 8)}</g>`),
+  categorizedArt("diamond", "Diamond", "Symbols", `<path d="M28 12h44l18 24-40 52L10 36z"/><path d="M10 36h80M28 12l8 24 14-24 14 24 8-24M36 36l14 52 14-52" fill="none" stroke="#fff" stroke-width="3"/>`),
+  categorizedArt("flame", "Flame", "Symbols", `<path d="M50 5c15 21 27 29 27 47a27 27 0 0 1-54 0c0-10 5-18 12-26 1 8 4 13 9 16-3-15 0-26 6-37z"/>`),
+  categorizedArt("skull", "Skull", "Symbols", `<path fill-rule="evenodd" d="M50 7C33 7 20 20 20 38c0 11 5 19 11 24l1 15a6 6 0 0 0 6 6h24a6 6 0 0 0 6-6l1-15c6-5 11-13 11-24C80 20 67 7 50 7z${hole(37, 39, 9)}${hole(63, 39, 9)}M50 55l7 12H43z"/>`),
+  categorizedArt("sparkle", "Sparkle", "Symbols", `<path d="M50 4c4 23 19 38 42 42-23 4-38 19-42 42-4-23-19-38-42-42 23-4 38-19 42-42z"/>`),
+  categorizedArt("sparkles", "Sparkles", "Symbols", `<path d="M40 6c3 17 14 28 31 31-17 3-28 14-31 31-3-17-14-28-31-31 17-3 28-14 31-31z"/><path d="M78 52c2 9 7 15 16 16-9 2-14 7-16 16-2-9-7-14-16-16 9-1 14-7 16-16z"/>`),
+  categorizedArt("target", "Target", "Symbols", `<g>${line("M50 8a42 42 0 1 0 0.1 0z", 7)}${line("M50 30a20 20 0 1 0 0.1 0z", 7)}</g><circle cx="50" cy="50" r="8"/>`),
+  categorizedArt("compass", "Compass", "Symbols", `<g>${line("M50 8a42 42 0 1 0 0.1 0z", 7)}${line("M50 22v10M50 68v10M22 50h10M68 50h10", 6)}</g><path d="m68 32-10 26-26 10 10-26z"/>`),
+  categorizedArt("rocket", "Rocket", "Symbols", `<g>${line("M50 5c13 12 20 29 20 48v14H30V53C30 34 37 17 50 5z", 8)}${line("M50 26a10 10 0 1 0 0.1 0z", 7)}${line("M30 67 14 86l20-8M70 67l16 19-20-8M44 67v16a6 6 0 0 0 12 0V67", 7)}</g>`),
+  categorizedArt("gear", "Gear", "Symbols", `${evenodd(`${cog(9, 44, 30)}${hole(50, 50, 14)}`)}`),
+  categorizedArt("clock", "Clock", "Symbols", `<g>${line("M50 8a42 42 0 1 0 0.1 0z", 7)}${line("M50 24v28l20 13", 7)}</g>`),
+  categorizedArt("camera", "Camera", "Symbols", `<g>${line("M50 30a20 20 0 1 0 0.1 0z", 7)}</g><path fill-rule="evenodd" d="M12 26h18l6-12h28l6 12h18a6 6 0 0 1 6 6v50a6 6 0 0 1-6 6H12a6 6 0 0 1-6-6V32a6 6 0 0 1 6-6zm38 8a20 20 0 1 0 0 40 20 20 0 0 0 0-40z"/>`),
+  categorizedArt("map-pin", "Location Pin", "Symbols", `<path fill-rule="evenodd" d="M50 5c-16 0-29 13-29 29 0 21 29 60 29 60s29-39 29-60c0-16-13-29-29-29zm0 18a11 11 0 1 0 0 22 11 11 0 0 0 0-22z"/>`),
+  categorizedArt("controller", "Game Controller", "Symbols", `<path fill-rule="evenodd" d="M30 32h40c12 0 20 9 20 21 0 11-6 21-15 21-7 0-12-5-16-11H41c-4 6-9 11-16 11-9 0-15-10-15-21 0-12 8-21 20-21zm2 12v5h-5v6h5v5h6v-5h5v-6h-5v-5zm34-2a5 5 0 1 0 0 10 5 5 0 0 0 0-10zm11 9a5 5 0 1 0 0 10 5 5 0 0 0 0-10z"/>`),
+  categorizedArt("speech", "Speech Bubble", "Symbols", `<path d="M10 18h80a4 4 0 0 1 4 4v44a4 4 0 0 1-4 4H48L24 92V70H10a4 4 0 0 1-4-4V22a4 4 0 0 1 4-4z"/>`),
+  categorizedArt("check", "Check Mark", "Symbols", `${line("M12 52l26 26 50-58", 14)}`),
+  categorizedArt("infinity", "Infinity", "Symbols", `${line("M32 34c-13 0-22 7-22 16s9 16 22 16c16 0 24-16 36-16 13 0 22 7 22 16s-9 16-22 16c-12 0-20-16-36-16z", 9)}`),
+  categorizedArt("key", "Key", "Symbols", `<path fill-rule="evenodd" d="M40 12a28 28 0 1 0 24 42l6 0 4 8h12v-12h8v-12h-30A28 28 0 0 0 40 12zm0 16a12 12 0 1 1 0 24 12 12 0 0 1 0-24z"/>`),
+  categorizedArt("eye", "Eye", "Symbols", `${evenodd(`M4 50C18 28 34 20 50 20s32 8 46 30c-14 22-30 30-46 30S18 72 4 50z${hole(50, 50, 17)}`)}<circle cx="50" cy="50" r="8"/>`),
+  categorizedArt("wifi", "Signal", "Symbols", `<g>${line("M20 42a44 44 0 0 1 60 0", 9)}${line("M32 56a28 28 0 0 1 36 0", 9)}${line("M43 69a13 13 0 0 1 14 0", 8)}</g><circle cx="50" cy="84" r="6"/>`),
+  categorizedArt("crown-royal", "Royal Crown", "Symbols", `<path d="M50 14 66 40 88 16l-6 56H18L12 16l22 24z"/><rect x="16" y="78" width="68" height="10" rx="3"/>`),
+
+  categorizedArt("helmet", "Football Helmet", "Sports", `<g>${line("M24 48a26 26 0 0 1 52 0v18H24z", 8)}${line("M76 52h14a9 9 0 0 1 0 18H62", 7)}${line("M44 48a8 8 0 1 0 0.1 0z", 6)}</g>`),
+  categorizedArt("dumbbell", "Dumbbell", "Sports", `<path d="M8 40h9v20H8zM21 33h11v34H21zM68 33h11v34H68zM83 40h9v20h-9z"/><rect x="32" y="43" width="36" height="14" rx="2"/>`),
+  categorizedArt("tennis", "Tennis Racket", "Sports", `<g>${line("M38 6a25 25 0 1 0 0.1 0z", 7)}${line("M24 22l28 28M52 22 24 50M38 6v50M12 32h52", 3)}${line("M56 58l28 32", 10)}</g>`),
+  categorizedArt("golf", "Golf", "Sports", `<g>${line("M26 8v80", 7)}${line("M4 88h44", 6)}</g><path d="M28 10 66 22 28 34z"/><path d="M26 52c10-4 18-2 24 6" fill="none" stroke="#141414" stroke-width="5"/>`),
+  categorizedArt("volleyball", "Volleyball", "Sports", `<g>${line("M50 8a42 42 0 1 0 0.1 0z", 6)}${line("M50 8c-12 12-17 29-13 48M50 8c12 12 17 29 13 48M14 38c16 7 40 7 58 0M22 74c11-13 25-21 43-23", 5)}</g>`),
+  categorizedArt("boxing", "Boxing Glove", "Sports", `<g>${line("M30 16h24a20 20 0 0 1 20 20v10a18 18 0 0 1-18 18H30a14 14 0 0 1-14-14V30a14 14 0 0 1 14-14z", 8)}${line("M16 56h58", 7)}${line("M38 74h26a8 8 0 0 1 0 16H38a8 8 0 0 1 0-16z", 8)}</g>`),
+  categorizedArt("skateboard", "Skateboard", "Sports", `<rect x="6" y="30" width="88" height="18" rx="9"/><circle cx="26" cy="68" r="11"/><circle cx="74" cy="68" r="11"/>`),
+  categorizedArt("surfboard", "Surfboard", "Sports", `<path d="M50 4c12 14 18 30 18 46s-6 32-18 46c-12-14-18-30-18-46S38 18 50 4z"/><path d="M50 12v76" fill="none" stroke="#fff" stroke-width="3"/>`),
+  categorizedArt("medal", "Medal", "Sports", `<path d="M30 6l12 26h16L70 6" fill="none" stroke="#141414" stroke-width="8"/><circle cx="50" cy="62" r="29"/><path d="M50 44l6 12 13 1-9 9 3 13-13-7-13 7 3-13-9-9 13-1z" fill="#fff"/>`),
+  categorizedArt("bowling", "Bowling Ball", "Sports", `<path fill-rule="evenodd" d="M50 8a42 42 0 1 0 0.1 0z${hole(38, 34, 6)}${hole(60, 32, 6)}${hole(50, 52, 6)}"/>`),
+  categorizedArt("runner", "Running", "Sports", `<g>${line("M52 16a8 8 0 1 0 0.1 0z", 6)}${line("M46 34l-6 22 14 8-8 20", 8)}${line("M40 56l-20 4M54 42l22-6M14 84l26-4M52 84h32", 6)}</g>`),
+
+  categorizedArt("praying", "Praying Hands", "Faith", `<path d="M49 6C41 24 35 44 33 60c-2 12 1 24 7 30h9V26z"/><path d="M51 6c8 18 14 38 16 54 2 12-1 24-7 30h-9V26z"/>`),
+  categorizedArt("angel-wings", "Angel Wings", "Faith", `<path d="M50 28c-7-11-21-17-36-14 7 10 6 23 15 29-9 0-16 4-20 10 13 7 28 7 41-2zM50 28c7-11 21-17 36-14-7 10-6 23-15 29 9 0 16 4 20 10-13 7-28 7-41-2z"/>`),
+  categorizedArt("menorah", "Menorah", "Faith", `<g>${line("M8 82h84M50 82V26M26 82V46M74 82V46M38 82V38M62 82V38M50 26V14M40 14h20", 6)}</g><circle cx="50" cy="10" r="4"/>`),
+  categorizedArt("star-david", "Star of David", "Faith", `${line("M50 8 82 64H18z", 7)}${line("M50 92 18 36h64z", 7)}`),
+  categorizedArt("bible-heart", "Faith & Love", "Faith", `<path d="M50 24c-12-11-27-12-38-7v54c11-5 25-4 38 7 13-11 27-12 38-7V17c-11-5-26-4-38 7zM50 24v54" fill="none" stroke="#141414" stroke-width="6" stroke-linejoin="round"/><path d="M50 74C34 62 26 54 26 44a12 12 0 0 1 24-4 12 12 0 0 1 24 4c0 10-8 18-24 30z"/>`),
+  categorizedArt("cross-rays", "Radiant Cross", "Faith", `<g>${spokes(8, 30, 46, 5, 22)}</g><path d="M40 6h20v30h30v20H60v38H40V56H10V36h30z"/>`),
+
+  categorizedArt("tree", "Tree", "Nature", `<path d="M50 4 24 46h13L16 78h68L63 46h13z"/><rect x="44" y="76" width="12" height="20"/>`),
+  categorizedArt("pine", "Pine Tree", "Nature", `<path d="M50 4 28 42h11L20 74h60L61 42h11z"/><rect x="44" y="72" width="12" height="22"/>`),
+  categorizedArt("cactus", "Cactus", "Nature", `<rect x="38" y="18" width="24" height="76" rx="12"/><path d="M38 52H30a10 10 0 0 1-10-10V30h12v12h6zM62 60h8a10 10 0 0 0 10-10V36H68v14h-6z"/>`),
+  categorizedArt("cloud", "Cloud", "Nature", `<path d="M28 76h46a18 18 0 0 0 1-36 25 25 0 0 0-48-3 17 17 0 0 0 1 39z"/>`),
+  categorizedArt("rainbow", "Rainbow", "Nature", `<path fill-rule="evenodd" d="M4 80a46 46 0 0 1 92 0h-14a32 32 0 0 0-64 0zm26 0a20 20 0 0 1 40 0H56a6 6 0 0 0-12 0z"/>`),
+  categorizedArt("snowflake", "Snowflake", "Nature", `<g>${spokes(6, 0, 42, 6)}${twigs(6, 28, 15, 5)}</g>`),
+  categorizedArt("campfire", "Campfire", "Nature", `<path d="M50 6c12 18 24 26 24 42a24 24 0 0 1-48 0c0-9 5-16 11-23 1 7 4 12 9 15-3-14 0-24 4-34z"/><path d="M14 82h72" fill="none" stroke="#141414" stroke-width="8" stroke-linecap="round"/><path d="M24 72l52-8M24 64l52 8" fill="none" stroke="#141414" stroke-width="6" stroke-linecap="round"/>`),
+  categorizedArt("palm-tree", "Palm Tree", "Nature", `<path d="M20 84c14-8 22-20 24-40" fill="none" stroke="#141414" stroke-width="10" stroke-linecap="round"/><path d="M44 44c-8-10-22-14-36-9 8-12 24-15 38-7 4-12 17-19 31-16-11 4-19 12-23 23 11-5 24-3 34 6-12 3-24 3-34-2-2 8-6 16-10 21z"/>`),
+  categorizedArt("tent", "Camp Tent", "Nature", `<path d="M50 10 4 88h92z"/><path d="M50 10v78M50 44 34 88M50 44l16 44" fill="none" stroke="#fff" stroke-width="5"/>`),
+  categorizedArt("sunset", "Sunset", "Nature", `<g>${line("M18 62a32 32 0 0 1 64 0", 7)}</g><rect x="2" y="60" width="96" height="8"/><path d="M12 76h76M22 88h56" fill="none" stroke="#141414" stroke-width="7" stroke-linecap="round"/>`),
+  categorizedArt("bee", "Bee", "Nature", `<ellipse cx="50" cy="58" rx="17" ry="26"/><path d="M33 46h34M33 58h34M33 70h34" fill="none" stroke="#fff" stroke-width="5"/><path d="M40 30c-5-11-15-15-22-13 2 6 6 11 12 14M60 30c5-11 15-15 22-13-2 6-6 11-12 14" fill="none" stroke="#141414" stroke-width="5"/>`),
+  categorizedArt("tulip", "Tulip", "Nature", `<path d="M26 26c0-13 11-22 24-22s24 9 24 22c0 15-11 26-24 26S26 41 26 26zM50 4v48" fill="#141414"/><path d="M50 52v42M50 66c-9-11-18-11-24-6 4 10 13 13 24 8M50 74c9-11 18-11 24-6-4 10-13 13-24 8" fill="none" stroke="#141414" stroke-width="6" stroke-linecap="round"/>`),
+  categorizedArt("mountains-snow", "Snowy Peaks", "Nature", `<path d="M2 84 30 34l16 26 14-40 36 64z"/><path d="m24 46 6-12 7 12m14-16 7-18 9 20" fill="none" stroke="#fff" stroke-width="5" stroke-linejoin="round"/><path d="M6 92h88" fill="none" stroke="#141414" stroke-width="6" stroke-linecap="round"/>`),
+  categorizedArt("island", "Island", "Nature", `<g>${line("M6 78h88", 6)}${line("M2 90c14-8 30-8 46 0s32 8 46 0", 6)}</g><circle cx="78" cy="24" r="11"/><path d="M40 78c4-8 8-14 12-18" fill="none" stroke="#141414" stroke-width="7" stroke-linecap="round"/><path d="M52 58c-6-8-16-11-26-7 6-9 17-11 27-5 3-8 12-13 22-11-8 3-13 9-16 17 8-4 17-2 24 5-9 2-18 2-25-2-1 6-4 11-6 14z"/>`),
+
+  categorizedArt("tropical-fish", "Fish", "Animals", `<path d="M8 50c14-18 34-21 50-8l18-12-4 20 4 20-18-12c-16 13-36 10-50-8z"/><circle cx="30" cy="44" r="4" fill="#fff"/>${line("M36 40v20", 4)}`),
+  categorizedArt("cat", "Cat", "Animals", `<path fill-rule="evenodd" d="M22 40 24 10l19 15h14l19-15 2 30v34a10 10 0 0 1-10 10H32a10 10 0 0 1-10-10z${hole(40, 46, 4)}${hole(60, 46, 4)}M50 60l-5 7h10z"/>`),
+  categorizedArt("dog", "Dog", "Animals", `<path fill-rule="evenodd" d="M24 42c0-15 11-26 26-26 7 0 13 3 18 7l12-9v20c3 5 5 11 5 17v20a11 11 0 0 1-11 11H35a11 11 0 0 1-11-11z${hole(41, 43, 4)}M50 62c0 7 7 11 14 8"/>${line("M62 74h14", 5)}`),
+  categorizedArt("dragonfly", "Dragonfly", "Animals", `<ellipse cx="30" cy="38" rx="21" ry="10"/><ellipse cx="70" cy="38" rx="21" ry="10"/><ellipse cx="32" cy="64" rx="17" ry="8"/><ellipse cx="68" cy="64" rx="17" ry="8"/><rect x="45" y="16" width="10" height="68" rx="5"/><circle cx="50" cy="14" r="8"/>`),
+  categorizedArt("whale", "Whale", "Animals", `<path d="M6 52c14-15 36-17 55-6 13 7 25 7 35 0-2 13-11 23-23 27-17 6-42 2-59-9-5-3-8-7-8-12z"/><path d="M14 40c0-9 6-15 15-15" fill="none" stroke="#141414" stroke-width="6"/><circle cx="30" cy="46" r="3" fill="#fff"/>`),
+  categorizedArt("paw-print", "Paw Print", "Animals", `<ellipse cx="50" cy="68" rx="25" ry="20"/><ellipse cx="19" cy="39" rx="9" ry="13" transform="rotate(-25 19 39)"/><ellipse cx="40" cy="24" rx="9" ry="13" transform="rotate(-10 40 24)"/><ellipse cx="62" cy="24" rx="9" ry="13" transform="rotate(10 62 24)"/><ellipse cx="82" cy="39" rx="9" ry="13" transform="rotate(25 82 39)"/>`),
+  categorizedArt("butterfly-wing", "Butterflies", "Animals", `<path d="M46 44C36 12 6 2 8 26c1 16 16 25 33 28-18-1-26 10-20 20 8 14 26 2 33-16 7 18 25 30 33 16 6-10-2-21-20-20 17-3 32-12 33-28 2-24-28-14-38 18zM46 44v40" fill="none" stroke="#141414" stroke-width="6" stroke-linejoin="round"/><path d="M38 30 26 16M58 30 70 16" fill="none" stroke="#141414" stroke-width="5" stroke-linecap="round"/>`),
 ];

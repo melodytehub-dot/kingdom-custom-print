@@ -3105,3 +3105,116 @@
   .rot-barbtn { min-width: 38px; padding-inline: 5px; }
   .rot-next { min-width: 66px; }
 }
+
+/* --------------------------------------------------------------------------
+   Portrait phone editor layout
+
+   When a layer editor (text / image) is open the canvas and the inspector share
+   the screen instead of the inspector floating over the artwork. The garment is
+   fitted into the visible strip above the inspector, so the element being edited
+   is never hidden behind the controls, and the inspector gets a tall, easy-to-
+   read scroll region with a single compact action row.
+   -------------------------------------------------------------------------- */
+
+@media (max-width: 900px) and (min-height: 501px) {
+  .rot[data-step="design"][data-layout="split"] .rot-body {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  .rot[data-step="design"][data-layout="split"] .rot-main {
+    position: relative;
+    inset: auto;
+    display: flex;
+    flex: 0 0 40%;
+    width: 100%;
+    min-height: 0;
+  }
+
+  .rot[data-step="design"][data-layout="split"] .rot-preview {
+    flex: 1 1 auto;
+    min-height: 0;
+  }
+
+  .rot[data-step="design"][data-layout="split"] .rot-stage-top {
+    height: 48px;
+    min-height: 48px;
+    max-height: 48px;
+    flex: 0 0 48px;
+    padding: 3px 6px;
+  }
+
+  .rot[data-step="design"][data-layout="split"] .rot-panel {
+    position: relative;
+    inset: auto;
+    flex: 1 1 auto;
+    width: 100%;
+    height: auto;
+    min-height: 0;
+    max-height: none;
+    border-top: 1px solid var(--rot-line);
+    box-shadow: 0 -6px 20px rgba(20, 20, 24, 0.1);
+    padding-top: 16px;
+  }
+
+  .rot[data-step="design"][data-layout="split"] .rot-editor {
+    height: 100%;
+    min-height: 0;
+  }
+
+  .rot[data-step="design"][data-layout="split"] .rot-editor-scroll {
+    flex: 1 1 0;
+    min-height: 0;
+    padding: 0 16px 16px;
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* Single compact action row instead of a two-row grid that ate the editor. */
+  .rot-actionbar {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: nowrap;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 2px;
+    padding: 6px 8px calc(6px + env(safe-area-inset-bottom));
+    overflow-x: auto;
+    overflow-y: hidden;
+    scrollbar-width: none;
+    border-top: 1px solid var(--rot-line);
+    background: #fff;
+  }
+
+  .rot-actionbar::-webkit-scrollbar { display: none; }
+
+  .rot-act {
+    flex: 0 1 auto;
+    min-width: 0;
+    gap: 2px;
+  }
+
+  .rot-act > span {
+    font-size: 8.5px;
+    line-height: 1;
+    white-space: nowrap;
+  }
+
+  .rot-actbtn,
+  .rot-actpair .rot-actbtn {
+    width: 44px;
+    height: 44px;
+    min-width: 44px;
+  }
+}
+
+@media (max-width: 400px) and (min-height: 501px) {
+  .rot-actionbar { gap: 0; padding-inline: 6px; }
+  .rot-act > span { font-size: 8px; }
+  .rot-actbtn,
+  .rot-actpair .rot-actbtn { width: 42px; min-width: 42px; }
+}

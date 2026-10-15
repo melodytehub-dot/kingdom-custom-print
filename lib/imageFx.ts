@@ -200,6 +200,105 @@ export async function applyImageFx(origSrc: string, fx: ImageFx): Promise<FxResu
   return { dataUrl: encoded.dataUrl, aspect: encoded.width / encoded.height };
 }
 
+/**
+ * Flood-fills the border-connected background colour to transparent.
+ * Works entirely from pixels so it runs instantly on any device — no model,
+ * no network, no WebGPU. Returns the fraction of pixels that were cleared.
+ */
+function floodFillBackground(img: ImageData, tolerance = 46, soft = 32): number {
+  const { data: d, width: w, height: h } = img;
+  const bg = borderColour(d, w, h);
+  if (!bg) return 0;
+
+  const seen = new Uint8Array(w * h);
+  const stack = new Int32Array(w * h);
+  let top = 0;
+  const seed = (p: number) => {
+    if (!seen[p]) {
+      seen[p] = 1;
+      stack[top++] = p;
+    }
+  };
+  for (let x = 0; x < w; x++) {
+    seed(x);
+    seed((h - 1) * w + x);
+  }
+  for (let y = 0; y < h; y++) {
+    seed(y * w);
+    seed(y * w + w - 1);
+  }
+
+  const limit = tolerance + soft;
+  let cleared = 0;
+  while (top > 0) {
+    const p = stack[--top];
+    const i = p * 4;
+    const dd = Math.sqrt(
+      (d[i] - bg[0]) ** 2 + (d[i + 1] - bg[1]) ** 2 + (d[i + 2] - bg[2]) ** 2,
+    );
+    if (dd > limit) continue;
+
+    // Soft edge: fully clear the core, feather the boundary band.
+    const alpha = dd <= tolerance ? 0 : Math.round((255 * (dd - tolerance)) / soft);
+    if (alpha < d[i + 3]) d[i + 3] = alpha;
+    cleared++;
+
+    const x = p % w;
+    const y = (p - x) / w;
+    if (x > 0) seed(p - 1);
+    if (x < w - 1) seed(p + 1);
+    if (y > 0) seed(p - w);
+    if (y < h - 1) seed(p + w);
+  }
+
+  return cleared / (w * h);
+}
+
+export interface QuickCutout {
+  dataUrl: string;
+  aspect: number;
+  /** Fraction of pixels made transparent. */
+  ratio: number;
+  /** True when enough of the image was background for the result to look right. */
+  confident: boolean;
+}
+
+/**
+ * Instant, dependency-free background removal. This is the guaranteed path on
+ * phones and tablets (and any browser without WebGPU); the AI model is only
+ * used afterwards to refine busy photos.
+ */
+export async function quickBackgroundRemoval(src: string): Promise<QuickCutout | null> {
+  const img = await load(src);
+  const W = Math.max(1, img.naturalWidth || img.width || 1000);
+  const H = Math.max(1, img.naturalHeight || img.height || 1000);
+  const canvas = document.createElement("canvas");
+  canvas.width = W;
+  canvas.height = H;
+  const ctx = canvas.getContext("2d", { willReadFrequently: true });
+  if (!ctx) return null;
+  ctx.imageSmoothingQuality = "high";
+  ctx.drawImage(img, 0, 0, W, H);
+
+  const data = ctx.getImageData(0, 0, W, H);
+  const ratio = floodFillBackground(data);
+  if (ratio <= 0) return null;
+  ctx.putImageData(data, 0, 0);
+
+  const encoded = encodeCanvasUnder(canvas);
+  return {
+    dataUrl: encoded.dataUrl,
+    aspect: encoded.width / encoded.height,
+    ratio,
+    confident: ratio >= 0.04,
+  };
+}
+
+/** True when the artwork should not be sent through the AI model. */
+export function isVectorSource(src: string): boolean {
+  return src.startsWith("data:image/svg+xml") || src.startsWith("data:image/svg");
+}
+
 /** Up to `count` dominant colours of an image (ignores transparent pixels). */
 export async function dominantColours(src: string, count = 3): Promise<string[]> {
   const img = await load(src);
