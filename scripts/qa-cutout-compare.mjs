@@ -120,6 +120,7 @@ try {
 
     await page.goto(`${BASE}/cutout-compare`, { waitUntil: "domcontentloaded" });
     await page.locator("h1").waitFor();
+    await page.waitForLoadState("load");
 
     check(`${label}: the three panes render`, (await page.locator(".cc-pane").count()) === 3);
     check(
@@ -132,42 +133,58 @@ try {
       /paste the imgix domain/i.test(await page.locator(".cc-pane").nth(1).innerText()),
     );
 
-    await page.getByRole("button", { name: /Flowers/ }).click();
-    check(
-      `${label}: picking a sample updates the test line`,
-      /Testing Flowers/.test(await page.locator(".cc-current").innerText()),
-    );
+    // A deployed build can take a moment to hydrate; keep pressing the picker
+    // until it answers instead of assuming the first click lands.
+    let picked = false;
+    for (let attempt = 0; attempt < 5 && !picked; attempt += 1) {
+      await page.getByRole("button", { name: /Flowers/ }).click();
+      picked = await page
+        .waitForFunction(
+          () => document.querySelector(".cc-current")?.textContent?.includes("Flowers") === true,
+          undefined,
+          { timeout: 4000 },
+        )
+        .then(() => true)
+        .catch(() => false);
+    }
+    check(`${label}: picking a sample updates the test line`, picked);
 
+    // Watch the network rather than the DOM: a fast failed fetch would swap
+    // the image for the error hint before the assertion could read its src.
+    const sampleRequest = page.waitForRequest(
+      (request) => request.url().startsWith("https://demo.imgix.net/cutout-samples/"),
+      { timeout: 20000 },
+    );
     await page.locator(".cc-field input").fill("demo.imgix.net");
-    const imgSrc = await page.locator(".cc-pane").nth(1).locator("img").getAttribute("src");
+    const imgSrc = await sampleRequest.then((request) => request.url()).catch(() => "");
     check(
       `${label}: the middle pane requests imgix with the pinned parameters`,
       Boolean(
-        imgSrc &&
-          imgSrc.startsWith("https://demo.imgix.net/cutout-samples/portrait-flowers.jpg?") &&
+        imgSrc.startsWith("https://demo.imgix.net/cutout-samples/portrait-flowers.jpg?") &&
           imgSrc.includes("bg-remove=true") &&
           imgSrc.includes("trim=colorUnlessAlpha") &&
           imgSrc.includes("fm=png") &&
           imgSrc.includes("cs=strip"),
       ),
-      imgSrc ?? "",
+      imgSrc,
     );
 
+    const bridgeRequest = page.waitForRequest(
+      (request) => request.url().startsWith("https://demo.imgix.net/api/cutout-bridge/"),
+      { timeout: 30000 },
+    );
     await page.locator('input[type="file"]').setInputFiles(PHOTO);
     await page.waitForFunction(
-      () => document.querySelector(".cc-current")?.textContent?.includes("mug.jpg"),
+      () => document.querySelector(".cc-current")?.textContent?.includes("mug.jpg") === true,
       undefined,
       { timeout: 30000 },
     );
-    const uploadSrc = await page.locator(".cc-pane").nth(1).locator("img").getAttribute("src");
+    const uploadSrc = await bridgeRequest.then((request) => request.url()).catch(() => "");
     check(
       `${label}: an uploaded photo is fetched back through the bridge`,
-      Boolean(
-        uploadSrc &&
-          uploadSrc.startsWith("https://demo.imgix.net/api/cutout-bridge/") &&
-          uploadSrc.includes("bg-remove=true"),
-      ),
-      uploadSrc ?? "",
+      uploadSrc.startsWith("https://demo.imgix.net/api/cutout-bridge/") &&
+        uploadSrc.includes("bg-remove=true"),
+      uploadSrc,
     );
 
     const overflow = await page.evaluate(
