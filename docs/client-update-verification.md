@@ -270,6 +270,10 @@ the real editor before deciding whether to pay for it.
   models. The editor parks the photo briefly on our own site
   (`/api/cutout-bridge`, random id, swept after a day) because imgix can only
   fetch from a configured source; the transparent PNG comes straight back.
+  imgix's remover accepts jpg/png only, so the parked copy is re-encoded from
+  the editor's stored WebP to JPEG first — the first production run proved it,
+  falling back to the on-device models when imgix refused the WebP with
+  `400 Invalid file type, expected jpg/png`.
 - The request mirrors rushordertees.com exactly — the parameters sit in their
   studio bundle and are pinned in `lib/imgixCutout.ts`:
   `bg-remove=true&trim=colorUnlessAlpha&fm=png&cs=strip` — plus one deliberate
@@ -301,13 +305,14 @@ the real editor before deciding whether to pay for it.
 - `npm run qa-hosted-cutout` is new (run against a dev server started with
   `NEXT_PUBLIC_IMGIX_SOURCE=test.imgix.net`; the imgix host is intercepted, so
   no credits are spent). On desktop and a phone: the photo reaches the bridge,
-  the imgix request carries the pinned recipe including
-  `bg-remove-fallback=false`, a "still processing" 423 is retried until ready,
-  the cut-out lands on the layer as `cutoutSource: "hosted"` with clear corners
-  and an intact subject, no AI model is downloaded, and the toast names the
-  hosted AI. A hosted failure on the phone falls back to the portrait model and
-  says so; a flat logo still cuts out instantly with no upload and no imgix
-  request.
+  the parked copy is jpg/png (imgix refuses WebP — pinned after the first
+  production run tripped on it), the imgix request carries the pinned recipe
+  including `bg-remove-fallback=false`, a "still processing" 423 is retried
+  until ready, the cut-out lands on the layer as `cutoutSource: "hosted"` with
+  clear corners and an intact subject, no AI model is downloaded, and the
+  toast names the hosted AI. A hosted failure on the phone falls back to the
+  portrait model and says so; a flat logo still cuts out instantly with no
+  upload and no imgix request.
 - `npm run qa-cutout-actions` grew: the hosted status lines, the two hosted
   endings (used / fell back), and that a hosted cut-out leaves no "improve"
   button (nothing better to run). No browser needed.

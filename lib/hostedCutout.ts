@@ -25,8 +25,9 @@ const BRIDGE_ACCEPT_BYTES = 3_900_000;
 const RENDER_DEADLINE_MS = 120_000;
 /** Gap between "still processing" retries. */
 const RETRY_MS = 4_000;
-/** A single request that never answers is treated as unreachable. */
-const ATTEMPT_TIMEOUT_MS = 30_000;
+/** A single request that never answers is treated as unreachable. Cold
+ * renders answer in seconds (measured ~6 s); a 423 restarts the clock. */
+const ATTEMPT_TIMEOUT_MS = 45_000;
 
 export type HostedCutoutPhase =
   /** Shrinking and sending the photo. */
@@ -74,15 +75,16 @@ async function sourceToBlob(src: string): Promise<Blob> {
 }
 
 /**
- * The bytes to send to imgix. Uploads are already stored as ≤1400 px WebP well
- * under the bridge's limit, so this is usually a pass-through; anything larger
- * (a big art file) is scaled to 2048 px and re-compressed.
+ * The bytes to send to imgix. imgix's background removal accepts **jpg/png
+ * only** — it refuses anything else with `400 Invalid file type, expected
+ * jpg/png`. The editor stores uploads as WebP, so the usual photo is
+ * re-encoded to JPEG here; an oversized jpg/png (a big art file) is scaled to
+ * 2048 px and re-compressed.
  */
 export async function prepareCutoutUpload(src: string): Promise<Blob> {
   const blob = await sourceToBlob(src);
-  const usable =
-    blob.type === "image/jpeg" || blob.type === "image/png" || blob.type === "image/webp";
-  if (usable && blob.size <= BRIDGE_ACCEPT_BYTES) return blob;
+  const acceptable = blob.type === "image/jpeg" || blob.type === "image/png";
+  if (acceptable && blob.size <= BRIDGE_ACCEPT_BYTES) return blob;
 
   const objectUrl = URL.createObjectURL(blob);
   try {
@@ -157,7 +159,14 @@ export async function renderHostedCutout(
       await new Promise((resolve) => window.setTimeout(resolve, RETRY_MS));
       continue;
     }
-    if (!response.ok) throw new Error(`The hosted remover answered with ${response.status}.`);
+    if (!response.ok) {
+      // imgix exposes why a removal failed (it is an exposed CORS header);
+      // carry it into the error so devtools tells the story of a fallback.
+      const reason = response.headers.get("x-imgix-bg-remove-failure-reason");
+      throw new Error(
+        `The hosted remover answered with ${response.status}${reason ? ` (${reason})` : ""}.`,
+      );
+    }
 
     const blob = await response.blob();
     const objectUrl = URL.createObjectURL(blob);

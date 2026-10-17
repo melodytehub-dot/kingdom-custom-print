@@ -12,6 +12,7 @@
  *
  *  - the request URL mirrors the rushordertees recipe plus
  *    `bg-remove-fallback=false` (never silently hand back the original photo)
+ *  - the upload imgix receives is jpg/png — its remover refuses WebP
  *  - a "still processing" 423 is retried until the render is ready
  *  - the result lands on the layer as `cutoutSource: "hosted"`, corners clear
  *  - no AI model is downloaded when the hosted remover does the work
@@ -238,14 +239,13 @@ try {
 
       // The bridge upload is the hosted path's first step — it is also how a
       // misconfigured server run is detected early.
-      const uploadSeen = await page
+      const upload = await page
         .waitForRequest(
           (request) => request.method() === "POST" && request.url().includes("/api/cutout-bridge"),
           { timeout: 15000 },
         )
-        .then(() => true)
-        .catch(() => false);
-      if (!uploadSeen) {
+        .catch(() => null);
+      if (!upload) {
         check(
           `${label} hosted: the server is running with a hosted source`,
           false,
@@ -255,6 +255,9 @@ try {
         continue;
       }
       hostedModeSeen = true;
+      const uploadBody = upload.postDataBuffer();
+      const uploadHead = uploadBody ? uploadBody.subarray(0, 4096).toString("latin1") : "";
+      const uploadType = uploadHead.match(/content-type: (image\/[a-z0-9.+-]+)/i)?.[1] ?? "unknown";
 
       const toast = await waitForToast(page);
       const elapsed = Date.now() - started;
@@ -266,6 +269,11 @@ try {
         `${label} hosted: the photo is parked on our bridge for imgix`,
         bridgePosts.length === 1,
         bridgePosts[0] ?? "no bridge upload",
+      );
+      check(
+        `${label} hosted: imgix only gets jpg/png (it refuses WebP)`,
+        uploadType === "image/jpeg" || uploadType === "image/png",
+        uploadType,
       );
       check(
         `${label} hosted: the imgix request carries the pinned recipe`,
