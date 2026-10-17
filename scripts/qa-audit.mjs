@@ -32,6 +32,7 @@ const ROUTES = [
   { path: "/wishlist", name: "wishlist" },
   { path: "/checkout", name: "checkout" },
   { path: "/order/success", name: "order-success" },
+  { path: "/cutout-compare", name: "cutout-compare" },
   { path: "/admin", name: "admin-login" },
   { path: "/nonexistent", name: "not-found" },
 ];

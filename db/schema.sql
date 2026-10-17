@@ -167,3 +167,21 @@ CREATE TRIGGER products_touch BEFORE UPDATE ON products
 DROP TRIGGER IF EXISTS orders_touch ON orders;
 CREATE TRIGGER orders_touch BEFORE UPDATE ON orders
   FOR EACH ROW EXECUTE FUNCTION touch_updated_at();
+
+-- ---------------------------------------------------------------------------
+-- Hosted cut-out evaluation
+--
+-- The side-by-side test at /cutout-compare hands photos to imgix ("Remove
+-- Background") through a public URL. Uploads live here for a day so imgix can
+-- fetch them, then the next upload sweeps the old rows away.
+-- ---------------------------------------------------------------------------
+
+CREATE TABLE IF NOT EXISTS cutout_bridge_images (
+  id           text PRIMARY KEY,
+  content_type text NOT NULL DEFAULT 'image/jpeg',
+  bytes        bytea NOT NULL,
+  created_at   timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS cutout_bridge_images_created_idx
+  ON cutout_bridge_images (created_at);

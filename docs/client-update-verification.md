@@ -257,3 +257,44 @@ mobile".
   add to cart → reprice → checkout path was re-checked in a real browser after
   the text-entry panel and the footer button labels changed.
 
+## October 17 — Hosted cut-out evaluation (side by side)
+
+Client note: after the on-device rebuild, background removal is "not really
+perfect yet", and a paid hosted service (imgix) is being evaluated hands-on
+before deciding whether to pay for it.
+
+### The comparison page
+
+- `/cutout-compare` (not linked from the store, `noindex`) puts the same photo
+  through both engines side by side: **Original**, **imgix** (hosted) and
+  **On this device** (the engine the editor uses today), with render times,
+  which model ran, and PNG downloads.
+- The imgix request mirrors rushordertees.com exactly — the parameters sit in
+  their studio bundle and are pinned in `lib/imgixCutout.ts`:
+  `bg-remove=true&trim=colorUnlessAlpha&fm=png&cs=strip`, with the model
+  selectable (default Bria, the one rushordertees gets; or remove.bg,
+  fal-Ideogram, fal-Pixelcut).
+- imgix can only fetch photos from a configured source, so uploaded test photos
+  are parked briefly on our own site (`/api/cutout-bridge`, random id, rows
+  swept after a day) and the imgix source fetches them from there. Only the
+  middle pane sends a photo anywhere; the on-device pane never does.
+- Five stock test photos live in `public/cutout-samples/` (busy street, hair
+  wisps, soft sky, dark knit, product mug). A real photo can be uploaded
+  straight from a phone.
+- One-time setup in the imgix dashboard: Sources → New Source → Web Folder,
+  Base URL `https://kingdom-custom-print.vercel.app/`, subdomain of choice,
+  Deploy Source. The existing source has no usable origin (it answers 404), so
+  it cannot serve the test photos.
+- `NEXT_PUBLIC_IMGIX_SOURCE` can prefill the source domain; without it the page
+  takes the domain in a field on the page.
+
+### Verification
+
+- `npm run qa-cutout-compare` is new: it pins the URL builder to the
+  rushordertees recipe, round-trips a photo through the bridge (upload, same
+  bytes back, 404 on an unknown id, 415 on a non-photo) and drives the page on
+  desktop (1280x900) and a phone (390x844): three panes, sample picker, the
+  exact imgix request URL, an uploaded photo served back through the bridge,
+  no horizontal overflow and no page errors.
+- `npm run qa-audit` now includes `/cutout-compare` across its five viewports.
+
