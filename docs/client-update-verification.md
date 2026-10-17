@@ -302,6 +302,11 @@ the real editor before deciding whether to pay for it.
 
 ### Verification
 
+- Live check against the real source: the deployed editor cut a photograph out
+  through the real bridge and imgix on desktop and on a phone — the mug sample
+  and the client's own kaftan photo — in 11-13 s each (cold renders), no
+  on-device model ran, the layer recorded `cutoutSource: "hosted"`, and both
+  cut-outs came back clean (pixel-alpha checked, and eyeballed).
 - `npm run qa-hosted-cutout` is new (run against a dev server started with
   `NEXT_PUBLIC_IMGIX_SOURCE=test.imgix.net`; the imgix host is intercepted, so
   no credits are spent). On desktop and a phone: the photo reaches the bridge,
