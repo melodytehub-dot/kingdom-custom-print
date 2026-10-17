@@ -46,7 +46,7 @@ async function runCase(page, payload) {
   await page.goto(`${BASE}/customize/crown-classic-tee?color=black&sizes=M%3A1`, { waitUntil: "commit" });
   await page.locator(".rot-canvas-svg").waitFor();
 
-  await page.locator('input[type="file"]').setInputFiles(payload);
+  await page.locator('input[type="file"]').first().setInputFiles(payload);
   await page
     .waitForFunction(
       (key) => {

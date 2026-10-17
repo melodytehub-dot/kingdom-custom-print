@@ -325,7 +325,7 @@ the real editor before deciding whether to pay for it.
   as generic bytes) and a HEIC renamed to `.jpg` — plus JPG, PNG, AVIF, an
   oversized 9 MB file, a broken file and a BMP. Every good file lands on the
   design (the HEICs as real 1280x854 photos); every bad file gets its specific,
-  honest message.
+  honest message. The same checks pass against the deployed site.
 - Live check against the real source: the deployed editor cut a photograph out
   through the real bridge and imgix on desktop and on a phone — the mug sample
   and the client's own kaftan photo — in 11-13 s each (cold renders), no
