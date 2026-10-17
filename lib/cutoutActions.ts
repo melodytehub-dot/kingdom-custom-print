@@ -7,6 +7,7 @@
  */
 import { formatModelSize } from "@/lib/cutoutModels";
 import type { BackgroundRemovalProgress } from "@/lib/backgroundRemoval";
+import type { HostedCutoutPhase } from "@/lib/hostedCutout";
 import type { ImageLayer } from "@/lib/types";
 
 /**
@@ -32,6 +33,15 @@ export function cutoutStatus(progress: BackgroundRemovalProgress): string {
   return `Cutting out the subject with the ${name} model…`;
 }
 
+/** What the customer reads while the hosted remover has the photo. */
+export function hostedCutoutStatus(phase: HostedCutoutPhase): string {
+  if (phase === "upload") return "Sending the photo to the hosted AI…";
+  if (phase === "waiting") {
+    return "The hosted AI is still working on this photo — a new one can take a minute…";
+  }
+  return "The hosted AI is cutting out the subject…";
+}
+
 /**
  * The answer to "did my background go away?". This has to stay honest: when a
  * busy photo could not be cut out, saying so (and pointing at the two ways
@@ -41,10 +51,13 @@ export function cutoutNotice({
   removeBg,
   failure,
   hasCutout,
+  hosted = null,
 }: {
   removeBg: boolean;
   failure: "no-subject" | "unavailable" | null;
   hasCutout: boolean;
+  /** How the hosted remover fared when it was in play. */
+  hosted?: "used" | "fell-back" | null;
 }): { tone: "ok" | "warn" | "error"; text: string } {
   if (!removeBg) return { tone: "ok", text: "Original background restored." };
   if (failure === "no-subject") {
@@ -61,6 +74,10 @@ export function cutoutNotice({
       : { tone: "warn", text: "The cut-out model could not load. Check your connection and try again." };
   }
   if (!hasCutout) return { tone: "warn", text: "We could not detect a background to remove. Try Select Object for busy photos." };
+  if (hosted === "used") return { tone: "ok", text: "Background removed with the hosted AI." };
+  if (hosted === "fell-back") {
+    return { tone: "warn", text: "Background removed on this device — the hosted AI did not answer." };
+  }
   return { tone: "ok", text: "Background removed." };
 }
 
@@ -92,6 +109,8 @@ export function cutoutActionFor(
   }
   // The detailed model has already had its turn: there is nothing better to run.
   if (layer.cutoutSource === "general") return undefined;
+  // Neither has the hosted remover — it is the best cut-out on offer.
+  if (layer.cutoutSource === "hosted") return undefined;
   // Nothing was cut out at all — the models found no subject, or could not be
   // reached. Leave the customer a way to try again rather than a dead end.
   return {

@@ -87,7 +87,14 @@ import {
   quickBackgroundRemoval,
 } from "@/lib/imageFx";
 import { removeBackgroundLocally, CutoutError } from "@/lib/backgroundRemoval";
-import { canAutoRunDetailedModel, cutoutActionFor, cutoutNotice, cutoutStatus } from "@/lib/cutoutActions";
+import {
+  canAutoRunDetailedModel,
+  cutoutActionFor,
+  cutoutNotice,
+  cutoutStatus,
+  hostedCutoutStatus,
+} from "@/lib/cutoutActions";
+import { hostedCutoutDataUrl, hostedCutoutReady } from "@/lib/hostedCutout";
 import {
   CUTOUT_MAX_EDGE,
   DETAILED_PLAN,
@@ -686,6 +693,18 @@ export default function Customizer({
     });
   };
 
+  /**
+   * Cuts a photo with the hosted remover when one is configured for this
+   * build. The photo makes a round trip — our bridge, then imgix — so the
+   * status line says what is happening; any failure throws and the caller
+   * falls back to the on-device models.
+   */
+  const runHostedCutout = async (orig: string) => {
+    return hostedCutoutDataUrl(orig, {
+      onPhase: (phase) => setFxStatus(hostedCutoutStatus(phase)),
+    });
+  };
+
   const applyFx = async (layer: ImageLayer, next: Partial<ImageFx>) => {
     const fx: ImageFx = { ...(layer.fx ?? DEFAULT_FX), ...next };
     const orig = layer.origSrc ?? layer.src;
@@ -696,6 +715,7 @@ export default function Customizer({
     setFxStatus(fx.removeBg ? "Preparing background removal…" : "Applying artwork edits…");
     try {
       let cutoutFailure: "no-subject" | "unavailable" | null = null;
+      let hosted: "used" | "fell-back" | null = null;
       if (fx.removeBg && !backgroundRemovedSrc) {
         // Decide what this upload *is* before touching it. Flat artwork — a
         // logo, a sticker, a screenshot — has no background colour to argue
@@ -717,19 +737,33 @@ export default function Customizer({
           setFxStatus("Removing background…");
           keepQuick(await quickCut());
         } else {
-          try {
-            const result = await runCutoutModels(orig, cutoutPlan(canAutoRunDetailedModel()));
-            backgroundRemovedSrc = result.dataUrl;
-            cutoutSource = result.source;
-          } catch (error) {
-            cutoutFailure = error instanceof CutoutError ? error.reason : "unavailable";
-            // One last resort for a photo the models could not handle: the
-            // colour key, but only when it is sure of itself *and* left a
-            // subject behind. Both halves matter — on the customer's own photo
-            // the key was sure of itself having kept 4% of the picture.
-            setFxStatus("Removing background…");
-            const quick = await quickCut();
-            if (quick?.confident && quick.ratio <= 0.85) keepQuick(quick);
+          if (hostedCutoutReady()) {
+            try {
+              backgroundRemovedSrc = await runHostedCutout(orig);
+              cutoutSource = "hosted";
+              hosted = "used";
+            } catch {
+              // Whatever went wrong on the hosted side — no signal, no
+              // credits, a photo it cannot cut — the models below are the
+              // fallback, and the notice says the hosted AI did not answer.
+              hosted = "fell-back";
+            }
+          }
+          if (!backgroundRemovedSrc) {
+            try {
+              const result = await runCutoutModels(orig, cutoutPlan(canAutoRunDetailedModel()));
+              backgroundRemovedSrc = result.dataUrl;
+              cutoutSource = result.source;
+            } catch (error) {
+              cutoutFailure = error instanceof CutoutError ? error.reason : "unavailable";
+              // One last resort for a photo the models could not handle: the
+              // colour key, but only when it is sure of itself *and* left a
+              // subject behind. Both halves matter — on the customer's own photo
+              // the key was sure of itself having kept 4% of the picture.
+              setFxStatus("Removing background…");
+              const quick = await quickCut();
+              if (quick?.confident && quick.ratio <= 0.85) keepQuick(quick);
+            }
           }
         }
       }
@@ -750,6 +784,7 @@ export default function Customizer({
             removeBg: fx.removeBg,
             failure: cutoutFailure,
             hasCutout: Boolean(backgroundRemovedSrc),
+            hosted,
           }),
         );
       }
@@ -766,9 +801,9 @@ export default function Customizer({
   };
 
   /**
-   * Re-cuts the layer with the AI models on request: the portrait model first
-   * (a 6 MB download), or the detailed model directly when the portrait model
-   * has already had its turn.
+   * Re-cuts the layer on request: the hosted remover first when one is
+   * configured, else the portrait model (a 6 MB download) or the detailed
+   * model directly when the portrait model has already had its turn.
    */
   const refineCutout = async (layer: ImageLayer) => {
     const orig = layer.origSrc ?? layer.src;
@@ -778,22 +813,51 @@ export default function Customizer({
     setFxProgress(null);
     setFxStatus("Preparing the AI cut-out…");
     try {
-      const result = await runCutoutModels(orig, plan);
+      let dataUrl = "";
+      let source: CutoutSource = "portrait";
+      let bestEffort = false;
+      let hostedFailed = false;
+      if (hostedCutoutReady()) {
+        try {
+          dataUrl = await runHostedCutout(orig);
+          source = "hosted";
+        } catch {
+          hostedFailed = true;
+        }
+      }
+      if (!dataUrl) {
+        const result = await runCutoutModels(orig, plan);
+        dataUrl = result.dataUrl;
+        source = result.source;
+        bestEffort = Boolean(result.report.reject);
+      }
       setFxStatus("Applying artwork edits…");
-      const res = await applyImageFx(result.dataUrl, { ...fx, removeBg: false });
+      const res = await applyImageFx(dataUrl, { ...fx, removeBg: false });
       patch(side, layer.id, {
         fx,
         origSrc: orig,
-        backgroundRemovedSrc: result.dataUrl,
-        cutoutSource: result.source,
+        backgroundRemovedSrc: dataUrl,
+        cutoutSource: source,
         src: res.dataUrl,
         aspect: res.aspect,
       } as Partial<ImageLayer>);
-      setNotice(
-        result.report.reject
-          ? { tone: "warn", text: "AI cut-out applied best effort — zoom in and check the edges." }
-          : { tone: "ok", text: `Background removed with the ${result.source === "general" ? "detailed" : "portrait"} model.` },
-      );
+      if (source === "hosted") {
+        setNotice({ tone: "ok", text: "Background removed with the hosted AI." });
+      } else if (bestEffort) {
+        setNotice({
+          tone: "warn",
+          text: hostedFailed
+            ? "The hosted AI did not answer, and the AI cut-out is best effort — zoom in and check the edges."
+            : "AI cut-out applied best effort — zoom in and check the edges.",
+        });
+      } else {
+        setNotice({
+          tone: "ok",
+          text: hostedFailed
+            ? `The hosted AI did not answer — the ${source === "general" ? "detailed" : "portrait"} model handled it.`
+            : `Background removed with the ${source === "general" ? "detailed" : "portrait"} model.`,
+        });
+      }
     } catch (error) {
       const reason = error instanceof CutoutError ? error.reason : "unavailable";
       setNotice({

@@ -169,11 +169,11 @@ CREATE TRIGGER orders_touch BEFORE UPDATE ON orders
   FOR EACH ROW EXECUTE FUNCTION touch_updated_at();
 
 -- ---------------------------------------------------------------------------
--- Hosted cut-out evaluation
+-- Hosted background removal
 --
--- The side-by-side test at /cutout-compare hands photos to imgix ("Remove
--- Background") through a public URL. Uploads live here for a day so imgix can
--- fetch them, then the next upload sweeps the old rows away.
+-- "Remove Background" in the editor hands photos to imgix through a public
+-- URL. Uploads live here for a day so imgix can fetch them, then the next
+-- upload sweeps the old rows away.
 -- ---------------------------------------------------------------------------
 
 CREATE TABLE IF NOT EXISTS cutout_bridge_images (

@@ -1,13 +1,18 @@
 /**
- * The hosted cut-out request, for the /cutout-compare evaluation page.
+ * The hosted cut-out request.
  *
  * These are the exact parameters the rushordertees.com studio sends to imgix
  * when a customer flips "Remove Background": `bg-remove=true` with
  * `trim=colorUnlessAlpha` to also snip a leftover border, `fm=png` for
  * transparency, and `cs=strip` to drop the colour profile. Their payload is
  * readable in their studio bundle (`configuration {bgRemove: true, trim:
- * 'colorUnlessAlpha'}`), and this module mirrors it so the comparison is
- * apples-to-apples.
+ * 'colorUnlessAlpha'}`), and this module mirrors it.
+ *
+ * One parameter is deliberately not theirs: `bg-remove-fallback=false`. With
+ * imgix's default, a removal that fails is served as the *original photo* with
+ * a 200, which the editor would paste onto a shirt as if it had been cut out.
+ * A hard failure lets `lib/hostedCutout.ts` retry while imgix reports "still
+ * processing" (a 423) and fall back to the on-device models otherwise.
  */
 
 export const IMGIX_CUTOUT_PARAMS: Record<string, string> = {
@@ -15,15 +20,8 @@ export const IMGIX_CUTOUT_PARAMS: Record<string, string> = {
   trim: "colorUnlessAlpha",
   fm: "png",
   cs: "strip",
+  "bg-remove-fallback": "false",
 };
-
-/** Which AI model does the removal; the default is Bria, which is theirs. */
-export const IMGIX_MODELS = [
-  { value: "", label: "Default (Bria — matches rushordertees)" },
-  { value: "1", label: "Remove.bg" },
-  { value: "3", label: "fal · Ideogram" },
-  { value: "4", label: "fal · Pixelcut" },
-] as const;
 
 /** Accepts a pasted dashboard URL or bare host and returns the host. */
 export function cleanImgixDomain(raw: string): string {
@@ -33,14 +31,13 @@ export function cleanImgixDomain(raw: string): string {
     .replace(/\/+$/, "");
 }
 
-/** Builds `https://<domain>/<path>?bg-remove=…` for a sample or bridge path. */
-export function imgixCutoutUrl(domain: string, path: string, model = ""): string {
+/** Builds `https://<domain>/<path>?bg-remove=…` for a parked photo. */
+export function imgixCutoutUrl(domain: string, path: string): string {
   const clean = cleanImgixDomain(domain);
-  if (!clean) throw new Error("Enter the imgix domain first.");
+  if (!clean) throw new Error("No imgix source is configured.");
   const url = new URL(`https://${clean}/${path.replace(/^\/+/, "")}`);
   for (const [key, value] of Object.entries(IMGIX_CUTOUT_PARAMS)) {
     url.searchParams.set(key, value);
   }
-  if (model) url.searchParams.set("bg-remove-model", model);
   return url.toString();
 }

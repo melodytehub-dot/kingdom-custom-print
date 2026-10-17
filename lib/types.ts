@@ -134,10 +134,11 @@ export interface ImageFx {
 }
 
 /**
- * Where a layer's cut-out came from: the instant on-device pass, or one of the
- * two AI models (see `lib/cutoutModels.ts`). Drives the "improve" affordances.
+ * Where a layer's cut-out came from: the instant on-device pass, one of the two
+ * AI models (see `lib/cutoutModels.ts`), or the hosted remover
+ * (see `lib/hostedCutout.ts`). Drives the "improve" affordances.
  */
-export type CutoutSource = "quick" | "manual" | "portrait" | "general";
+export type CutoutSource = "quick" | "manual" | "portrait" | "general" | "hosted";
 
 export interface ImageLayer extends BaseLayer {
   type: "image";

@@ -28,7 +28,7 @@ function load(file, dependencies, globals = {}) {
 }
 
 const models = load("lib/cutoutModels.ts", {});
-const { canAutoRunDetailedModel, cutoutActionFor, cutoutNotice, cutoutStatus } = load("lib/cutoutActions.ts", {
+const { canAutoRunDetailedModel, cutoutActionFor, cutoutNotice, cutoutStatus, hostedCutoutStatus } = load("lib/cutoutActions.ts", {
   "@/lib/cutoutModels": models,
 });
 
@@ -69,6 +69,17 @@ const check = (name, ok, detail = "") => {
   check("the detailed download warns that it is slower", general === "Downloading the detailed model… 7% (42 MB, downloads once). This one is slower.", general);
   const working = cutoutStatus({ phase: "processing", attempt: 1, model: PORTRAIT_MODEL });
   check("while it works it says which model is working", working === "Cutting out the subject with the portrait model…", working);
+
+  const sending = hostedCutoutStatus("upload");
+  check("the hosted trip says the photo is being sent", sending === "Sending the photo to the hosted AI…", sending);
+  const cutting = hostedCutoutStatus("cutting");
+  check("then that the hosted AI is working", cutting === "The hosted AI is cutting out the subject…", cutting);
+  const waiting = hostedCutoutStatus("waiting");
+  check(
+    "a slow hosted render says a new photo can take a minute",
+    /still working/i.test(waiting) && /minute/i.test(waiting),
+    waiting,
+  );
 }
 
 /* ---- 3. What the customer is told -------------------------------------- */
@@ -105,8 +116,29 @@ const check = (name, ok, detail = "") => {
     notice("unavailable", true).text,
   );
 
+  // The hosted remover's two honest endings: it did the work, or the on-device
+  // fallback did — and the customer is told which.
+  const hostedUsed = cutoutNotice({ removeBg: true, failure: null, hasCutout: true, hosted: "used" });
+  check(
+    "a hosted cut-out says the hosted AI did it",
+    hostedUsed.tone === "ok" && /hosted ai/i.test(hostedUsed.text),
+    hostedUsed.text,
+  );
+  const hostedFallback = cutoutNotice({ removeBg: true, failure: null, hasCutout: true, hosted: "fell-back" });
+  check(
+    "a hosted failure that fell back to the device says so",
+    hostedFallback.tone === "warn" && /on this device/i.test(hostedFallback.text) && /hosted ai did not answer/i.test(hostedFallback.text),
+    hostedFallback.text,
+  );
+  check(
+    "a hopeless photo keeps the more useful failure message",
+    /could not find a subject/i.test(
+      cutoutNotice({ removeBg: true, failure: "no-subject", hasCutout: false, hosted: "fell-back" }).text,
+    ),
+  );
+
   // A warning must never be dressed as an error: errors are for exceptions.
-  const tones = [notice(null, true), notice(null, false), notice("no-subject", true), notice("no-subject", false), notice("unavailable", true), notice("unavailable", false)];
+  const tones = [notice(null, true), notice(null, false), notice("no-subject", true), notice("no-subject", false), notice("unavailable", true), notice("unavailable", false), hostedUsed, hostedFallback];
   check("no outcome is reported as an error", tones.every((entry) => entry.tone === "ok" || entry.tone === "warn"), tones.map((entry) => entry.tone).join(","));
   check("every message is a finished sentence", tones.every((entry) => entry.text.endsWith(".")), tones.map((entry) => entry.text).join(" | "));
 }
@@ -128,6 +160,8 @@ const check = (name, ok, detail = "") => {
   check("after the portrait model, the detailed model is offered", portrait?.label === "Try the Detailed Model", portrait?.label ?? "none");
   const general = actionFor({ cutoutSource: "general" });
   check("after the detailed model there is nothing better to offer", general === undefined, general?.label ?? "nothing");
+  const hosted = actionFor({ cutoutSource: "hosted" });
+  check("after the hosted remover there is nothing better to offer", hosted === undefined, hosted?.label ?? "nothing");
   const failed = actionFor({});
   check("removal on but nothing cut out still offers a retry", failed?.label === "Try the AI Cut-out Again", failed?.label ?? "none");
   const off = actionFor({ fx: { removeBg: false } });

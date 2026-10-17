@@ -5,11 +5,12 @@ import { sql } from "@/lib/db";
 export const runtime = "nodejs";
 
 /**
- * Upload for the hosted cut-out comparison at /cutout-compare.
+ * Upload for hosted background removal.
  *
  * imgix renders `bg-remove` by fetching the original photo from a public URL,
- * so the photo picked on the test page is parked here under a random id and
- * served back by the sibling GET route. Rows are swept after a day.
+ * so a photo the editor is cutting out is parked here under a random id and
+ * served back by the sibling GET route; imgix fetches it from there. Rows are
+ * swept after a day.
  */
 const MAX_BYTES = 4_000_000;
 const CONTENT_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
@@ -31,7 +32,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Use a JPEG, PNG or WebP photo." }, { status: 415 });
   }
   if (file.size > MAX_BYTES) {
-    return NextResponse.json({ error: "Keep the test photo under 4 MB." }, { status: 413 });
+    return NextResponse.json({ error: "Keep the photo under 4 MB." }, { status: 413 });
   }
 
   const bytes = Buffer.from(await file.arrayBuffer());

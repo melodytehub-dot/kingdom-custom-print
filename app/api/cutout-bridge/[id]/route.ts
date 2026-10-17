@@ -4,8 +4,8 @@ import { sql } from "@/lib/db";
 export const runtime = "nodejs";
 
 /**
- * Serves a parked photo for /cutout-compare so imgix (and the page itself)
- * can fetch it. Random private ids; rows are swept after a day by the POST.
+ * Serves a parked photo so imgix can fetch it during hosted background
+ * removal. Random private ids; rows are swept after a day by the POST.
  */
 export async function GET(
   _request: Request,

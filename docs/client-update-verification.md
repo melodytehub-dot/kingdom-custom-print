@@ -257,44 +257,61 @@ mobile".
   add to cart → reprice → checkout path was re-checked in a real browser after
   the text-entry panel and the footer button labels changed.
 
-## October 17 — Hosted cut-out evaluation (side by side)
+## October 17 — Hosted background removal in the editor
 
 Client note: after the on-device rebuild, background removal is "not really
-perfect yet", and a paid hosted service (imgix) is being evaluated hands-on
-before deciding whether to pay for it.
+perfect yet", and a paid hosted service (imgix) is being evaluated hands-on in
+the real editor before deciding whether to pay for it.
 
-### The comparison page
+### How it works in the customizer
 
-- `/cutout-compare` (not linked from the store, `noindex`) puts the same photo
-  through both engines side by side: **Original**, **imgix** (hosted) and
-  **On this device** (the engine the editor uses today), with render times,
-  which model ran, and PNG downloads.
-- The imgix request mirrors rushordertees.com exactly — the parameters sit in
-  their studio bundle and are pinned in `lib/imgixCutout.ts`:
-  `bg-remove=true&trim=colorUnlessAlpha&fm=png&cs=strip`, with the model
-  selectable (default Bria, the one rushordertees gets; or remove.bg,
-  fal-Ideogram, fal-Pixelcut).
-- imgix can only fetch photos from a configured source, so uploaded test photos
-  are parked briefly on our own site (`/api/cutout-bridge`, random id, rows
-  swept after a day) and the imgix source fetches them from there. Only the
-  middle pane sends a photo anywhere; the on-device pane never does.
-- Five stock test photos live in `public/cutout-samples/` (busy street, hair
-  wisps, soft sky, dark knit, product mug). A real photo can be uploaded
-  straight from a phone.
+- When `NEXT_PUBLIC_IMGIX_SOURCE` names the account's imgix source, "Remove
+  Background" on a photograph is done by imgix instead of the on-device
+  models. The editor parks the photo briefly on our own site
+  (`/api/cutout-bridge`, random id, swept after a day) because imgix can only
+  fetch from a configured source; the transparent PNG comes straight back.
+- The request mirrors rushordertees.com exactly — the parameters sit in their
+  studio bundle and are pinned in `lib/imgixCutout.ts`:
+  `bg-remove=true&trim=colorUnlessAlpha&fm=png&cs=strip` — plus one deliberate
+  change of our own: `bg-remove-fallback=false`, so a removal that fails is an
+  error rather than the untouched photo served with a 200 pretending to be the
+  cut-out. A "still processing" answer (HTTP 423, normal for a cold photo — it
+  can take up to a minute the first time) is retried until the render is ready.
+- The result obeys the same contract as the on-device one (`encodeCanvasUnder`:
+  WebP, transparency kept, under 380 KB), so ordering and drafts are untouched.
+  The layer records `cutoutSource: "hosted"`.
+- Any hosted failure — no signal, no credits, a photo it cannot cut — falls
+  back to the on-device models, and the customer is told which one did the
+  work: "Background removed with the hosted AI." or "Background removed on this
+  device — the hosted AI did not answer."
+- Flat artwork (logos, stickers, screenshots) is still keyed out instantly in
+  the browser and is never uploaded anywhere — that gate predates this change
+  and keeps logos private, instant and free.
 - One-time setup in the imgix dashboard: Sources → New Source → Web Folder,
   Base URL `https://kingdom-custom-print.vercel.app/`, subdomain of choice,
   Deploy Source. The existing source has no usable origin (it answers 404), so
-  it cannot serve the test photos.
-- `NEXT_PUBLIC_IMGIX_SOURCE` can prefill the source domain; without it the page
-  takes the domain in a field on the page.
+  it cannot fetch our photos.
+- Turning the evaluation off is removing `NEXT_PUBLIC_IMGIX_SOURCE` and
+  redeploying; without it nothing about removal changes from before.
+- While hosted removal is on, customer photos are processed by imgix. If it
+  stays, the privacy policy should say so before launch.
 
 ### Verification
 
-- `npm run qa-cutout-compare` is new: it pins the URL builder to the
-  rushordertees recipe, round-trips a photo through the bridge (upload, same
-  bytes back, 404 on an unknown id, 415 on a non-photo) and drives the page on
-  desktop (1280x900) and a phone (390x844): three panes, sample picker, the
-  exact imgix request URL, an uploaded photo served back through the bridge,
-  no horizontal overflow and no page errors.
-- `npm run qa-audit` now includes `/cutout-compare` across its five viewports.
+- `npm run qa-hosted-cutout` is new (run against a dev server started with
+  `NEXT_PUBLIC_IMGIX_SOURCE=test.imgix.net`; the imgix host is intercepted, so
+  no credits are spent). On desktop and a phone: the photo reaches the bridge,
+  the imgix request carries the pinned recipe including
+  `bg-remove-fallback=false`, a "still processing" 423 is retried until ready,
+  the cut-out lands on the layer as `cutoutSource: "hosted"` with clear corners
+  and an intact subject, no AI model is downloaded, and the toast names the
+  hosted AI. A hosted failure on the phone falls back to the portrait model and
+  says so; a flat logo still cuts out instantly with no upload and no imgix
+  request.
+- `npm run qa-cutout-actions` grew: the hosted status lines, the two hosted
+  endings (used / fell back), and that a hosted cut-out leaves no "improve"
+  button (nothing better to run). No browser needed.
+- `npm run qa-background-remove`, `qa-cutout-ai`, `qa-customizer-*`,
+  `qa-cart-flow` and `qa-audit` pass unchanged with hosted removal off —
+  the on-device path is exactly as it was.
 
