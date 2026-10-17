@@ -9,6 +9,7 @@ import type {
   TextLayer,
 } from "./types";
 import { measureTextLayer } from "@/components/customizer/textGeometry";
+import { convertHeicUpload, isHeicUpload } from "./heic";
 
 /**
  * Layers are stored in normalized coordinates (0-100) relative to the
@@ -425,8 +426,13 @@ export const ACCEPTED_TYPES = [
   "image/jpeg",
   "image/jpg",
   "image/webp",
+  "image/avif",
   "image/gif",
   "image/svg+xml",
+  // HEIC/HEIF pass the gate and are converted by readImageFile; some brands
+  // are only caught by sniffing the bytes (see lib/heic.ts).
+  "image/heic",
+  "image/heif",
 ];
 
 export interface UploadCheck {
@@ -435,21 +441,25 @@ export interface UploadCheck {
   warning?: string;
 }
 
-export function validateUpload(file: File): UploadCheck {
-  const isImage = file.type.startsWith("image/");
-  if (!isImage) {
-    return { ok: false, error: "That file is not an image. Upload a PNG, JPG, WEBP or SVG." };
-  }
-  if (!ACCEPTED_TYPES.includes(file.type.toLowerCase())) {
-    return {
-      ok: false,
-      error: `We cannot print ${file.type.split("/")[1]?.toUpperCase() || "that format"}. Use PNG, JPG, WEBP or SVG.`,
-    };
-  }
+export async function validateUpload(file: File): Promise<UploadCheck> {
   if (file.size > MAX_UPLOAD_BYTES) {
     return {
       ok: false,
       error: `That file is ${(file.size / 1024 / 1024).toFixed(1)} MB. Keep uploads under 8 MB.`,
+    };
+  }
+  // iPhone photos arrive as HEIC, which browsers cannot decode — and Windows
+  // and Android report the type inconsistently (sometimes not even as
+  // "image/"). Sniff the bytes so those uploads pass and convert later.
+  if (await isHeicUpload(file)) return { ok: true };
+  const isImage = file.type.startsWith("image/");
+  if (!isImage) {
+    return { ok: false, error: "That file is not an image. Upload a PNG, JPG, WEBP, HEIC, AVIF or SVG." };
+  }
+  if (!ACCEPTED_TYPES.includes(file.type.toLowerCase())) {
+    return {
+      ok: false,
+      error: `We cannot print ${file.type.split("/")[1]?.toUpperCase() || "that format"}. Use PNG, JPG, WEBP, HEIC, AVIF or SVG.`,
     };
   }
 
@@ -509,12 +519,27 @@ export function encodeCanvasUnder(
 
 /**
  * Reads a file into a data URL, downscaling oversized raster images and
- * recompressing so the stored payload stays small enough to order.
+ * recompressing so the stored payload stays small enough to order. iPhone
+ * HEIC/HEIF photos are converted to JPEG first (lib/heic.ts).
  */
-export function readImageFile(
+export async function readImageFile(
   file: File,
   maxEdge = 1400
 ): Promise<DecodedImage> {
+  if (await isHeicUpload(file)) {
+    try {
+      file = await convertHeicUpload(file);
+    } catch {
+      throw new Error(
+        "That iPhone photo could not be converted. Try exporting it as a JPG and uploading that."
+      );
+    }
+  }
+  return readAsImage(file, maxEdge);
+}
+
+/** Decodes an upload the browser reads natively (JPG/PNG/WEBP/AVIF/SVG). */
+function readAsImage(file: File, maxEdge: number): Promise<DecodedImage> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onerror = () => reject(new Error("We could not read that file. Try again."));

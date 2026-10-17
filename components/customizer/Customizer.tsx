@@ -657,7 +657,7 @@ export default function Customizer({
 
   const onUpload = async (file: File | undefined) => {
     if (!file || busy || step !== "design") return;
-    const check = validateUpload(file);
+    const check = await validateUpload(file);
     if (!check.ok) {
       setNotice({ tone: "error", text: check.error ?? "That file cannot be used." });
       if (fileInput.current) fileInput.current.value = "";
@@ -2106,7 +2106,7 @@ export default function Customizer({
       <input
         ref={fileInput}
         type="file"
-        accept="image/png,image/jpeg,image/webp,image/svg+xml,image/gif"
+        accept="image/png,image/jpeg,image/webp,image/avif,image/heic,image/heif,image/svg+xml,image/gif,.heic,.heif,.avif"
         onChange={(e) => onUpload(e.target.files?.[0])}
         className="rot-hidden-file"
         aria-label="Upload artwork file"
