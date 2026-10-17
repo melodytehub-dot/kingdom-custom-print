@@ -188,13 +188,81 @@ try {
     check(`${name}: customer is told it worked`, /background removed/i.test(toast), toast.replace(/\s+/g, " ").trim() || "no toast");
     check(`${name}: no browser errors`, errors.length === 0, errors.join(" | "));
 
-    // The escape hatch must be offered once the portrait model has had its turn.
-    const improve = await page
-      .locator(".rot-subject-link")
-      .filter({ hasText: /detailed model/i })
+    // One control only: the Remove Background switch — no "Select Object"
+    // tab, no model-upgrade offers, no AI badges.
+    const switches = await page.getByRole("switch", { name: "Remove Background" }).count();
+    const extras = await page
+      .getByText(/select object|improve cut|detailed model|try the ai/i)
       .count()
       .catch(() => 0);
-    check(`${name}: the detailed model is offered`, improve >= 1, `${improve} button(s)`);
+    const aiBadges = await page.locator(".rot-editor .rot-badge").count();
+    check(
+      `${name}: one background-removal control, no extra offers`,
+      switches === 1 && extras === 0 && aiBadges === 0,
+      `${switches} switch(es), ${extras} extra offer(s), ${aiBadges} badge(s)`,
+    );
+
+    // Switching it off and on again must reuse the stored cut-out: same
+    // pixels, same source, no second run and no second model download.
+    const before = await page.evaluate((key) => {
+      const layer = JSON.parse(localStorage.getItem(key)).design.front.at(-1);
+      return { cached: layer.backgroundRemovedSrc ?? null, src: layer.src, cutoutSource: layer.cutoutSource ?? null };
+    }, DRAFT_KEY);
+    await page.getByRole("switch", { name: "Remove Background" }).click(); // off
+    await page
+      .waitForFunction(
+        (key) => JSON.parse(localStorage.getItem(key) ?? "null")?.design?.front?.at(-1)?.fx?.removeBg === false,
+        DRAFT_KEY,
+        { timeout: 15000 },
+      )
+      .catch(() => {});
+    await page
+      .waitForFunction(
+        () => /original background restored/i.test(document.querySelector(".rot-toast")?.textContent ?? ""),
+        undefined,
+        { timeout: 5000 },
+      )
+      .catch(() => {});
+    const offToast = await page.locator(".rot-toast").first().textContent().catch(() => "");
+    const again = Date.now();
+    await page.getByRole("switch", { name: "Remove Background" }).click(); // on
+    await page
+      .waitForFunction(
+        (key) => JSON.parse(localStorage.getItem(key) ?? "null")?.design?.front?.at(-1)?.fx?.removeBg === true,
+        DRAFT_KEY,
+        { timeout: 15000 },
+      )
+      .catch(() => {});
+    const reShownMs = Date.now() - again;
+    await page.waitForTimeout(300);
+    await page
+      .waitForFunction(
+        () => /background removed/i.test(document.querySelector(".rot-toast")?.textContent ?? ""),
+        undefined,
+        { timeout: 5000 },
+      )
+      .catch(() => {});
+    const after = await page.evaluate((key) => {
+      const layer = JSON.parse(localStorage.getItem(key)).design.front.at(-1);
+      return { cached: layer.backgroundRemovedSrc ?? null, src: layer.src, cutoutSource: layer.cutoutSource ?? null };
+    }, DRAFT_KEY);
+    const onToast = await page.locator(".rot-toast").first().textContent().catch(() => "");
+
+    check(
+      `${name}: switching off restores the original and keeps the cut-out`,
+      /original background restored/i.test(offToast ?? "") && after.cached === before.cached,
+      (offToast ?? "").trim() || "no toast",
+    );
+    check(
+      `${name}: switching on reuses it instantly — no second run`,
+      after.src === before.src && after.cutoutSource === before.cutoutSource && reShownMs < 4000,
+      `back in ${reShownMs}ms, source ${after.cutoutSource}`,
+    );
+    check(
+      `${name}: the re-shown result says the background is removed`,
+      /background removed/i.test(onToast ?? ""),
+      (onToast ?? "").trim() || "no toast",
+    );
 
     await page.close();
     await context.close();

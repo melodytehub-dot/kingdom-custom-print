@@ -14,7 +14,7 @@ const GROUPS: { title: string; items: { q: string; a: string }[] }[] = [
     items: [
       {
         q: "What file types can I upload?",
-        a: "PNG, JPG, WEBP and SVG. Vector files such as SVG print sharpest at any size. For raster artwork, 300 DPI at the finished print size is the target — a design printing 12 inches wide should be at least 3600 × 3600 pixels.",
+        a: "PNG, JPG, WebP, HEIC, AVIF, GIF and SVG. Vector files such as SVG print sharpest at any size. For raster artwork, 300 DPI at the finished print size is the target — a design printing 12 inches wide should be at least 3600 × 3600 pixels.",
       },
       {
         q: "Why is there a dashed outline on the garment?",

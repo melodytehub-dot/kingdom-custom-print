@@ -15,8 +15,11 @@
  *  - the upload imgix receives is jpg/png — its remover refuses WebP
  *  - a "still processing" 423 is retried until the render is ready
  *  - the result lands on the layer as `cutoutSource: "hosted"`, corners clear
- *  - no AI model is downloaded when the hosted remover does the work
- *  - a hosted failure falls back to the on-device models and says so
+ *  - no model is downloaded when the off-device remover does the work
+ *  - switching the switch off and on again reuses the stored cut-out:
+ *    no second upload, no second render, nothing billable
+ *  - a failure falls back to the on-device path and the customer is told
+ *    the honest outcome (clean success, or why not)
  *  - flat artwork still cuts out instantly and is never uploaded anywhere
  *
  * Not part of `npm run qa-site`: it must run against a server that was started
@@ -127,6 +130,19 @@ async function waitForToast(page) {
     .first()
     .textContent({ timeout: 240000 })
     .catch(() => "");
+}
+
+/** Waits until the toast text matches, so a stale toast cannot be read. */
+async function waitForToastText(page, pattern, timeout = 15000) {
+  await page
+    .waitForFunction(
+      (source) => new RegExp(source, "i").test(document.querySelector(".rot-toast")?.textContent ?? ""),
+      pattern.source,
+      { timeout },
+    )
+    .catch(() => {});
+  const text = await page.locator(".rot-toast").first().textContent().catch(() => "");
+  return (text ?? "").replace(/\s+/g, " ").trim();
 }
 
 async function settleDraft(page) {
@@ -305,11 +321,53 @@ try {
       check(`${label} hosted: the backdrop is fully cleared`, probe.corner === 0, `corner alpha ${probe.corner}`);
       check(`${label} hosted: the subject survives`, probe.center > 128, `center alpha ${probe.center}`);
       check(
-        `${label} hosted: the customer is told the hosted AI did it`,
-        /hosted ai/i.test(toast),
+        `${label} hosted: the customer is told the background is removed`,
+        /^background removed\.$/i.test(toast.replace(/\s+/g, " ").trim()),
         toast.replace(/\s+/g, " ").trim() || "no toast",
       );
       check(`${label} hosted: no browser errors`, errors.length === 0, errors.join(" | "));
+
+      // Credit guard: off and on again must reuse the stored cut-out —
+      // no second bridge upload, no second render, nothing billable.
+      const before = await page.evaluate((key) => {
+        const layer = JSON.parse(localStorage.getItem(key)).design.front.at(-1);
+        return { cached: layer.backgroundRemovedSrc ?? null, src: layer.src };
+      }, DRAFT_KEY);
+      await flipRemoveBackground(page); // off
+      const offToast = await waitForToastText(page, /original background restored/i);
+      const again = Date.now();
+      await flipRemoveBackground(page); // on
+      const onToast = await waitForToastText(page, /background removed/i);
+      const reShownMs = Date.now() - again;
+      await settleDraft(page);
+      const after = await page.evaluate((key) => {
+        const layer = JSON.parse(localStorage.getItem(key)).design.front.at(-1);
+        return {
+          cached: layer.backgroundRemovedSrc ?? null,
+          src: layer.src,
+          cutoutSource: layer.cutoutSource ?? null,
+        };
+      }, DRAFT_KEY);
+
+      check(
+        `${label} hosted: switching off restores the original and keeps the cut-out`,
+        /original background restored/i.test(offToast) && after.cached === before.cached,
+        offToast || "no toast",
+      );
+      check(
+        `${label} hosted: switching on again is instant — no new upload, no new render`,
+        bridgePosts.length === 1 &&
+          imgixRequests.length === 2 &&
+          after.cutoutSource === "hosted" &&
+          after.src === before.src &&
+          reShownMs < 4000,
+        `${bridgePosts.length} upload(s), ${imgixRequests.length} render(s), back in ${reShownMs}ms`,
+      );
+      check(
+        `${label} hosted: the re-shown result is a clean success message`,
+        /^background removed\.$/i.test(onToast),
+        onToast || "no toast",
+      );
 
       await page.close();
     }
@@ -370,8 +428,8 @@ try {
       );
       if (probe.hasCutout) {
         check(
-          `${label} fallback: the customer is told the device handled it`,
-          /background removed/i.test(toast) && /hosted ai did not answer/i.test(toast),
+          `${label} fallback: the customer sees the same clean success`,
+          /^background removed\.$/i.test(toast.replace(/\s+/g, " ").trim()),
           toast.replace(/\s+/g, " ").trim() || "no toast",
         );
       } else {

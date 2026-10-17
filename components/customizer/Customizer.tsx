@@ -89,7 +89,6 @@ import {
 import { removeBackgroundLocally, CutoutError } from "@/lib/backgroundRemoval";
 import {
   canAutoRunDetailedModel,
-  cutoutActionFor,
   cutoutNotice,
   cutoutStatus,
   hostedCutoutStatus,
@@ -97,7 +96,6 @@ import {
 import { hostedCutoutDataUrl, hostedCutoutReady } from "@/lib/hostedCutout";
 import {
   CUTOUT_MAX_EDGE,
-  DETAILED_PLAN,
   cutoutPlan,
   type CutoutModelKind,
 } from "@/lib/cutoutModels";
@@ -715,7 +713,6 @@ export default function Customizer({
     setFxStatus(fx.removeBg ? "Preparing background removal…" : "Applying artwork edits…");
     try {
       let cutoutFailure: "no-subject" | "unavailable" | null = null;
-      let hosted: "used" | "fell-back" | null = null;
       if (fx.removeBg && !backgroundRemovedSrc) {
         // Decide what this upload *is* before touching it. Flat artwork — a
         // logo, a sticker, a screenshot — has no background colour to argue
@@ -741,12 +738,10 @@ export default function Customizer({
             try {
               backgroundRemovedSrc = await runHostedCutout(orig);
               cutoutSource = "hosted";
-              hosted = "used";
             } catch {
               // Whatever went wrong on the hosted side — no signal, no
               // credits, a photo it cannot cut — the models below are the
-              // fallback, and the notice says the hosted AI did not answer.
-              hosted = "fell-back";
+              // fallback; the outcome the customer sees is the same.
             }
           }
           if (!backgroundRemovedSrc) {
@@ -784,7 +779,6 @@ export default function Customizer({
             removeBg: fx.removeBg,
             failure: cutoutFailure,
             hasCutout: Boolean(backgroundRemovedSrc),
-            hosted,
           }),
         );
       }
@@ -792,80 +786,6 @@ export default function Customizer({
       setNotice({
         tone: "error",
         text: err instanceof Error ? err.message : "That edit could not be applied.",
-      });
-    } finally {
-      setFxBusy(false);
-      setFxStatus(null);
-      setFxProgress(null);
-    }
-  };
-
-  /**
-   * Re-cuts the layer on request: the hosted remover first when one is
-   * configured, else the portrait model (a 6 MB download) or the detailed
-   * model directly when the portrait model has already had its turn.
-   */
-  const refineCutout = async (layer: ImageLayer) => {
-    const orig = layer.origSrc ?? layer.src;
-    const fx: ImageFx = { ...(layer.fx ?? DEFAULT_FX), removeBg: true };
-    const plan = layer.cutoutSource === "portrait" ? DETAILED_PLAN : cutoutPlan(true);
-    setFxBusy(true);
-    setFxProgress(null);
-    setFxStatus("Preparing the AI cut-out…");
-    try {
-      let dataUrl = "";
-      let source: CutoutSource = "portrait";
-      let bestEffort = false;
-      let hostedFailed = false;
-      if (hostedCutoutReady()) {
-        try {
-          dataUrl = await runHostedCutout(orig);
-          source = "hosted";
-        } catch {
-          hostedFailed = true;
-        }
-      }
-      if (!dataUrl) {
-        const result = await runCutoutModels(orig, plan);
-        dataUrl = result.dataUrl;
-        source = result.source;
-        bestEffort = Boolean(result.report.reject);
-      }
-      setFxStatus("Applying artwork edits…");
-      const res = await applyImageFx(dataUrl, { ...fx, removeBg: false });
-      patch(side, layer.id, {
-        fx,
-        origSrc: orig,
-        backgroundRemovedSrc: dataUrl,
-        cutoutSource: source,
-        src: res.dataUrl,
-        aspect: res.aspect,
-      } as Partial<ImageLayer>);
-      if (source === "hosted") {
-        setNotice({ tone: "ok", text: "Background removed with the hosted AI." });
-      } else if (bestEffort) {
-        setNotice({
-          tone: "warn",
-          text: hostedFailed
-            ? "The hosted AI did not answer, and the AI cut-out is best effort — zoom in and check the edges."
-            : "AI cut-out applied best effort — zoom in and check the edges.",
-        });
-      } else {
-        setNotice({
-          tone: "ok",
-          text: hostedFailed
-            ? `The hosted AI did not answer — the ${source === "general" ? "detailed" : "portrait"} model handled it.`
-            : `Background removed with the ${source === "general" ? "detailed" : "portrait"} model.`,
-        });
-      }
-    } catch (error) {
-      const reason = error instanceof CutoutError ? error.reason : "unavailable";
-      setNotice({
-        tone: "warn",
-        text:
-          reason === "no-subject"
-            ? "The AI could not find a subject in that photo. Use Select Object instead."
-            : "The cut-out model could not load. Check your connection and try again.",
       });
     } finally {
       setFxBusy(false);
@@ -1317,36 +1237,6 @@ export default function Customizer({
     setNotice({ tone: "ok", text });
   };
 
-  const applySubjectSelection = async (layer: ImageLayer, cutout: string) => {
-    const orig = layer.origSrc ?? layer.src;
-    const fx: ImageFx = { ...(layer.fx ?? DEFAULT_FX), removeBg: true };
-    setFxBusy(true);
-    setFxProgress(null);
-    setFxStatus("Applying selected cutout…");
-    try {
-      const result = await applyImageFx(cutout, { ...fx, removeBg: false });
-      patch(side, layer.id, {
-        fx,
-        origSrc: orig,
-        backgroundRemovedSrc: cutout,
-        cutoutSource: "manual",
-        src: result.dataUrl,
-        aspect: result.aspect,
-      } as Partial<ImageLayer>);
-      setNotice({ tone: "ok", text: "Selected object cut out." });
-    } catch (error) {
-      setNotice({
-        tone: "error",
-        text: error instanceof Error ? error.message : "Could not apply the selected cutout.",
-      });
-      throw error;
-    } finally {
-      setFxBusy(false);
-      setFxStatus(null);
-      setFxProgress(null);
-    }
-  };
-
   const queueProductHandoff = (
     target: Product,
     transferLines: Record<string, number>,
@@ -1527,8 +1417,8 @@ export default function Customizer({
             <h2 className="rot-ptitle">Upload Artwork</h2>
             <button type="button" className="rot-upload-zone" onClick={openFilePicker} disabled={busy}>
               <CloudUploadIcon size={42} />
-              <strong>{busy ? "Reading artwork..." : "Choose an image"}</strong>
-              <span>PNG, JPG, WebP, SVG or GIF</span>
+              <strong>{busy ? "Reading artwork…" : "Choose an image"}</strong>
+              <span>PNG, JPG, WebP, HEIC, SVG or GIF</span>
             </button>
             <button type="button" className="rot-textlink" onClick={closePanel}>Done</button>
           </div>
@@ -1542,9 +1432,7 @@ export default function Customizer({
             progress={fxProgress}
             eyebrow={ART_LIBRARY.some((a) => a.src === selected.origSrc) ? "Add Art" : "Upload Art"}
             actions={actionsFor(selected)}
-            cutoutAction={cutoutActionFor(selected, (layer) => void refineCutout(layer))}
             onFx={(next) => void applyFx(selected, next)}
-            onApplySelection={applySubjectSelection}
             onChange={(changes) => patchActive(selected.id, changes)}
             onReset={() => void resetImage(selected)}
             onClose={closePanel}

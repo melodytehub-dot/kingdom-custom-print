@@ -48,16 +48,31 @@ const DESKTOP_CASES = [
   // An SVG whose type did not survive the picker; must stay vector artwork.
   ["svg with no type", { name: "logo.svg", mimeType: "application/octet-stream", buffer: svgBytes }, "layer"],
   ["oversized", { name: "huge.jpg", mimeType: "image/jpeg", buffer: hugeBytes }, "8 MB"],
-  ["broken png", { name: "broken.png", mimeType: "image/png", buffer: Buffer.from("this is not really an image") }, "decoded"],
+  ["broken png", { name: "broken.png", mimeType: "image/png", buffer: Buffer.from("this is not really an image") }, "could not open"],
   ["unsupported bmp", { name: "old.bmp", mimeType: "image/bmp", buffer: Buffer.from("BMfake") }, "BMP"],
+  // A phone that drops the first decode under memory pressure ("it worked on
+  // my third attempt") must recover on its own, first click.
+  ["flaky first decode", { name: "photo.jpg", mimeType: "image/jpeg", buffer: jpgBytes }, "layer", FLAKY_DECODE],
 ];
 
-async function runCase(page, payload) {
+/** Makes the first blob-URL load fail, like a phone dropping a big decode. */
+function FLAKY_DECODE() {
+  const real = URL.createObjectURL.bind(URL);
+  let calls = 0;
+  URL.createObjectURL = (obj) => {
+    calls += 1;
+    if (calls === 1) return real(new Blob([new Uint8Array([0, 1, 2, 3])], { type: "image/jpeg" }));
+    return real(obj);
+  };
+}
+
+async function runCase(page, payload, init) {
   await page.goto(BASE, { waitUntil: "commit" });
   await page.evaluate(() => localStorage.clear());
   await page.goto(`${BASE}/customize/crown-classic-tee?color=black&sizes=M%3A1`, { waitUntil: "commit" });
   await page.locator(".rot-canvas-svg").waitFor();
 
+  if (init) await page.evaluate(init);
   await page.locator('input[type="file"]').first().setInputFiles(payload);
   await page
     .waitForFunction(
@@ -101,8 +116,8 @@ try {
   const page = await desktop.newPage();
   page.setDefaultTimeout(30000);
 
-  for (const [label, payload, expected] of DESKTOP_CASES) {
-    const { layer, toast } = await runCase(page, payload);
+  for (const [label, payload, expected, init] of DESKTOP_CASES) {
+    const { layer, toast } = await runCase(page, payload, init);
     if (expected === "layer") {
       const detail = layer ? `${layer.type} ${layer.width}x${layer.height}` : `toast: ${toast ?? "none"}`;
       check(`desktop ${label}: uploads and lands on the design`, Boolean(layer?.ok), detail);

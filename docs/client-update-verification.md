@@ -370,3 +370,86 @@ the real editor before deciding whether to pay for it.
   `qa-cart-flow` and `qa-audit` pass unchanged with hosted removal off —
   the on-device path is exactly as it was.
 
+## October 17 — One button, clean words, pay-once removal, phone decode retry
+
+Client notes (same day, in the real editor): (1) the phone once showed "That
+JPG could not be decoded as an image" before the same photo uploaded on a
+retry; (2) there should be one Remove Background control, not several;
+(3) drop the "Select Object" tab; (4) turning removal off and on again must
+not process (or pay) a second time; (5) apply the supplied `client-ready-ux`
+skill across the site.
+
+### One background-removal control
+
+- The artwork editor now shows exactly one control: the **Remove Background**
+  switch. The "Select Object" tab and its whole subject-selection editor are
+  removed (`components/customizer/SubjectSelectionEditor.tsx`,
+  `lib/subjectSelection*.ts`, the worker, the model loader and their CSS), and
+  the follow-up offer buttons are gone with them ("Improve Cut-out with AI",
+  "Try the Detailed Model", "Try the AI Cut-out Again"). Clicking the switch
+  simply uses the best path available — hosted when configured, otherwise the
+  on-device models — so the customer never has to know which engine ran.
+- Supersedes the October 13/15 behaviour that pointed errors at Select Object
+  and offered model-upgrade buttons: the copy now suggests a plainer photo,
+  checking the connection, or checking the edges instead, depending on what
+  actually happened.
+
+### Pay-once background removal
+
+- Turning the switch off keeps the finished cut-out on the layer
+  (`backgroundRemovedSrc`); turning it back on re-displays it instantly with
+  **no second run, no second upload and no second imgix credit** — measured at
+  ~520 ms on desktop and phone versus 15+ s for a fresh model run. This is
+  pinned by new checks in `qa-cutout-ai` (on-device) and `qa-hosted-cutout`
+  (counter asserts one bridge upload + one successful render, however many
+  times the switch is flipped).
+- The removed "improve" buttons were the one path that could re-run the hosted
+  remover on every click; with the single switch, a cut-out is processed once
+  per photo unless the customer resets the artwork.
+
+### Client-ready copy across the site (client-ready-ux skill)
+
+- Installed the supplied skill at `.opencode/skills/client-ready-ux/` and
+  appended its addendum to `AGENTS.md`, so it applies to future changes.
+- Audited every customer-visible string. The cut-out surface no longer says
+  "AI", "model", "hosted" or the provider name anywhere: status lines read
+  "Preparing background removal… 42% (downloads once).", "Removing background…",
+  "Preparing your photo…", and outcomes are a clean "Background removed." (or
+  an honest, actionable fallback) regardless of which engine did the work.
+  The "AI" badges are gone from the editor.
+- Upload copy now matches what is accepted: the upload zone and FAQ list
+  "PNG, JPG, WebP, HEIC, AVIF, GIF and SVG"; refusals are consistent
+  sentence-case. Privacy disclosure for the hosted service remains an open
+  item for the client (see October 17 hosted section).
+- `scripts/qa-cutout-actions.mjs` was rewritten to pin the new strings **and**
+  fail if implementation language (AI/model/hosted/imgix) reappears in any
+  customer-facing cut-out message.
+
+### The phone decode retry
+
+- The reported toast ("could not be decoded", success on a later attempt) is a
+  transient phone failure: mobile browsers under memory pressure occasionally
+  fail a large image decode and succeed moments later. The uploader now tries
+  three times, each with a fresh blob URL and a short pause (400 ms, then
+  900 ms), before showing the (reworded) "We could not open that JPG. Try a
+  smaller copy or a screenshot." So the retry the client performed by hand now
+  happens by itself.
+- New regression check in `qa-upload-formats`: the first decode is forced to
+  fail (a broken blob URL is handed to the first read) and the upload must
+  still land on the design with no user action.
+
+### Verification
+
+- `qa-upload-formats` (19 checks) passes locally — including the new
+  flaky-decode recovery case — on desktop and phone contexts.
+- `qa-cutout-ai` passes on desktop and phone with three new checks each: one
+  switch and no extra offers/badges, off/on reuses the stored cut-out (no
+  second run), and the re-shown result reports success.
+- `qa-hosted-cutout` passes with new credit-guard checks: after a hosted
+  cut-out, flipping the switch off and on again performs no second bridge
+  upload and no second render (`imgixRequests` stays at 2 — the 423 retry plus
+  the successful render), and both messages are the clean success copy.
+- `qa-customizer-controls` grew a check that no "Select Object" tab and no
+  badges remain; `qa-background-remove`, `qa-cutout`, `qa-cutout-mask`,
+  `qa-cutout-actions`, `qa-cart-flow`, typecheck, lint and build all pass.
+

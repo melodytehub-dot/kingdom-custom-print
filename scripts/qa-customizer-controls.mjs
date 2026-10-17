@@ -277,10 +277,15 @@ try {
   const templateArtBox = await templateArt.boundingBox();
   if (templateArtBox) await page.mouse.click(templateArtBox.x + templateArtBox.width / 2, templateArtBox.y + templateArtBox.height / 2);
   check(
-    "selected template artwork exposes background removal and artwork actions",
+    "selected template artwork exposes one background-removal switch and artwork actions",
     await page.getByRole("switch", { name: "Remove Background" }).count() === 1
       && await page.locator('.rot-canvas-svg g[role="button"][aria-label="Edit artwork"]').count() === 1
       && await page.locator('.rot-canvas-svg g[role="button"][aria-label="Delete"]').count() === 1,
+  );
+  check(
+    "and no leftover Select Object tab or AI badges",
+    await page.getByText(/select object/i).count() === 0
+      && await page.locator(".rot-editor .rot-badge").count() === 0,
   );
 
   await page.goto(`${BASE}/customize/v-neck-tee?qa=lock`, {

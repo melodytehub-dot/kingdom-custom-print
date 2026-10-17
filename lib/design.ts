@@ -460,12 +460,12 @@ export async function validateUpload(file: File): Promise<UploadCheck> {
   if (format === "bmp" || format === "tiff") {
     return {
       ok: false,
-      error: `We cannot print ${formatLabel(format)}. Use PNG, JPG, WEBP, HEIC, AVIF or SVG.`,
+      error: `We cannot print ${formatLabel(format)}. Use PNG, JPG, WebP, HEIC, AVIF or SVG.`,
     };
   }
   return {
     ok: false,
-    error: "That file is not an image. Upload a PNG, JPG, WEBP, HEIC, AVIF or SVG.",
+    error: "That file is not an image. Upload a PNG, JPG, WebP, HEIC, AVIF or SVG.",
   };
 }
 
@@ -537,9 +537,7 @@ export async function readImageFile(
       try {
         return await readAsImage(file, maxEdge, "heic");
       } catch {
-        throw new Error(
-          "That iPhone photo could not be converted. Try exporting it as a JPG and uploading that."
-        );
+        throw new Error("We could not open that iPhone photo. Save it as a JPG and try again.");
       }
     }
   }
@@ -549,7 +547,7 @@ export async function readImageFile(
 /** One honest, actionable line for a file the browser could not open. */
 function decodeError(format: ImageFormat): Error {
   return new Error(
-    `That ${formatLabel(format)} could not be decoded as an image. Try a smaller copy or a screenshot.`
+    `We could not open that ${formatLabel(format)}. Try a smaller copy or a screenshot.`
   );
 }
 
@@ -565,32 +563,56 @@ const MIME_BY_FORMAT: Partial<Record<ImageFormat, string>> = {
   heic: "image/heic",
 };
 
-/** Decodes an upload the browser reads natively (JPG/PNG/WEBP/AVIF/SVG). */
+/**
+ * Decodes an upload the browser reads natively (JPG/PNG/WEBP/AVIF/SVG).
+ *
+ * Phones occasionally fail a large decode on the first try under memory
+ * pressure and succeed moments later — "it worked on my third attempt". Each
+ * attempt gets a fresh object URL and there are three attempts, so the
+ * customer never sees that flake.
+ */
 function readAsImage(file: File, maxEdge: number, format: ImageFormat): Promise<DecodedImage> {
   // SVG is text: small artwork is stored as vector, not rasterised.
   if (format === "svg") return readAsVector(file, maxEdge);
   const type = MIME_BY_FORMAT[format];
-  return new Promise((resolve, reject) => {
-    // Re-stamp the blob with the sniffed type — some browsers are strict
-    // about the MIME type on an <img> source (no data is copied).
-    let url: string;
+  // Re-stamp the blob with the sniffed type — some browsers are strict about
+  // the MIME type on an <img> source (no data is copied).
+  const makeUrl = () => {
     try {
-      url = URL.createObjectURL(type && file.type !== type ? new Blob([file], { type }) : file);
+      return URL.createObjectURL(type && file.type !== type ? new Blob([file], { type }) : file);
     } catch {
-      url = URL.createObjectURL(file);
+      return URL.createObjectURL(file);
     }
+  };
+  return loadImage(makeUrl, 0).then(
+    (img) => rasterize(img, maxEdge),
+    () => {
+      throw decodeError(format);
+    }
+  );
+}
+
+const DECODE_RETRIES = 2;
+const DECODE_RETRY_DELAYS = [400, 900];
+
+/** Loads an image, retrying a failed decode after a short pause. */
+function loadImage(makeUrl: () => string, attempt: number): Promise<HTMLImageElement> {
+  return new Promise((resolve, reject) => {
+    const url = makeUrl();
     const img = new Image();
     img.onerror = () => {
       URL.revokeObjectURL(url);
-      reject(decodeError(format));
+      if (attempt >= DECODE_RETRIES) {
+        reject(new Error("Image decode failed"));
+        return;
+      }
+      window.setTimeout(() => {
+        loadImage(makeUrl, attempt + 1).then(resolve, reject);
+      }, DECODE_RETRY_DELAYS[attempt] ?? 900);
     };
     img.onload = () => {
       URL.revokeObjectURL(url);
-      try {
-        resolve(rasterize(img, maxEdge));
-      } catch (error) {
-        reject(error);
-      }
+      resolve(img);
     };
     img.src = url;
   });
@@ -635,7 +657,7 @@ function rasterize(img: HTMLImageElement, maxEdge: number): DecodedImage {
   canvas.width = Math.max(1, Math.round((img.width || 1000) * scale));
   canvas.height = Math.max(1, Math.round((img.height || 1000) * scale));
   const ctx = canvas.getContext("2d");
-  if (!ctx) throw new Error("This browser could not prepare that image. Try a different browser.");
+  if (!ctx) throw new Error("We could not prepare that image. Try a different browser.");
   ctx.imageSmoothingQuality = "high";
   ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
   return encodeCanvasUnder(canvas);
