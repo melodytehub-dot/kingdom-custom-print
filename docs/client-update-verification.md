@@ -300,32 +300,53 @@ the real editor before deciding whether to pay for it.
 - While hosted removal is on, customer photos are processed by imgix. If it
   stays, the privacy policy should say so before launch.
 
-### The uploader accepts iPhone photos
+### The uploader accepts what phones actually send
 
-- Client report: some uploads show "the picture can't be read" while others
-  work. Reproduced: browsers cannot decode HEIC — the default photo format on
-  every iPhone — and Windows and Android report those files so differently
-  that the old checks refused them ("not an image") or stumbled on the data
-  ("could not be decoded"), while ordinary JPG/PNG downloads sailed through.
-- Every upload's first bytes are now sniffed, so a HEIC is recognised even
-  when it arrives renamed to `.jpg` (how chat apps and Windows often hand it
-  over), and `heic-to` (libheif compiled to WebAssembly) converts the photo to
-  JPEG on the customer's device. The ~3 MB decoder downloads only when a HEIC
-  actually arrives — JPG/PNG uploads are exactly as fast as before.
+- Client report (round 1): some uploads show "the picture can't be read" while
+  others work. Reproduced: browsers cannot decode HEIC — the default photo
+  format on every iPhone — and Windows and Android report those files so
+  differently that the old checks refused them ("not an image") or stumbled on
+  the data ("could not be decoded"), while ordinary JPG/PNG downloads sailed
+  through.
+- Client report (round 2): the same stock photo uploads fine on desktop but
+  cannot be read on the phone. Both causes of that pattern are now fixed: (a)
+  phone pickers often hand files over with a missing or generic MIME type
+  ("application/octet-stream"), which the old checks refused, and (b) raster
+  photos were decoded from multi-megabyte base64 data URLs, which mobile
+  browsers choke on where desktop Chrome does not.
+- Acceptance is byte-first for every format, not just HEIC: JPG, PNG, WEBP,
+  AVIF, GIF and HEIC are recognised from the upload's leading bytes, so a
+  mislabelled photo passes no matter what the phone's picker wrote on the
+  label; BMP/TIFF are named refusals. The picker itself is permissive
+  (`image/*` plus extensions) so phones do not hide these files in the first
+  place — the validator is the real gate, and it reads bytes, not labels.
+- Photos now decode through a blob URL instead of a base64 data URL. This is
+  the "works on desktop, cannot be read on my phone" fix: the old path built
+  a ~33 %-larger base64 copy of the whole photo in memory before decoding,
+  which is exactly where phone browsers run out of room on big photos.
+- `heic-to` (libheif compiled to WebAssembly) converts HEIC photos to JPEG on
+  the customer's device — recognised even when renamed to `.jpg` (how chat
+  apps and Windows often hand it over). The ~3 MB decoder downloads only when
+  a HEIC actually arrives — JPG/PNG uploads are exactly as fast as before.
+  If the wasm converter cannot handle a photo (a few HDR/10-bit files),
+  Safari is given one chance to read it natively before failing.
 - AVIF (what Google Images often saves) is accepted too; modern browsers
   decode it natively.
 - The remaining refusals explain themselves: an oversized file tells its size,
-  an unreadable file says it could not be decoded, and an old format names
-  itself ("We cannot print BMP. Use PNG, JPG, WEBP, HEIC, AVIF or SVG.").
+  an unreadable file names the format it could not decode and suggests a
+  smaller copy or a screenshot, and an old format names itself ("We cannot
+  print BMP. Use PNG, JPG, WEBP, HEIC, AVIF or SVG.").
 
 ### Verification
 
-- `npm run qa-upload-formats` is new: drives the real upload input on desktop
-  and on a phone with the exact files that failed — an iPhone HEIC (reported
-  as generic bytes) and a HEIC renamed to `.jpg` — plus JPG, PNG, AVIF, an
-  oversized 9 MB file, a broken file and a BMP. Every good file lands on the
-  design (the HEICs as real 1280x854 photos); every bad file gets its specific,
-  honest message. The same checks pass against the deployed site.
+- `npm run qa-upload-formats` grew to 18 checks: it drives the real upload
+  input on desktop and on a phone with the exact files that failed — an
+  iPhone HEIC (reported as generic bytes), a HEIC renamed to `.jpg`, and a
+  plain JPG handed over with no usable type — plus JPG, PNG, AVIF, an SVG
+  with no type (stays vector), a 48 MP photo (downscaled to 1050x1400 before
+  storing), an oversized 9 MB file, a broken file and a BMP. Every good file
+  lands on the design; every bad file gets its specific, honest message. The
+  same checks pass against the deployed site.
 - Live check against the real source: the deployed editor cut a photograph out
   through the real bridge and imgix on desktop and on a phone — the mug sample
   and the client's own kaftan photo — in 11-13 s each (cold renders), no

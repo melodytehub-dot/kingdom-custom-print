@@ -2106,7 +2106,7 @@ export default function Customizer({
       <input
         ref={fileInput}
         type="file"
-        accept="image/png,image/jpeg,image/webp,image/avif,image/heic,image/heif,image/svg+xml,image/gif,.heic,.heif,.avif"
+        accept="image/*,.png,.jpg,.jpeg,.webp,.avif,.gif,.svg,.heic,.heif,.bmp,.tif,.tiff"
         onChange={(e) => onUpload(e.target.files?.[0])}
         className="rot-hidden-file"
         aria-label="Upload artwork file"

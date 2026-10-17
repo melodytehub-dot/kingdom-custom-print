@@ -9,7 +9,8 @@ import type {
   TextLayer,
 } from "./types";
 import { measureTextLayer } from "@/components/customizer/textGeometry";
-import { convertHeicUpload, isHeicUpload } from "./heic";
+import { convertHeicUpload } from "./heic";
+import { detectImageFormat, formatLabel, type ImageFormat } from "./imageFormat";
 
 /**
  * Layers are stored in normalized coordinates (0-100) relative to the
@@ -421,19 +422,6 @@ export function duplicateSelection(
    ------------------------------------------------------------------------- */
 
 export const MAX_UPLOAD_BYTES = 8 * 1024 * 1024;
-export const ACCEPTED_TYPES = [
-  "image/png",
-  "image/jpeg",
-  "image/jpg",
-  "image/webp",
-  "image/avif",
-  "image/gif",
-  "image/svg+xml",
-  // HEIC/HEIF pass the gate and are converted by readImageFile; some brands
-  // are only caught by sniffing the bytes (see lib/heic.ts).
-  "image/heic",
-  "image/heif",
-];
 
 export interface UploadCheck {
   ok: boolean;
@@ -448,27 +436,36 @@ export async function validateUpload(file: File): Promise<UploadCheck> {
       error: `That file is ${(file.size / 1024 / 1024).toFixed(1)} MB. Keep uploads under 8 MB.`,
     };
   }
-  // iPhone photos arrive as HEIC, which browsers cannot decode — and Windows
-  // and Android report the type inconsistently (sometimes not even as
-  // "image/"). Sniff the bytes so those uploads pass and convert later.
-  if (await isHeicUpload(file)) return { ok: true };
-  const isImage = file.type.startsWith("image/");
-  if (!isImage) {
-    return { ok: false, error: "That file is not an image. Upload a PNG, JPG, WEBP, HEIC, AVIF or SVG." };
-  }
-  if (!ACCEPTED_TYPES.includes(file.type.toLowerCase())) {
+  // The leading bytes decide the format, not the file name or MIME type:
+  // phone pickers and chat apps hand files over mislabelled often enough
+  // (a photo as "application/octet-stream", an iPhone HEIC as "not an
+  // image", a HEIC renamed to .jpg) that the label loses real photos.
+  const format = await detectImageFormat(file);
+  if (format === "svg") {
     return {
-      ok: false,
-      error: `We cannot print ${file.type.split("/")[1]?.toUpperCase() || "that format"}. Use PNG, JPG, WEBP, HEIC, AVIF or SVG.`,
+      ok: true,
+      warning: "Vector artwork prints sharpest. Make sure fonts are outlined before uploading.",
     };
   }
-
-  const svg = file.type === "image/svg+xml";
+  if (
+    format === "jpeg" ||
+    format === "png" ||
+    format === "webp" ||
+    format === "avif" ||
+    format === "gif" ||
+    format === "heic"
+  ) {
+    return { ok: true };
+  }
+  if (format === "bmp" || format === "tiff") {
+    return {
+      ok: false,
+      error: `We cannot print ${formatLabel(format)}. Use PNG, JPG, WEBP, HEIC, AVIF or SVG.`,
+    };
+  }
   return {
-    ok: true,
-    warning: svg
-      ? "Vector artwork prints sharpest. Make sure fonts are outlined before uploading."
-      : undefined,
+    ok: false,
+    error: "That file is not an image. Upload a PNG, JPG, WEBP, HEIC, AVIF or SVG.",
   };
 }
 
@@ -519,58 +516,129 @@ export function encodeCanvasUnder(
 
 /**
  * Reads a file into a data URL, downscaling oversized raster images and
- * recompressing so the stored payload stays small enough to order. iPhone
- * HEIC/HEIF photos are converted to JPEG first (lib/heic.ts).
+ * recompressing so the stored payload stays small enough to order. The bytes
+ * decide the format (lib/imageFormat.ts); HEIC/HEIF photos are converted to
+ * JPEG first (lib/heic.ts). Rasters decode through a blob URL rather than a
+ * base64 data URL — mobile browsers choke on multi-megabyte data URLs, which
+ * is how "works on desktop, cannot be read on my phone" happens.
  */
 export async function readImageFile(
   file: File,
   maxEdge = 1400
 ): Promise<DecodedImage> {
-  if (await isHeicUpload(file)) {
+  let format = await detectImageFormat(file);
+  if (format === "heic") {
     try {
       file = await convertHeicUpload(file);
+      format = "jpeg";
     } catch {
-      throw new Error(
-        "That iPhone photo could not be converted. Try exporting it as a JPG and uploading that."
-      );
+      // A few HDR/10-bit HEICs defeat the wasm decoder while Safari still
+      // reads them natively — give the browser one chance before failing.
+      try {
+        return await readAsImage(file, maxEdge, "heic");
+      } catch {
+        throw new Error(
+          "That iPhone photo could not be converted. Try exporting it as a JPG and uploading that."
+        );
+      }
     }
   }
-  return readAsImage(file, maxEdge);
+  return readAsImage(file, maxEdge, format);
 }
 
+/** One honest, actionable line for a file the browser could not open. */
+function decodeError(format: ImageFormat): Error {
+  return new Error(
+    `That ${formatLabel(format)} could not be decoded as an image. Try a smaller copy or a screenshot.`
+  );
+}
+
+/** MIME types for the sniffed formats the browser can render directly. */
+const MIME_BY_FORMAT: Partial<Record<ImageFormat, string>> = {
+  jpeg: "image/jpeg",
+  png: "image/png",
+  webp: "image/webp",
+  avif: "image/avif",
+  gif: "image/gif",
+  bmp: "image/bmp",
+  tiff: "image/tiff",
+  heic: "image/heic",
+};
+
 /** Decodes an upload the browser reads natively (JPG/PNG/WEBP/AVIF/SVG). */
-function readAsImage(file: File, maxEdge: number): Promise<DecodedImage> {
+function readAsImage(file: File, maxEdge: number, format: ImageFormat): Promise<DecodedImage> {
+  // SVG is text: small artwork is stored as vector, not rasterised.
+  if (format === "svg") return readAsVector(file, maxEdge);
+  const type = MIME_BY_FORMAT[format];
+  return new Promise((resolve, reject) => {
+    // Re-stamp the blob with the sniffed type — some browsers are strict
+    // about the MIME type on an <img> source (no data is copied).
+    let url: string;
+    try {
+      url = URL.createObjectURL(type && file.type !== type ? new Blob([file], { type }) : file);
+    } catch {
+      url = URL.createObjectURL(file);
+    }
+    const img = new Image();
+    img.onerror = () => {
+      URL.revokeObjectURL(url);
+      reject(decodeError(format));
+    };
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      try {
+        resolve(rasterize(img, maxEdge));
+      } catch (error) {
+        reject(error);
+      }
+    };
+    img.src = url;
+  });
+}
+
+/** SVG is text: keep small artwork as vector, rasterise only when huge. */
+function readAsVector(file: File, maxEdge: number): Promise<DecodedImage> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onerror = () => reject(new Error("We could not read that file. Try again."));
     reader.onload = () => {
-      const dataUrl = String(reader.result);
+      const raw = String(reader.result);
+      // The picker may have handed the SVG over with the wrong type (or
+      // none); re-stamp the data URL so the layer renders as vector.
+      const dataUrl = raw.startsWith("data:image/svg+xml")
+        ? raw
+        : raw.replace(/^data:[^,]*,/, "data:image/svg+xml;base64,");
       const img = new Image();
-      img.onerror = () => reject(new Error("That file could not be decoded as an image."));
+      img.onerror = () => reject(decodeError("svg"));
       img.onload = () => {
-        const isSvg = file.type === "image/svg+xml";
-        if (isSvg && dataUrl.length <= MAX_IMAGE_DATA_URL) {
+        if (dataUrl.length <= MAX_IMAGE_DATA_URL) {
           resolve({ width: img.width || 1000, height: img.height || 1000, dataUrl });
           return;
         }
-        const largest = Math.max(img.width, img.height) || 1000;
-        const scale = Math.min(1, maxEdge / largest);
-        const canvas = document.createElement("canvas");
-        canvas.width = Math.max(1, Math.round((img.width || 1000) * scale));
-        canvas.height = Math.max(1, Math.round((img.height || 1000) * scale));
-        const ctx = canvas.getContext("2d");
-        if (!ctx) {
-          resolve({ width: img.width, height: img.height, dataUrl });
-          return;
+        try {
+          resolve(rasterize(img, maxEdge));
+        } catch (error) {
+          reject(error);
         }
-        ctx.imageSmoothingQuality = "high";
-        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-        resolve(encodeCanvasUnder(canvas));
       };
       img.src = dataUrl;
     };
     reader.readAsDataURL(file);
   });
+}
+
+/** Draws a decoded image onto a canvas, downscaled and recompressed to fit. */
+function rasterize(img: HTMLImageElement, maxEdge: number): DecodedImage {
+  const largest = Math.max(img.width, img.height) || 1000;
+  const scale = Math.min(1, maxEdge / largest);
+  const canvas = document.createElement("canvas");
+  canvas.width = Math.max(1, Math.round((img.width || 1000) * scale));
+  canvas.height = Math.max(1, Math.round((img.height || 1000) * scale));
+  const ctx = canvas.getContext("2d");
+  if (!ctx) throw new Error("This browser could not prepare that image. Try a different browser.");
+  ctx.imageSmoothingQuality = "high";
+  ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+  return encodeCanvasUnder(canvas);
 }
 
 /* -------------------------------------------------------------------------

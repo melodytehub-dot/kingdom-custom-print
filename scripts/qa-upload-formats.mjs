@@ -1,8 +1,9 @@
 /**
  * Upload format checks — the files phones and the web actually hand over:
  * iPhone HEIC (also renamed to .jpg, which is how chat apps and Windows
- * deliver it), AVIF, oversized files, broken files and old formats — driven
- * through the real upload input on the customizer.
+ * deliver it), AVIF, SVG, a 48 MP photo, mislabelled files (phone pickers
+ * hand photos over as "application/octet-stream"), oversized files and old
+ * formats — driven through the real upload input on the customizer.
  *
  * Needs a dev server (npm run dev). No imgix source needed: this is the
  * on-device upload path.
@@ -24,6 +25,10 @@ const heicBytes = readFileSync(`${SAMPLE}/example.heic`);
 const jpgBytes = readFileSync(`${SAMPLE}/mug.jpg`);
 const pngBytes = readFileSync("public/img/catalog-models/tee.png");
 const avifBytes = readFileSync(`${SAMPLE}/sample.avif`);
+const largeBytes = readFileSync(`${SAMPLE}/large-photo.jpg`);
+const svgBytes = Buffer.from(
+  '<svg xmlns="http://www.w3.org/2000/svg" width="120" height="80"><rect width="120" height="80" fill="#c00"/></svg>',
+);
 const hugeBytes = Buffer.alloc(9 * 1024 * 1024, 0x20);
 
 /** [label, file payload, expected] — "layer" or a substring of the error toast. */
@@ -35,6 +40,13 @@ const DESKTOP_CASES = [
   // Renamed by a chat app or a file manager — the classic "some work, some don't".
   ["heic renamed .jpg", { name: "IMG_0402.jpg", mimeType: "image/jpeg", buffer: heicBytes }, "layer"],
   ["avif", { name: "google-image.avif", mimeType: "image/avif", buffer: avifBytes }, "layer"],
+  // The phone-picker complaint: the same JPEG works on desktop but arrives
+  // as "application/octet-stream" (or nothing) on the phone — bytes decide.
+  ["jpg with no type", { name: "download.jpg", mimeType: "application/octet-stream", buffer: jpgBytes }, "layer"],
+  // A 48 MP photo: phones choke decoding multi-megabyte base64 data URLs.
+  ["large photo", { name: "IMG_20240101.jpg", mimeType: "image/jpeg", buffer: largeBytes }, "layer"],
+  // An SVG whose type did not survive the picker; must stay vector artwork.
+  ["svg with no type", { name: "logo.svg", mimeType: "application/octet-stream", buffer: svgBytes }, "layer"],
   ["oversized", { name: "huge.jpg", mimeType: "image/jpeg", buffer: hugeBytes }, "8 MB"],
   ["broken png", { name: "broken.png", mimeType: "image/png", buffer: Buffer.from("this is not really an image") }, "decoded"],
   ["unsupported bmp", { name: "old.bmp", mimeType: "image/bmp", buffer: Buffer.from("BMfake") }, "BMP"],
@@ -72,7 +84,7 @@ async function runCase(page, payload) {
         .decode()
         .then(() => true)
         .catch(() => false);
-      return { ok, width: image.naturalWidth, height: image.naturalHeight, type: last.type };
+      return { ok, width: image.naturalWidth, height: image.naturalHeight, type: last.type, srcHead: last.src.slice(0, 30) };
     }, DRAFT_KEY)
     .catch(() => null);
   const toast = await page
@@ -101,6 +113,20 @@ try {
           `${layer?.width ?? 0}x${layer?.height ?? 0}`,
         );
       }
+      if (label.startsWith("large photo")) {
+        check(
+          `desktop ${label}: downscaled before storing`,
+          (layer?.width ?? 0) > 0 && (layer?.width ?? 0) <= 1400 && (layer?.height ?? 0) <= 1400,
+          `${layer?.width ?? 0}x${layer?.height ?? 0}`,
+        );
+      }
+      if (label.startsWith("svg")) {
+        check(
+          `desktop ${label}: kept as vector artwork`,
+          Boolean(layer?.srcHead?.startsWith("data:image/svg+xml")),
+          layer?.srcHead ?? "no src",
+        );
+      }
     } else {
       check(
         `desktop ${label}: refused with a helpful message`,
@@ -120,16 +146,21 @@ try {
   });
   const phonePage = await iphone.newPage();
   phonePage.setDefaultTimeout(30000);
-  const { layer, toast } = await runCase(phonePage, {
-    name: "IMG_0402.HEIC",
-    mimeType: "application/octet-stream",
-    buffer: heicBytes,
-  });
-  check(
-    "phone heic: uploads and lands on the design",
-    Boolean(layer?.ok),
-    layer ? `${layer.type} ${layer.width}x${layer.height}` : `toast: ${toast ?? "none"}`,
-  );
+  const PHONE_CASES = [
+    ["phone heic", { name: "IMG_0402.HEIC", mimeType: "application/octet-stream", buffer: heicBytes }],
+    // The reported bug: a normal JPEG that uploads on desktop but arrives
+    // from the phone's picker without a usable type.
+    ["phone jpg with no type", { name: "downloaded.jpg", mimeType: "application/octet-stream", buffer: jpgBytes }],
+    ["phone large photo", { name: "IMG_20240101.jpg", mimeType: "application/octet-stream", buffer: largeBytes }],
+  ];
+  for (const [label, payload] of PHONE_CASES) {
+    const { layer, toast } = await runCase(phonePage, payload);
+    check(
+      `${label}: uploads and lands on the design`,
+      Boolean(layer?.ok),
+      layer ? `${layer.type} ${layer.width}x${layer.height}` : `toast: ${toast ?? "none"}`,
+    );
+  }
   await iphone.close();
 } finally {
   await browser.close();
