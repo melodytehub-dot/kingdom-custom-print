@@ -453,3 +453,77 @@ skill across the site.
   badges remain; `qa-background-remove`, `qa-cutout`, `qa-cutout-mask`,
   `qa-cutout-actions`, `qa-cart-flow`, typecheck, lint and build all pass.
 
+## October 18 — Photoroom comparison row (evaluation build)
+
+Client request: set up Photoroom's background removal as a **second Remove
+Background button in the customizer**, so the two services can be compared on
+the same photo in the same editor before choosing one. The existing imgix
+wiring is untouched — production keeps exactly one switch.
+
+### What was added
+
+- **Server route** `app/api/photoroom-cutout/route.ts`. The API key lives in
+  the server environment (`PHOTOROOM_API_KEY`) and never reaches the browser.
+  The editor posts the prepared photo there; the route calls Photoroom
+  (`sdk.photoroom.com/v1/segment`, `x-api-key` header, multipart `image_file`)
+  and hands the transparent PNG back. 4 MB cap; jpg/png/webp/heic accepted;
+  responses are never cached.
+- **Client module** `lib/photoroomCutout.ts`. The photo is prepared exactly
+  like the imgix path — Photoroom and imgix both refuse WebP, so the editor's
+  WebP canvas copy is re-encoded to JPEG — rides the same status lines
+  ("Preparing your photo…", "Removing background…") and lands through the same
+  WebP-under-380KB contract as every other cut-out.
+- **The comparison row** (`components/customizer/editors.tsx`,
+  `lib/cutoutActions.ts`). A second row sits under the normal switch:
+  "Remove Background with Photoroom / Runs Photoroom's remover on this photo".
+  It renders **only when the build sets `NEXT_PUBLIC_CUTOUT_ALT=photoroom`**,
+  so a normal build shows no second button at all.
+- **Pay-once comparison.** The first tap runs Photoroom and stores its result
+  on the layer (`altRemovedSrc`); every later tap just switches between the
+  two stored results, so flipping through both versions repeatedly makes no
+  new request to either service. The switch keeps showing the last-selected
+  result (off/on changes nothing); the comparison row is the only control that
+  switches between them. Row states: "Remove Background with Photoroom" →
+  "Showing Photoroom's result / Tap to switch back" ↔ "Show Photoroom's
+  result / Already saved — no extra processing".
+
+### Environment (Preview scope only)
+
+| Variable | Scope | Value |
+| --- | --- | --- |
+| `NEXT_PUBLIC_CUTOUT_ALT` | Preview | `photoroom` |
+| `PHOTOROOM_API_KEY` | Preview (server-side) | the trial key |
+
+Production was not given either variable: it keeps one switch, imgix behind
+it. Deleting the two Preview variables removes the comparison everywhere.
+While the comparison build is in use, photos cut out through that row are
+processed by Photoroom; whether a site-wide privacy line is needed when one
+service is chosen remains the open item from October 17.
+
+### Measured against the trial key (2 real calls, $0.04 total)
+
+- Kaftan test photo (2047×2560): 200 OK in 6.1 s — 73.1% cleared, 0.9% soft
+  edge pixels, hair/fingers/garment edges intact.
+- Mug sample (900×1200): 200 OK in 1.1 s — 72.8% cleared, 0.8% soft edges.
+- Both results were saved locally for the client to inspect. Photoroom price
+  for reference: Basic plan $0.02 per image; the imgix side is unchanged.
+
+### Verification
+
+- `qa-photoroom-cutout` (new, hermetic — a local mock serves Photoroom and
+  imgix is fulfilled in-page, so zero credits are spent): 47 checks across
+  desktop and phone cover the row appearing only when configured, the key
+  never appearing in any browser request, the exact upstream contract
+  (POST /v1/segment, server-held `x-api-key`, multipart `image_file`, JPEG
+  never WebP), the result landing and showing, switching between results
+  costing no new call, off/on keeping the last-selected result, an
+  alt-first flow producing the main result on switch-back, a failed call
+  staying honest with a working retry, and intentional flat-artwork
+  comparison.
+- `qa-hosted-cutout` re-ran green: imgix behaviour, status copy and the
+  pay-once credit guard are unchanged.
+- `qa-cutout-actions` gained three pins for the row's copy;
+  `qa-customizer-controls` gained a check that a normal build shows zero
+  comparison rows. `qa-cutout-ai` (both viewports) and `qa-upload-formats`
+  re-ran green; typecheck, lint and build all pass.
+

@@ -744,6 +744,20 @@
   accent-color: var(--rot-accent);
 }
 
+/* The Photoroom comparison row (evaluation builds only). */
+.rot-alt-cutout .rot-row-label > span {
+  display: grid;
+  gap: 2px;
+}
+
+.rot-alt-cutout .rot-row-label small {
+  color: var(--rot-muted);
+  font-size: 11.5px;
+  font-weight: 400;
+  letter-spacing: 0.01em;
+  line-height: 1.35;
+}
+
 .rot-lockhint {
   margin-bottom: 4px;
 }

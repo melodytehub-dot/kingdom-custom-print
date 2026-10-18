@@ -115,6 +115,23 @@ export async function prepareCutoutUpload(src: string): Promise<Blob> {
   }
 }
 
+/** Decodes a cut-out blob into the editor's data-URL contract. */
+export async function blobToCutoutDataUrl(blob: Blob): Promise<string> {
+  const objectUrl = URL.createObjectURL(blob);
+  try {
+    const image = await loadImage(objectUrl);
+    const canvas = document.createElement("canvas");
+    canvas.width = image.naturalWidth;
+    canvas.height = image.naturalHeight;
+    const context = canvas.getContext("2d");
+    if (!context) throw new Error("This browser could not prepare the photo.");
+    context.drawImage(image, 0, 0);
+    return encodeCanvasUnder(canvas).dataUrl;
+  } finally {
+    URL.revokeObjectURL(objectUrl);
+  }
+}
+
 /** Parks the photo on our own site and returns the path imgix should fetch. */
 export async function uploadCutoutPhoto(blob: Blob): Promise<string> {
   const extension = blob.type === "image/png" ? "png" : blob.type === "image/webp" ? "webp" : "jpg";
@@ -168,20 +185,7 @@ export async function renderHostedCutout(
       );
     }
 
-    const blob = await response.blob();
-    const objectUrl = URL.createObjectURL(blob);
-    try {
-      const image = await loadImage(objectUrl);
-      const canvas = document.createElement("canvas");
-      canvas.width = image.naturalWidth;
-      canvas.height = image.naturalHeight;
-      const context = canvas.getContext("2d");
-      if (!context) throw new Error("This browser could not prepare the photo.");
-      context.drawImage(image, 0, 0);
-      return encodeCanvasUnder(canvas).dataUrl;
-    } finally {
-      URL.revokeObjectURL(objectUrl);
-    }
+    return blobToCutoutDataUrl(await response.blob());
   }
 }
 

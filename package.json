@@ -27,6 +27,7 @@
     "qa-cutout-mask": "node scripts/qa-cutout-mask.mjs",
     "qa-cutout-actions": "node scripts/qa-cutout-actions.mjs",
     "qa-hosted-cutout": "node scripts/qa-hosted-cutout.mjs",
+    "qa-photoroom-cutout": "node scripts/qa-photoroom-cutout.mjs",
     "qa-background-remove": "node scripts/qa-background-remove.mjs",
     "qa-upload-formats": "node scripts/qa-upload-formats.mjs",
     "qa-cutout-ai": "node scripts/qa-cutout-ai.mjs",

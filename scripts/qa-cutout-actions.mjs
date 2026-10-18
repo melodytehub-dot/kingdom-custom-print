@@ -160,6 +160,33 @@ const check = (name, ok, detail = "") => {
   );
 }
 
+/* ---- 5. The Photoroom comparison row (evaluation builds only) ----------- */
+
+{
+  // The one deliberate provider mention: the client asked for a second
+  // Remove Background row to compare the two services before choosing one.
+  // It only ever renders when `NEXT_PUBLIC_CUTOUT_ALT=photoroom`.
+  const { photoroomAction } = cutoutActions;
+  const fresh = photoroomAction({ active: false, hasAlt: false });
+  check(
+    "the comparison row names what it runs before anything is stored",
+    fresh.label === "Remove Background with Photoroom" && /Runs Photoroom's remover/i.test(fresh.hint),
+    `${fresh.label} — ${fresh.hint}`,
+  );
+  const showing = photoroomAction({ active: true, hasAlt: true });
+  check(
+    "while its result is showing, the row offers the way back",
+    showing.label === "Showing Photoroom's result" && /switch back/i.test(showing.hint),
+    `${showing.label} — ${showing.hint}`,
+  );
+  const stored = photoroomAction({ active: false, hasAlt: true });
+  check(
+    "a stored result is re-shown without re-processing",
+    stored.label === "Show Photoroom's result" && /no extra processing/i.test(stored.hint),
+    `${stored.label} — ${stored.hint}`,
+  );
+}
+
 if (failures > 0) {
   console.log(`${failures} cut-out action check(s) failed`);
   process.exit(1);

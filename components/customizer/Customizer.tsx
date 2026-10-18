@@ -92,8 +92,10 @@ import {
   cutoutNotice,
   cutoutStatus,
   hostedCutoutStatus,
+  photoroomAction,
 } from "@/lib/cutoutActions";
 import { hostedCutoutDataUrl, hostedCutoutReady } from "@/lib/hostedCutout";
+import { photoroomAltReady, photoroomCutoutDataUrl } from "@/lib/photoroomCutout";
 import {
   CUTOUT_MAX_EDGE,
   cutoutPlan,
@@ -703,73 +705,97 @@ export default function Customizer({
     });
   };
 
+  /**
+   * The cut-out pipeline for a photo that does not have one yet: flat artwork
+   * is keyed out instantly, a photograph goes to the hosted remover (when this
+   * build has one) and then to the on-device models.
+   */
+  const runPrimaryCutout = async (orig: string) => {
+    let dataUrl: string | undefined;
+    let source: CutoutSource | undefined;
+    let failure: "no-subject" | "unavailable" | null = null;
+
+    // Decide what this upload *is* before touching it. Flat artwork — a
+    // logo, a sticker, a screenshot — has no background colour to argue
+    // with, so the instant key is exact and downloads nothing. A
+    // photograph has to be recognised instead, because a busy backdrop has
+    // no colour to key out and guessing one is what ate the customer's
+    // photo: it reported itself confident having cleared 95.7% of it.
+    const profile = await artworkProfile(orig).catch(() => null);
+    const flatArtwork = isVectorSource(orig) || (profile ? isFlatArtwork(profile) : false);
+
+    const quickCut = async () => quickBackgroundRemoval(orig).catch(() => null);
+    const keepQuick = (quick: Awaited<ReturnType<typeof quickCut>>) => {
+      if (!quick) return;
+      dataUrl = quick.dataUrl;
+      source = "quick";
+    };
+
+    if (flatArtwork) {
+      setFxStatus("Removing background…");
+      keepQuick(await quickCut());
+    } else {
+      if (hostedCutoutReady()) {
+        try {
+          dataUrl = await runHostedCutout(orig);
+          source = "hosted";
+        } catch {
+          // Whatever went wrong on the hosted side — no signal, no
+          // credits, a photo it cannot cut — the models below are the
+          // fallback; the outcome the customer sees is the same.
+        }
+      }
+      if (!dataUrl) {
+        try {
+          const result = await runCutoutModels(orig, cutoutPlan(canAutoRunDetailedModel()));
+          dataUrl = result.dataUrl;
+          source = result.source;
+        } catch (error) {
+          failure = error instanceof CutoutError ? error.reason : "unavailable";
+          // One last resort for a photo the models could not handle: the
+          // colour key, but only when it is sure of itself *and* left a
+          // subject behind. Both halves matter — on the customer's own photo
+          // the key was sure of itself having kept 4% of the picture.
+          setFxStatus("Removing background…");
+          const quick = await quickCut();
+          if (quick?.confident && quick.ratio <= 0.85) keepQuick(quick);
+        }
+      }
+    }
+    return { dataUrl, source, failure };
+  };
+
   const applyFx = async (layer: ImageLayer, next: Partial<ImageFx>) => {
     const fx: ImageFx = { ...(layer.fx ?? DEFAULT_FX), ...next };
     const orig = layer.origSrc ?? layer.src;
     let backgroundRemovedSrc = layer.backgroundRemovedSrc;
     let cutoutSource: CutoutSource | undefined = layer.cutoutSource;
+    // Turning removal off and on again shows the same result the customer
+    // was looking at; the Photoroom comparison row is the only thing that
+    // switches between the two stored results.
+    const activeCutout: "primary" | "alt" =
+      layer.activeCutout === "alt" && layer.altRemovedSrc ? "alt" : "primary";
     setFxBusy(true);
     setFxProgress(null);
     setFxStatus(fx.removeBg ? "Preparing background removal…" : "Applying artwork edits…");
     try {
       let cutoutFailure: "no-subject" | "unavailable" | null = null;
-      if (fx.removeBg && !backgroundRemovedSrc) {
-        // Decide what this upload *is* before touching it. Flat artwork — a
-        // logo, a sticker, a screenshot — has no background colour to argue
-        // with, so the instant key is exact and downloads nothing. A
-        // photograph has to be recognised instead, because a busy backdrop has
-        // no colour to key out and guessing one is what ate the customer's
-        // photo: it reported itself confident having cleared 95.7% of it.
-        const profile = await artworkProfile(orig).catch(() => null);
-        const flatArtwork = isVectorSource(orig) || (profile ? isFlatArtwork(profile) : false);
-
-        const quickCut = async () => quickBackgroundRemoval(orig).catch(() => null);
-        const keepQuick = (quick: Awaited<ReturnType<typeof quickCut>>) => {
-          if (!quick) return;
-          backgroundRemovedSrc = quick.dataUrl;
-          cutoutSource = "quick";
-        };
-
-        if (flatArtwork) {
-          setFxStatus("Removing background…");
-          keepQuick(await quickCut());
-        } else {
-          if (hostedCutoutReady()) {
-            try {
-              backgroundRemovedSrc = await runHostedCutout(orig);
-              cutoutSource = "hosted";
-            } catch {
-              // Whatever went wrong on the hosted side — no signal, no
-              // credits, a photo it cannot cut — the models below are the
-              // fallback; the outcome the customer sees is the same.
-            }
-          }
-          if (!backgroundRemovedSrc) {
-            try {
-              const result = await runCutoutModels(orig, cutoutPlan(canAutoRunDetailedModel()));
-              backgroundRemovedSrc = result.dataUrl;
-              cutoutSource = result.source;
-            } catch (error) {
-              cutoutFailure = error instanceof CutoutError ? error.reason : "unavailable";
-              // One last resort for a photo the models could not handle: the
-              // colour key, but only when it is sure of itself *and* left a
-              // subject behind. Both halves matter — on the customer's own photo
-              // the key was sure of itself having kept 4% of the picture.
-              setFxStatus("Removing background…");
-              const quick = await quickCut();
-              if (quick?.confident && quick.ratio <= 0.85) keepQuick(quick);
-            }
-          }
-        }
+      if (fx.removeBg && activeCutout === "primary" && !backgroundRemovedSrc) {
+        const result = await runPrimaryCutout(orig);
+        backgroundRemovedSrc = result.dataUrl;
+        cutoutSource = result.source ?? cutoutSource;
+        cutoutFailure = result.failure;
       }
       setFxStatus("Applying artwork edits…");
-      const source = fx.removeBg ? backgroundRemovedSrc ?? orig : orig;
+      const cutout = activeCutout === "alt" ? layer.altRemovedSrc : backgroundRemovedSrc;
+      const source = fx.removeBg ? cutout ?? orig : orig;
       const res = await applyImageFx(source, { ...fx, removeBg: false });
       patch(side, layer.id, {
         fx,
         origSrc: orig,
         backgroundRemovedSrc,
         cutoutSource,
+        activeCutout,
         src: res.dataUrl,
         aspect: res.aspect,
       } as Partial<ImageLayer>);
@@ -778,7 +804,9 @@ export default function Customizer({
           cutoutNotice({
             removeBg: fx.removeBg,
             failure: cutoutFailure,
-            hasCutout: Boolean(backgroundRemovedSrc),
+            hasCutout:
+              Boolean(backgroundRemovedSrc) ||
+              Boolean(activeCutout === "alt" && layer.altRemovedSrc),
           }),
         );
       }
@@ -787,6 +815,78 @@ export default function Customizer({
         tone: "error",
         text: err instanceof Error ? err.message : "That edit could not be applied.",
       });
+    } finally {
+      setFxBusy(false);
+      setFxStatus(null);
+      setFxProgress(null);
+    }
+  };
+
+  /**
+   * The Photoroom comparison row (evaluation builds only). The first tap runs
+   * the photo through Photoroom and shows the result; after that the tap
+   * switches between the two stored results, so comparing costs nothing extra.
+   */
+  const applyAltCutout = async (layer: ImageLayer) => {
+    const fx: ImageFx = { ...(layer.fx ?? DEFAULT_FX), removeBg: true };
+    const orig = layer.origSrc ?? layer.src;
+    const active =
+      (layer.activeCutout ?? "primary") === "alt" &&
+      Boolean(layer.altRemovedSrc) &&
+      Boolean(layer.fx?.removeBg);
+    setFxBusy(true);
+    setFxProgress(null);
+    try {
+      let backgroundRemovedSrc = layer.backgroundRemovedSrc;
+      let cutoutSource = layer.cutoutSource;
+      let altRemovedSrc = layer.altRemovedSrc;
+      let cutoutFailure: "no-subject" | "unavailable" | null = null;
+      let activeCutout: "primary" | "alt" = "alt";
+      if (active) {
+        // Switch back to the main result — producing it first if this photo
+        // has never been through the normal path.
+        activeCutout = "primary";
+        if (!backgroundRemovedSrc) {
+          const result = await runPrimaryCutout(orig);
+          backgroundRemovedSrc = result.dataUrl;
+          cutoutSource = result.source ?? cutoutSource;
+          cutoutFailure = result.failure;
+        }
+      } else if (!altRemovedSrc) {
+        altRemovedSrc = await photoroomCutoutDataUrl(orig, {
+          onPhase: (phase) => setFxStatus(hostedCutoutStatus(phase)),
+        });
+        cutoutSource = "hosted";
+      }
+      const cutout = activeCutout === "alt" ? altRemovedSrc : backgroundRemovedSrc;
+      setFxStatus("Applying artwork edits…");
+      const res = await applyImageFx(cutout ?? orig, { ...fx, removeBg: false });
+      patch(side, layer.id, {
+        fx,
+        origSrc: orig,
+        backgroundRemovedSrc,
+        altRemovedSrc,
+        cutoutSource,
+        activeCutout,
+        src: res.dataUrl,
+        aspect: res.aspect,
+      } as Partial<ImageLayer>);
+      setNotice(
+        cutoutNotice({
+          removeBg: true,
+          failure: cutoutFailure,
+          hasCutout: Boolean(cutout),
+        }),
+      );
+    } catch (error) {
+      const reason = error instanceof CutoutError ? error.reason : "unavailable";
+      setNotice(
+        cutoutNotice({
+          removeBg: true,
+          failure: reason,
+          hasCutout: Boolean(layer.backgroundRemovedSrc || layer.altRemovedSrc),
+        }),
+      );
     } finally {
       setFxBusy(false);
       setFxStatus(null);
@@ -803,6 +903,8 @@ export default function Customizer({
         fx: { ...DEFAULT_FX },
         origSrc: orig,
         backgroundRemovedSrc: undefined,
+        altRemovedSrc: undefined,
+        activeCutout: undefined,
         cutoutSource: undefined,
         src: res.dataUrl,
         aspect: res.aspect,
@@ -1432,6 +1534,20 @@ export default function Customizer({
             progress={fxProgress}
             eyebrow={ART_LIBRARY.some((a) => a.src === selected.origSrc) ? "Add Art" : "Upload Art"}
             actions={actionsFor(selected)}
+            altCutout={
+              photoroomAltReady()
+                ? {
+                    ...photoroomAction({
+                      active:
+                        (selected.activeCutout ?? "primary") === "alt" &&
+                        Boolean(selected.altRemovedSrc) &&
+                        Boolean(selected.fx?.removeBg),
+                      hasAlt: Boolean(selected.altRemovedSrc),
+                    }),
+                    onRun: () => void applyAltCutout(selected),
+                  }
+                : undefined
+            }
             onFx={(next) => void applyFx(selected, next)}
             onChange={(changes) => patchActive(selected.id, changes)}
             onReset={() => void resetImage(selected)}

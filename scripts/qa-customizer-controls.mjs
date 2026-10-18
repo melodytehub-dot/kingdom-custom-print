@@ -287,6 +287,11 @@ try {
     await page.getByText(/select object/i).count() === 0
       && await page.locator(".rot-editor .rot-badge").count() === 0,
   );
+  check(
+    "a normal build shows exactly one remover — no Photoroom comparison row",
+    await page.locator(".rot-alt-cutout").count() === 0,
+    `${await page.locator(".rot-alt-cutout").count()} comparison row(s)`,
+  );
 
   await page.goto(`${BASE}/customize/v-neck-tee?qa=lock`, {
     waitUntil: "commit",

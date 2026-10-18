@@ -135,8 +135,8 @@ export interface ImageFx {
 
 /**
  * Where a layer's cut-out came from: the instant on-device pass, one of the two
- * AI models (see `lib/cutoutModels.ts`), or the hosted remover
- * (see `lib/hostedCutout.ts`). Drives the "improve" affordances.
+ * models (see `lib/cutoutModels.ts`), or a hosted remover
+ * (see `lib/hostedCutout.ts`).
  */
 export type CutoutSource = "quick" | "manual" | "portrait" | "general" | "hosted";
 
@@ -153,6 +153,14 @@ export interface ImageLayer extends BaseLayer {
   backgroundRemovedSrc?: string;
   /** Which pass produced `backgroundRemovedSrc`. */
   cutoutSource?: CutoutSource;
+  /**
+   * A second hosted remover's cut-out for the same photo (the Photoroom
+   * comparison build only), kept so switching between the two results is
+   * instant and never processes the photo again.
+   */
+  altRemovedSrc?: string;
+  /** Which stored cut-out `fx.removeBg` shows. Defaults to the main one. */
+  activeCutout?: "primary" | "alt";
   fx?: ImageFx;
 }
 

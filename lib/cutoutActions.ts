@@ -40,6 +40,34 @@ export function hostedCutoutStatus(phase: HostedCutoutPhase): string {
 }
 
 /**
+ * The evaluation row that runs the Photoroom comparison.
+ *
+ * This is the one deliberate mention of a provider in the editor: the client
+ * asked for a second Remove Background button so the two services can be
+ * compared side by side before one is chosen. It only ever renders when
+ * `NEXT_PUBLIC_CUTOUT_ALT=photoroom`, so shoppers never see a second remover;
+ * the row (and these strings) are removed once the choice is made.
+ */
+export function photoroomAction({
+  active,
+  hasAlt,
+}: {
+  active: boolean;
+  hasAlt: boolean;
+}): { label: string; hint: string } {
+  if (!hasAlt) {
+    return {
+      label: "Remove Background with Photoroom",
+      hint: "Runs Photoroom's remover on this photo",
+    };
+  }
+  if (active) {
+    return { label: "Showing Photoroom's result", hint: "Tap to switch back" };
+  }
+  return { label: "Show Photoroom's result", hint: "Already saved — no extra processing" };
+}
+
+/**
  * The answer to "did my background go away?". This has to stay honest: when a
  * busy photo could not be cut out, saying so (rather than pasting a
  * half-removed picture onto the shirt) is always the better outcome.

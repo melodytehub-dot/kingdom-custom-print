@@ -759,6 +759,7 @@ export function ImageEditor({
   progress,
   eyebrow,
   actions,
+  altCutout,
   onFx,
   onChange,
   onReset,
@@ -770,6 +771,11 @@ export function ImageEditor({
   progress: number | null;
   eyebrow: string;
   actions: LayerActionsProps;
+  /**
+   * The Photoroom comparison row (evaluation builds only) — omitted entirely
+   * in normal builds, so shoppers never see a second remover.
+   */
+  altCutout?: { label: string; hint: string; onRun: () => void };
   onFx: (next: Partial<ImageFx>) => void;
   onChange: (patch: Partial<ImageLayer>) => void;
   onReset: () => void;
@@ -912,6 +918,25 @@ export function ImageEditor({
             <span>{busyLabel ?? "Working on your artwork…"}</span>
             {progress !== null ? <progress max={100} value={progress} aria-label="Background removal progress" /> : null}
           </div>
+        ) : null}
+
+        {altCutout ? (
+          <button
+            type="button"
+            className="rot-row is-link rot-alt-cutout"
+            onClick={altCutout.onRun}
+            disabled={busy}
+          >
+            <span className="rot-row-label">
+              <span>
+                {altCutout.label}
+                <small>{altCutout.hint}</small>
+              </span>
+            </span>
+            <span className="rot-chev">
+              <ChevronRightIcon size={16} />
+            </span>
+          </button>
         ) : null}
 
         <Row
