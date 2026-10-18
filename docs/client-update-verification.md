@@ -508,6 +508,23 @@ service is chosen remains the open item from October 17.
 - Both results were saved locally for the client to inspect. Photoroom price
   for reference: Basic plan $0.02 per image; the imgix side is unchanged.
 
+### Where to try it
+
+- Preview build: `https://kingdom-custom-print-oew4uqsa3-melodytehubbs.vercel.app` —
+  open the editor, add a photo, tap the second row. Verified on the deployment
+  itself: the row is present, one real call answered, the result was stored as
+  the alt cut-out (`activeCutout: "alt"`, `cutoutSource: "hosted"`), the toast
+  read "Background removed.", and the row flipped to "Showing Photoroom's
+  result".
+- The live site (`kingdom-custom-print.vercel.app`) serves the same code built
+  without the two Preview variables: verified as zero comparison rows, so
+  shoppers see exactly the one switch they had before.
+- The project had Vercel Authentication on, which puts deployment URLs
+  (previews included) behind a Vercel login; it was switched off in project
+  settings so the preview opens on any device without signing in. Turn it back
+  on (Project → Settings → Deployment Protection → Vercel Authentication) once
+  the comparison is done.
+
 ### Verification
 
 - `qa-photoroom-cutout` (new, hermetic — a local mock serves Photoroom and
