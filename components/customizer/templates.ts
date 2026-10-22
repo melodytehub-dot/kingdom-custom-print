@@ -139,11 +139,6 @@ export const DESIGN_TEMPLATES: DesignTemplate[] = [
     { type: "text", layer: title("OCEAN CLUB", 67, 11, "#176A83") },
     { type: "text", layer: caption("FIND YOUR HORIZON", 77) },
   ]),
-  template("crowned", "Crowned", "Classic", "Kingdom originals", "crown", ["classic", "crown", "kingdom"], [
-    { type: "art", layer: art("crown", 39, 0.26) },
-    { type: "text", layer: title("KINGDOM", 65, 12) },
-    { type: "text", layer: caption("CUSTOM PRINT", 76) },
-  ]),
   template("good-vibes", "Good Vibes", "Classic", "Keep it bright", "sun", ["classic", "sun", "positive"], [
     { type: "art", layer: art("sun", 39, 0.28) },
     { type: "text", layer: title("GOOD VIBES", 67, 11, "#D77724") },
@@ -242,11 +237,6 @@ export const DESIGN_TEMPLATES: DesignTemplate[] = [
   ]),
 
   /* ---- Classic ---- */
-  template("kingdom-co", "Kingdom Co.", "Classic", "Since day one", "crown-royal", ["classic", "crown", "kingdom"], [
-    { type: "art", layer: art("crown-royal", 37, 0.3) },
-    { type: "text", layer: title("KINGDOM CO.", 68, 11) },
-    { type: "text", layer: caption("SINCE DAY ONE", 78) },
-  ]),
   template("retro-star", "Retro Star", "Classic", "Good vibes only", "sparkle", ["classic", "retro", "star"], [
     { type: "text", layer: title("RETRO", 31, 13, "#C45468", 8) },
     { type: "art", layer: art("sparkle", 53, 0.28) },
@@ -334,5 +324,50 @@ export const DESIGN_TEMPLATES: DesignTemplate[] = [
     { type: "art", layer: art("dog", 37, 0.3) },
     { type: "text", layer: title("GOOD BOY CLUB", 68, 10, "#1D5B9B") },
     { type: "text", layer: caption("WOOF", 78) },
+  ]),
+  template("school-spirit", "School Spirit", "Team & Sports", "Our school, our team", "graduation", ["school", "team", "spirit"], [
+    { type: "art", layer: art("graduation", 38, 0.3) },
+    { type: "text", layer: title("SCHOOL SPIRIT", 68, 10, "#263953") },
+    { type: "text", layer: caption("OUR SCHOOL, OUR TEAM", 78) },
+  ]),
+  template("run-club", "Run Club", "Team & Sports", "Every mile counts", "running-shoe", ["running", "club", "race"], [
+    { type: "art", layer: art("running-shoe", 40, 0.32) },
+    { type: "text", layer: title("RUN CLUB", 67, 12, "#386CAB") },
+    { type: "text", layer: caption("EVERY MILE COUNTS", 78) },
+  ]),
+  template("earth-crew", "Earth Crew", "Nature", "Keep it green", "earth-day", ["earth", "environment", "green"], [
+    { type: "art", layer: art("earth-day", 39, 0.3) },
+    { type: "text", layer: title("EARTH CREW", 69, 11, "#337A5A") },
+    { type: "text", layer: caption("KEEP IT GREEN", 79) },
+  ]),
+  template("grow-together", "Grow Together", "Nature", "Bloom where you are", "sunflower", ["flower", "garden", "community"], [
+    { type: "art", layer: art("sunflower", 38, 0.3) },
+    { type: "text", layer: title("GROW TOGETHER", 68, 10, "#856027") },
+    { type: "text", layer: caption("BLOOM WHERE YOU ARE", 78) },
+  ]),
+  template("morning-brew", "Morning Brew", "Business", "Made with care", "coffee-cup", ["coffee", "cafe", "shop"], [
+    { type: "art", layer: art("coffee-cup", 38, 0.3) },
+    { type: "text", layer: title("MORNING BREW", 68, 10, "#824B35") },
+    { type: "text", layer: caption("MADE WITH CARE", 78) },
+  ]),
+  template("market-day", "Market Day", "Business", "Support local", "heart-bloom", ["market", "small business", "local"], [
+    { type: "art", layer: art("heart-bloom", 38, 0.3) },
+    { type: "text", layer: title("MARKET DAY", 68, 11, "#C45468") },
+    { type: "text", layer: caption("SUPPORT LOCAL", 78) },
+  ]),
+  template("class-of", "Class Of", "Events & Celebrations", "Make this year yours", "graduation", ["graduation", "class", "school"], [
+    { type: "art", layer: art("graduation", 36, 0.29) },
+    { type: "text", layer: title("CLASS OF 2026", 67, 11, "#263953") },
+    { type: "text", layer: caption("MAKE THIS YEAR YOURS", 78) },
+  ]),
+  template("celebrate-you", "Celebrate You", "Events & Celebrations", "Your day, your way", "gift", ["gift", "party", "celebration"], [
+    { type: "art", layer: art("gift", 38, 0.3) },
+    { type: "text", layer: title("CELEBRATE YOU", 68, 10, "#B93C52") },
+    { type: "text", layer: caption("YOUR DAY, YOUR WAY", 78) },
+  ]),
+  template("ocean-friends", "Ocean Friends", "Pets", "Take it slow", "turtle", ["turtle", "ocean", "animals"], [
+    { type: "art", layer: art("turtle", 38, 0.31) },
+    { type: "text", layer: title("OCEAN FRIENDS", 68, 10, "#337B77") },
+    { type: "text", layer: caption("TAKE IT SLOW", 78) },
   ]),
 ];

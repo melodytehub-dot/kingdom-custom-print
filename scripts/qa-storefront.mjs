@@ -39,6 +39,7 @@ try {
   const results = await page.locator('.mm-card-title').allTextContents();
   assert.ok(results.length && results.every(name => /hoodie/i.test(name)), 'Search results match query');
   await page.goto(`${base}/shop?kind=fleece`, { waitUntil: "load" });
+  await page.locator('.mm-card').first().waitFor();
   assert.ok(await page.locator('.mm-card').count() > 0, 'Fleece collection is populated');
   await page.selectOption('#shop-sort', 'name');
   await page.waitForURL(/sort=name/);
@@ -68,12 +69,14 @@ try {
   assert.equal(await page.getByRole('button', { name: 'Open menu' }).getAttribute('aria-expanded'), 'false');
   console.log('PASS mobile menu opens, closes with Escape and restores focus');
   await page.goto(base, { waitUntil: "load" });
-  await page.getByRole('button', { name: 'Hoodies & fleece', exact: true }).click();
+  await page.getByRole('navigation', { name: 'Shop by category' }).getByRole('link', { name: 'HOODIES' }).click();
+  await page.waitForURL(/\/shop\?kind=fleece/);
+  await page.getByRole('heading', { name: 'Premium Pullover Hoodie' }).waitFor();
   const filtered = await page.locator('.mm-card-title').allTextContents();
   assert.ok(filtered.length && filtered.every(name => /hoodie|crewneck/i.test(name)));
   assert.equal(await page.locator('footer').getByText(/Kingdom Custom Print. All Rights Reserved/).count(), 1);
   assert.equal(await page.locator('a[href="#"]').count(), 0);
-  console.log('PASS homepage tabs and Kingdom branding');
+  console.log('PASS homepage category navigation and Kingdom branding');
   assert.deepEqual(errors, []);
   console.log('ALL STOREFRONT CHECKS PASSED');
 } finally { await browser.close(); }

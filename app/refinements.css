@@ -262,7 +262,7 @@ main#main { min-height: calc(100svh - var(--header-h)); }
 .rot-profile-preview p { position: absolute; bottom: 2%; left: 0; right: 0; text-align: center; font-size: 13px; }
 .mm-category-strip {
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-template-columns: repeat(6, minmax(0, 1fr));
   max-width: 1100px;
   gap: 12px;
   padding-block: 20px;
@@ -281,15 +281,19 @@ main#main { min-height: calc(100svh - var(--header-h)); }
   display: block;
   width: 100%;
   aspect-ratio: 1;
-  background-image: url('/img/category-atlas.png');
-  background-size: 200% 200%;
+  background-size: contain;
+  background-position: center;
   background-repeat: no-repeat;
 }
-.mm-category-art-polo { background-size: contain; background-position: center; background-color: #fff; }
 .mm-category-link:hover { color: var(--red); }
+.shop-brand-filter { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin-top: -14px; margin-bottom: 26px; font-size: 13px; }
+.shop-brand-filter > span { margin-right: 8px; font-weight: 700; }
+.shop-brand-filter a { padding: 8px 14px; background: #f2f2f2; color: #1a1a1a; text-decoration: none; }
+.shop-brand-filter a[aria-current="page"] { background: #141414; color: #fff; }
 @media (max-width: 768px) {
-  .mm-category-strip { gap: 6px; padding-block: 12px; }
+  .mm-category-strip { grid-template-columns: repeat(6, minmax(78px, 1fr)); gap: 6px; padding-block: 12px; overflow-x: auto; overscroll-behavior-inline: contain; scroll-snap-type: x proximity; }
   .mm-category-link { font-size: 11px; min-height: 92px; }
+  .mm-category-link { scroll-snap-align: start; }
 }
 @media (max-width: 400px) {
   .pdp-thumb { width: 72px; }

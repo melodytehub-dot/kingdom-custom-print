@@ -1166,6 +1166,8 @@ export function ReviewPanel({
   lines,
   roster,
   previews,
+  designNotes,
+  onDesignNotes,
   rows,
 }: {
   product: Product;
@@ -1177,6 +1179,8 @@ export function ReviewPanel({
   lines: { label: string; qty: number }[];
   roster: number;
   previews: { front: string | null; back: string | null };
+    designNotes: string;
+    onDesignNotes: (value: string) => void;
   rows?: ReactNode;
 }) {
   const item = (label: string, value: ReactNode) => (
@@ -1231,6 +1235,10 @@ export function ReviewPanel({
           <strong>{formatUSD(quote.total)}</strong>
         </li>
       </ul>
+        <label className="rot-design-notes">
+          Design notes (optional)
+          <textarea value={designNotes} onChange={(event) => onDesignNotes(event.target.value)} maxLength={2000} rows={3} placeholder="Placement, ink color, or production instructions" />
+        </label>
       {rows}
     </div>
   );

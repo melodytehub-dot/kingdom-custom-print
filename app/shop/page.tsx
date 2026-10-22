@@ -3,6 +3,7 @@ import ProductCard from "@/components/ProductCard";
 import { lowestPrintedUnit } from "@/lib/pricing";
 import ShopSort from "@/components/ShopSort";
 import { getProducts, getCategories } from "@/lib/catalog";
+import { brandForProduct, PRODUCT_BRANDS } from "@/lib/product-brands";
 
 export const revalidate = 60;
 
@@ -22,7 +23,7 @@ const KIND_FILTERS = [
 export default async function ShopPage({
   searchParams,
 }: {
-  searchParams: Promise<{ category?: string; kind?: string; sort?: string; q?: string }>;
+  searchParams: Promise<{ category?: string; kind?: string; brand?: string; sort?: string; q?: string }>;
 }) {
   const params = await searchParams;
   const [allCategories, allProducts] = await Promise.all([
@@ -33,15 +34,17 @@ export default async function ShopPage({
 
   const activeCategory = params.category ?? "";
   const activeKind = params.kind ?? "";
+  const activeBrand = PRODUCT_BRANDS.find((brand) => brand.slug === params.brand)?.slug ?? "";
 
   const query = (params.q ?? "").trim().slice(0, 200);
   let products = allProducts;
   if (query) {
     const words = query.toLowerCase().split(/\s+/);
-    products = products.filter((p) => words.every((word) => `${p.name} ${p.styleCode} ${p.blurb} ${p.categoryName} ${p.material}`.toLowerCase().includes(word)));
+    products = products.filter((p) => words.every((word) => `${p.name} ${p.styleCode} ${p.blurb} ${p.categoryName} ${p.material} ${brandForProduct(p)?.name ?? ""}`.toLowerCase().includes(word)));
   }
   if (activeCategory) products = products.filter((p) => p.categorySlug === activeCategory);
   if (activeKind) products = products.filter((p) => activeKind === "fleece" ? p.kind === "hoodie" || p.kind === "crew" : p.kind === activeKind);
+  if (activeBrand) products = products.filter((p) => brandForProduct(p)?.slug === activeBrand);
 
   const sort = params.sort ?? "featured";
   products = [...products].sort((a, b) => {
@@ -51,21 +54,23 @@ export default async function ShopPage({
     return Number(b.featured) - Number(a.featured) || a.sortOrder - b.sortOrder;
   });
 
-  const buildHref = (next: { category?: string; kind?: string; sort?: string }) => {
+  const buildHref = (next: { category?: string; kind?: string; brand?: string; sort?: string }) => {
     const q = new URLSearchParams();
     if (query) q.set("q", query);
     const category = next.category ?? activeCategory;
     const kind = next.kind ?? activeKind;
+    const brand = next.brand ?? activeBrand;
     const s = next.sort ?? sort;
     if (category) q.set("category", category);
     if (kind) q.set("kind", kind);
+    if (brand) q.set("brand", brand);
     if (s && s !== "featured") q.set("sort", s);
     const qs = q.toString();
     return qs ? `/shop?${qs}` : "/shop";
   };
 
   const activeCategoryName = categories.find((c) => c.slug === activeCategory)?.name;
-  const hasFilters = Boolean(activeCategory || activeKind || query);
+  const hasFilters = Boolean(activeCategory || activeKind || activeBrand || query);
 
   return (
     <div className="mm-shop-page" style={{ paddingBottom: "80px" }}>
@@ -152,6 +157,12 @@ export default async function ShopPage({
           <ShopSort current={sort} />
         </div>
       </div>
+
+      <nav className="minimog-container shop-brand-filter" aria-label="Shop by brand">
+        <span>Brand</span>
+        <Link href={buildHref({ brand: "" })} aria-current={!activeBrand ? "page" : undefined}>All brands</Link>
+        {PRODUCT_BRANDS.map((brand) => <Link key={brand.slug} href={buildHref({ brand: brand.slug })} aria-current={activeBrand === brand.slug ? "page" : undefined}>{brand.name}</Link>)}
+      </nav>
 
       {hasFilters ? (
         <div className="minimog-container" style={{ marginBottom: "20px" }}>

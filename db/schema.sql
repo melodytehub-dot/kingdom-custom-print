@@ -97,8 +97,12 @@ CREATE TABLE IF NOT EXISTS customer_accounts (
   email         text NOT NULL UNIQUE,
   name          text NOT NULL,
   password_hash text NOT NULL,
+  google_sub    text,
   created_at    timestamptz NOT NULL DEFAULT now()
 );
+
+ALTER TABLE customer_accounts ADD COLUMN IF NOT EXISTS google_sub text;
+CREATE UNIQUE INDEX IF NOT EXISTS customer_accounts_google_sub_idx ON customer_accounts (google_sub) WHERE google_sub IS NOT NULL;
 
 CREATE TABLE IF NOT EXISTS customer_sessions (
   token_hash text PRIMARY KEY,

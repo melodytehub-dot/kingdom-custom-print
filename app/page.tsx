@@ -11,20 +11,21 @@ import { getProducts } from "@/lib/catalog";
 export const revalidate = 60;
 
 const POD_CATEGORIES = [
-  { name: "SHIRTS", href: "/shop?kind=tee", position: "0% 0%" },
-  { name: "POLOS", href: "/shop?kind=polo", image: "/img/products/polo-black-crown.webp" },
-  { name: "HOODIES", href: "/shop?kind=fleece", position: "100% 0%" },
-  { name: "CAPS", href: "/shop?kind=cap", position: "0% 100%" },
-  { name: "MERCH", href: "/shop?category=accessories", position: "100% 100%" },
+  { name: "SHIRTS", href: "/shop?kind=tee", image: "/img/printed-catalog/crown-classic-tee/black.webp" },
+  { name: "POLOS", href: "/shop?kind=polo", image: "/img/printed-catalog/classic-pique-polo/black.webp" },
+  { name: "HOODIES", href: "/shop?kind=fleece", image: "/img/printed-catalog/premium-pullover-hoodie/black.webp" },
+  { name: "CAPS", href: "/shop?kind=cap", image: "/img/printed-catalog/five-panel-cap/black.webp" },
+  { name: "TOTES", href: "/shop?kind=tote", image: "/img/printed-catalog/canvas-tote/natural.webp" },
+  { name: "MERCH", href: "/shop?kind=mug", image: "/img/printed-catalog/ceramic-mug/black.webp" },
 ];
 
 const INSTA_IMAGES = [
-  "/img/products/comfort-colors-tee.jpg",
-  "/img/products/crown-classic-tee-black.jpg",
-  "/img/products/crown-classic-tee-white.jpg",
-  "/img/products/crown-classic-tee-maroon.jpg",
-  "/img/products/crown-classic-tee-red.jpg",
-  "/img/products/crown-classic-tee-ash.jpg",
+  "/img/printed-catalog/crown-classic-tee/black.webp",
+  "/img/printed-catalog/crown-classic-tee/white.webp",
+  "/img/printed-catalog/classic-pique-polo/black.webp",
+  "/img/printed-catalog/premium-pullover-hoodie/black.webp",
+  "/img/printed-catalog/canvas-tote/natural.webp",
+  "/img/printed-catalog/five-panel-cap/black.webp",
 ];
 
 const COLLECTIONS = [
@@ -77,7 +78,7 @@ export default async function HomePage() {
       <nav className="mm-category-strip minimog-container" aria-label="Shop by category">
         {POD_CATEGORIES.map((category) => (
           <Link key={category.name} href={category.href} className="mm-category-link">
-            <span className={`mm-category-art${"image" in category ? " mm-category-art-polo" : ""}`} aria-hidden="true" style={"image" in category ? { backgroundImage: `url(${category.image})` } : { backgroundPosition: category.position }} />
+            <span className="mm-category-art" aria-hidden="true" style={{ backgroundImage: `url(${category.image}?v=blank-1)` }} />
             <span>{category.name}</span>
           </Link>
         ))}
@@ -309,8 +310,8 @@ export default async function HomePage() {
             {INSTA_IMAGES.map((img, i) => (
               <Link key={`insta-${i}`} href="/shop" className="mm-insta-item">
                 <Image
-                  src={img}
-                  alt={`Kingdom Custom Print garment inspiration ${i + 1}`}
+                  src={`${img}?v=blank-1`}
+                  alt={`Blank garment ready to customize ${i + 1}`}
                   fill
                   sizes="(max-width: 768px) 33vw, 200px"
                   style={{ objectFit: "cover" }}

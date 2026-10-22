@@ -156,6 +156,7 @@ const NN_FONT_SIZES: Record<NNSize, { name: number; number: number; sub: number 
 interface DraftState {
   colorCode: string;
   design: Design;
+  designNotes?: string;
   lines: Record<string, number>;
   roster: RosterEntry[];
   nn: NNSettings;
@@ -242,6 +243,7 @@ export default function Customizer({
     return match.code;
   });
   const [design, setDesign] = useState<Design>(emptyDesign);
+  const [designNotes, setDesignNotes] = useState("");
   const [lines, setLines] = useState<Record<string, number>>(initialLines);
   /** The selection is a list: one layer, a whole group, or a multi-pick. */
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
@@ -334,6 +336,7 @@ export default function Customizer({
       if (handoff?.targetSlug === product.slug && handoff.design?.front && handoff.design?.back) {
         restoredDesign = normalizeDesign(handoff.design);
         setDesign(restoredDesign);
+        setDesignNotes(handoff.designNotes ?? "");
         const transferredColor = productMockups.find((item) => item.slug === handoff.colorSlug);
         const matchingName = productMockups.find((item) => item.name.toLowerCase() === handoff.colorName.toLowerCase());
         setColorCode((transferredColor ?? matchingName ?? closestProductColor(productMockups, handoff.colorHex))?.code ?? TEE_MOCKUPS[0].code);
@@ -354,6 +357,7 @@ export default function Customizer({
             restoredDesign = normalizeDesign(parsed.design);
             setDesign(restoredDesign);
           }
+          setDesignNotes(parsed?.designNotes ?? "");
           const requestedColor = colorForProduct(productMockups, initialColor);
           const savedColor = colorForProduct(productMockups, parsed?.colorCode);
           if (requestedColor) setColorCode(requestedColor.code);
@@ -402,12 +406,12 @@ export default function Customizer({
     try {
       window.localStorage.setItem(
         draftKey,
-        JSON.stringify({ colorCode, design, lines, roster, nn } satisfies DraftState)
+        JSON.stringify({ colorCode, design, designNotes, lines, roster, nn } satisfies DraftState)
       );
     } catch {
       // Storage unavailable or full; the in-progress design still works.
     }
-  }, [ready, restoredSlug, product.slug, draftKey, colorCode, design, lines, roster, nn]);
+  }, [ready, restoredSlug, product.slug, draftKey, colorCode, design, designNotes, lines, roster, nn]);
 
   /* Text entry is grouped; pointer gestures commit as one history step. */
   useEffect(() => {
@@ -1142,6 +1146,7 @@ export default function Customizer({
 
   const startOver = () => {
     setDesign(emptyDesign());
+    setDesignNotes("");
     setRoster([]);
     setSelectedIds([]);
     setPanel("none");
@@ -1188,6 +1193,7 @@ export default function Customizer({
       colorName: mockup.name,
       colorHex: mockup.hex,
       design,
+      designNotes,
       lines,
       roster,
       nn,
@@ -1215,6 +1221,7 @@ export default function Customizer({
         colorName: found.colorName,
         colorHex: found.colorHex,
         design: normalizeDesign(found.design),
+        designNotes: found.designNotes ?? "",
         lines: Object.fromEntries(target.sizes.map((size) => [size.label, found.lines?.[size.label] ?? 0])),
         roster: (found.roster ?? []).map((entry) => ({
           ...entry,
@@ -1228,6 +1235,7 @@ export default function Customizer({
     }
     applyingHistory.current = true;
     setDesign(normalizeDesign(found.design));
+    setDesignNotes(found.designNotes ?? "");
     setSelectedIds([]);
     const m = productMockups.find((candidate) => candidate.slug === found.colorSlug);
     if (m) setColorCode(m.code);
@@ -1287,6 +1295,7 @@ export default function Customizer({
         colorHex: mockup.hex,
         sidesUsed: sides,
         design: cartDesign,
+        designNotes: designNotes.trim().slice(0, 2000),
         roster: roster.length ? roster : undefined,
         previewFront: rendered.front,
         previewBack: rendered.back,
@@ -1352,6 +1361,7 @@ export default function Customizer({
       colorName: mockup.name,
       colorHex: mockup.hex,
       design,
+      designNotes,
       lines: Object.fromEntries(target.sizes.map((size) => [size.label, transferLines[size.label] ?? 0])),
       roster: transferRoster,
       nn,
@@ -1464,6 +1474,8 @@ export default function Customizer({
           lines={sizeLines}
           roster={rosterLocked ? roster.length : 0}
           previews={previews}
+          designNotes={designNotes}
+          onDesignNotes={setDesignNotes}
           rows={
             addedCount > 0 ? (
               <Link href="/cart" className="rot-cta rot-cta-ghost">

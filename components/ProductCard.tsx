@@ -4,6 +4,7 @@ import { useWishlist } from "@/lib/wishlist-context";
 import { useState } from "react";
 import Link from "next/link";
 import ProductPhotography from "./ProductPhotography";
+import { brandForProduct } from "@/lib/product-brands";
 import Garment from "./Garment";
 import { formatUSD, lowestPrintedUnit } from "@/lib/pricing";
 import type { Product } from "@/lib/types";
@@ -49,7 +50,7 @@ export default function ProductCard({
       <div className={`mm-card-media mm-card-media-${product.kind}`}>
         <Link prefetch={false} href={`/product/${product.slug}?color=${encodeURIComponent(selectedColor?.slug ?? "")}`} tabIndex={-1} aria-label={product.name}>
           {selectedColor ? (
-            <ProductPhotography product={product} color={selectedColor} priority={priority} className="mm-card-img-primary" />
+            <ProductPhotography key={`${product.slug}:${selectedColor.slug}`} product={product} color={selectedColor} priority={priority} className="mm-card-img-primary" />
           ) : <Garment kind={product.kind} color={baseHex} className="mm-card-img-primary" />}
         </Link>
 
@@ -82,7 +83,7 @@ export default function ProductCard({
       {/* 2. Card Body Details */}
       <div className="mm-card-body">
         <span className="mm-card-cat">
-          {product.categoryName ?? "Print on Demand"}
+          {brandForProduct(product)?.name ?? product.categoryName ?? "Print on Demand"}
           {product.styleCode ? ` · ${product.styleCode}` : ""}
         </span>
 

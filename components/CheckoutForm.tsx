@@ -315,6 +315,7 @@ export default function CheckoutForm({ settings, paymentsReady, account }: { set
                       .map((l) => `${l.label}×${l.qty}`)
                       .join(", ")}
                   </p>
+                  {item.designNotes ? <p className="small wrap-anywhere"><strong>Design notes:</strong> {item.designNotes}</p> : null}
                 </div>
                 <p className="tnum co-price">{money(item.total)}</p>
               </li>

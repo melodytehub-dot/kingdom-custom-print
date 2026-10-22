@@ -4,6 +4,7 @@ import { Suspense, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import ProductPhotography from "./ProductPhotography";
+import { brandForProduct } from "@/lib/product-brands";
 import ProductColorQuery from "./ProductColorQuery";
 import { PRODUCT_VIEWS, type ProductView } from "@/lib/product-presentation";
 import ArrowRight from "@/components/icons/ArrowRight";
@@ -80,7 +81,7 @@ export default function ProductDetail({ product, initialColor = "" }: { product:
       <Suspense fallback={null}><ProductColorQuery allowed={colorSlugs} onColor={setColorSlug} /></Suspense>
       <div className="pdp-media">
         <div className="pdp-photo-stage">
-          <ProductPhotography product={product} color={color} view={view} priority />
+          <ProductPhotography key={`${color?.slug}:${view}`} product={product} color={color} view={view} priority />
           <button type="button" className="pdp-gallery-arrow pdp-gallery-prev" aria-label="Previous product view"
             onClick={() => setView(productViews[(productViews.indexOf(view) + productViews.length - 1) % productViews.length])}>‹</button>
           <button type="button" className="pdp-gallery-arrow pdp-gallery-next" aria-label="Next product view"
@@ -92,7 +93,7 @@ export default function ProductDetail({ product, initialColor = "" }: { product:
             <li key={angle}>
               <button type="button" className={`pdp-thumb${angle === view ? " is-active" : ""}`}
                 onClick={() => setView(angle)} aria-label={`View ${angle}`} aria-pressed={angle === view}>
-                <ProductPhotography product={product} color={color} view={angle} decorative />
+                <ProductPhotography key={`${color?.slug}:${angle}`} product={product} color={color} view={angle} decorative />
                 <span>{angle}</span>
               </button>
             </li>
@@ -102,7 +103,7 @@ export default function ProductDetail({ product, initialColor = "" }: { product:
 
       <div className="pdp-panel">
         <p className="eyebrow">
-          {product.categoryName ?? "Blank"}
+          {brandForProduct(product)?.name ?? product.categoryName ?? "Blank"}
           {product.styleCode ? ` · Style ${product.styleCode}` : ""}
         </p>
         <h1 className="h2 pdp-title wrap-anywhere">{product.name}</h1>

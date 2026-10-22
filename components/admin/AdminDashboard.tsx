@@ -462,6 +462,7 @@ function OrderDetailPanel({
                       .map((s) => `${s.label}×${s.qty}`)
                       .join(", ")}
                   </p>
+                  {item.designNotes ? <p className="small wrap-anywhere"><strong>Design notes:</strong> {item.designNotes}</p> : null}
                 </div>
                 <p className="tnum small">{formatUSD(item.unitPrice * item.quantity)}</p>
               </li>

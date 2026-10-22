@@ -195,6 +195,7 @@ function CartRow({
               />
               {item.colorName} · {describeDesign(item.design)}
             </p>
+            {item.designNotes ? <p className="small wrap-anywhere"><strong>Design notes:</strong> {item.designNotes}</p> : null}
           </div>
           <p className="cart-price tnum">{money(item.total)}</p>
         </div>

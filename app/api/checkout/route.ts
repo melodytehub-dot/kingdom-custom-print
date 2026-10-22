@@ -99,6 +99,7 @@ async function sanitise(items: CartItem[]): Promise<PricedCartItem[]> {
       previewFront: truncateDataUrl(item.previewFront),
       previewBack: truncateDataUrl(item.previewBack),
       design: sanitiseDesign(item.design),
+      designNotes: String(item.designNotes ?? "").trim().slice(0, 2000),
       roster: sanitiseRoster(item.roster),
     });
   }

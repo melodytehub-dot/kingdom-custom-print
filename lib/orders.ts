@@ -52,6 +52,7 @@ export interface OrderSummary {
     design: Design;
     previewFront: string | null;
     previewBack: string | null;
+    designNotes: string;
   }[];
 }
 
@@ -116,7 +117,7 @@ export async function createOrder(input: CheckoutInput): Promise<{
           ${item.colorName}, ${item.colorHex}, ${item.unitPrice}, ${item.quantity},
           ${tx.json(item.lines as never)},
           ${tx.json(item.design as never)},
-          ${item.previewFront}, ${item.previewBack}, '')`;
+          ${item.previewFront}, ${item.previewBack}, ${item.designNotes ?? ""})`;
     }
   });
 
@@ -196,10 +197,11 @@ export async function getOrderByReference(reference: string): Promise<OrderSumma
       design: Design;
       preview_front: string | null;
       preview_back: string | null;
+      notes: string;
     }[]
   >`
     SELECT product_name, product_kind, color_name, color_hex, quantity, unit_price,
-      size_breakdown, design, preview_front, preview_back
+      size_breakdown, design, preview_front, preview_back, notes
     FROM order_items WHERE order_id = (SELECT id FROM orders WHERE reference = ${reference})
     ORDER BY id`;
 
@@ -224,6 +226,7 @@ export async function getOrderByReference(reference: string): Promise<OrderSumma
       design: i.design ?? { front: [], back: [] },
       previewFront: i.preview_front,
       previewBack: i.preview_back,
+      designNotes: i.notes,
     })),
   };
 }

@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 
-export function AccountAccess() {
+export function AccountAccess({ googleEnabled = false, googleError = "" }: { googleEnabled?: boolean; googleError?: string }) {
   const router = useRouter();
   const [mode, setMode] = useState<"login" | "register">("login");
   const [busy, setBusy] = useState(false);
@@ -47,6 +47,8 @@ export function AccountAccess() {
         {error ? <p className="account-error" role="alert">{error}</p> : null}
         <button className="account-submit" type="submit" disabled={busy}>{busy ? "Please wait…" : mode === "register" ? "Create account" : "Sign in"}</button>
       </form>
+      {googleEnabled ? <div className="account-google"><span>or</span><a href="/api/account/google">Continue with Google</a></div> : null}
+      {googleError ? <p className="account-error" role="alert">{googleError}</p> : null}
     </div>
   );
 }

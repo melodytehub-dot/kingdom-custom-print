@@ -52,6 +52,7 @@ export interface AdminOrderItem {
   design: { front: unknown[]; back: unknown[] };
   previewFront: string | null;
   previewBack: string | null;
+  designNotes: string;
 }
 
 export interface AdminOrderDetail {

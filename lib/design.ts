@@ -677,6 +677,7 @@ export interface SavedDraft {
   colorName: string;
   colorHex: string;
   design: Design;
+  designNotes?: string;
   lines?: Record<string, number>;
   roster?: RosterEntry[];
   nn?: {

@@ -12,6 +12,9 @@
 .account-error { color: #a00020; font-size: 14px; margin: 0 0 16px; }
 .account-submit { width: 100%; min-height: 50px; border: 0; background: #141414; color: white; font: inherit; font-weight: 700; cursor: pointer; }
 .account-submit:disabled, .account-signout:disabled { opacity: .6; cursor: wait; }
+.account-google { display: grid; gap: 18px; margin-top: 20px; text-align: center; color: #666; }
+.account-google a { display: flex; align-items: center; justify-content: center; min-height: 50px; border: 1px solid #777; color: #111; background: #fff; font-weight: 700; text-decoration: none; }
+.account-google a:hover { border-color: #111; background: #f6f6f6; }
 .account-signout { min-height: 42px; border: 1px solid #141414; background: white; padding: 0 18px; font: inherit; white-space: nowrap; cursor: pointer; }
 .account-content { display: grid; grid-template-columns: minmax(200px, 280px) minmax(0, 1fr); gap: 48px; }
 .account-profile h2, .account-orders h2 { font-size: 20px; margin: 0 0 10px; }

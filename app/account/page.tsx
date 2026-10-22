@@ -10,7 +10,8 @@ export const metadata = { title: "Your account", robots: { index: false, follow:
 
 type AccountOrder = { reference: string; status: string; total: unknown; created_at: Date };
 
-export default async function AccountPage() {
+export default async function AccountPage({ searchParams }: { searchParams: Promise<{ google?: string }> }) {
+  const params = await searchParams;
   const account = await customerFromCookies();
   const orders = account ? await sql<AccountOrder[]>`
     SELECT reference, status, total, created_at FROM orders
@@ -35,7 +36,7 @@ export default async function AccountPage() {
             </li>)}</ul> : <div className="account-empty"><p>Orders you place while signed in will appear here.</p><Link href="/shop">Shop products</Link></div>}
           </div>
         </div>
-      ) : <AccountAccess />}
+      ) : <AccountAccess googleEnabled={Boolean(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET)} googleError={params.google === "cancelled" ? "Google sign-in was cancelled." : params.google === "account-exists" ? "This email already has an account. Sign in with its password first." : params.google ? "Google sign-in could not be completed. Please try again." : ""} />}
     </section>
   );
 }

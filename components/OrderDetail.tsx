@@ -74,6 +74,7 @@ export default function OrderDetail({ order }: { order: OrderSummary }) {
                       </li>
                     ))}
                 </ul>
+                {item.designNotes ? <p className="small wrap-anywhere"><strong>Design notes:</strong> {item.designNotes}</p> : null}
               </div>
 
               <p className="order-item-qty tnum">×{item.quantity}</p>

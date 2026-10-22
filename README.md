@@ -34,6 +34,9 @@ The site runs at http://localhost:3000 and the admin at `/admin`.
 | `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` | for card payments | Stripe.js key |
 | `STRIPE_WEBHOOK_SECRET` | for card payments | Verifies `/api/webhook` events |
 | `NEXT_PUBLIC_SITE_URL` | recommended | Absolute base URL for Stripe redirects |
+| `GOOGLE_CLIENT_ID` | for Google sign-in | Google OAuth web client ID |
+| `GOOGLE_CLIENT_SECRET` | for Google sign-in | Google OAuth web client secret |
+| `GOOGLE_REDIRECT_URI` | for Google sign-in | Exact authorized callback URL |
 
 Without the Stripe secret key and webhook signing secret, checkout is disabled.
 The customer cart stays saved and the API creates no unpaid manual-payment order.
@@ -95,6 +98,14 @@ The starter polo is added by `npm run db:seed-additional`. Confirm its final
 blank specification and pricing in the admin catalog before taking live orders.
 Automated password recovery and email verification require an email delivery
 service and are not configured yet.
+
+To enable Google sign-in, create a Google OAuth web client, authorize
+`https://kingdom-custom-print.vercel.app/api/account/google/callback` as a
+redirect URI, and set all three `GOOGLE_*` variables in the Vercel production
+environment. Apply `npm run db:migrate` to add the account link column before
+enabling it. The Google button stays hidden until client credentials are set.
+The brand filters currently cover verified styles in the local catalog; the
+VictoryTee designer is a design reference, not a live supplier inventory feed.
 
 ## Deployment
 

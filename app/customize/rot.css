@@ -1979,6 +1979,9 @@
   font-weight: 700;
   text-align: right;
 }
+.rot-design-notes { display: grid; gap: 8px; margin: 20px 0; font-weight: 700; }
+.rot-design-notes textarea { width: 100%; min-height: 88px; padding: 12px; border: 1px solid #bfc4c9; border-radius: 4px; font: inherit; resize: vertical; }
+.rot-design-notes textarea:focus-visible { outline: 2px solid #1875a8; outline-offset: 2px; }
 
 /* --------------------------------------------------------------------------
    Phone layout: panels take over the screen

@@ -208,6 +208,7 @@ export interface CartItem {
   colorHex: string;
   sidesUsed: GarmentSide[];
   design: Design;
+  designNotes?: string;
   /** Per-shirt names/numbers captured by the names & numbers tool. */
   roster?: RosterEntry[];
   previewFront: string | null;

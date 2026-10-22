@@ -131,13 +131,6 @@ export const ART_LIBRARY: ArtItem[] = [
     ),
   },
   {
-    id: "crown",
-    name: "Crown",
-    src: svg(
-      `<path d="M8 30 30 48 50 18l20 30 22-18-8 50H16z"/><rect x="16" y="82" width="68" height="10" rx="2"/>`
-    ),
-  },
-  {
     id: "bolt",
     name: "Bolt",
     src: svg(`<path d="M58 4 20 56h24l-8 40 38-52H50z"/>`),
@@ -209,7 +202,15 @@ export const ART_LIBRARY: ArtItem[] = [
   categorizedArt("key", "Key", "Symbols", `<path fill-rule="evenodd" d="M40 12a28 28 0 1 0 24 42l6 0 4 8h12v-12h8v-12h-30A28 28 0 0 0 40 12zm0 16a12 12 0 1 1 0 24 12 12 0 0 1 0-24z"/>`),
   categorizedArt("eye", "Eye", "Symbols", `${evenodd(`M4 50C18 28 34 20 50 20s32 8 46 30c-14 22-30 30-46 30S18 72 4 50z${hole(50, 50, 17)}`)}<circle cx="50" cy="50" r="8"/>`),
   categorizedArt("wifi", "Signal", "Symbols", `<g>${line("M20 42a44 44 0 0 1 60 0", 9)}${line("M32 56a28 28 0 0 1 36 0", 9)}${line("M43 69a13 13 0 0 1 14 0", 8)}</g><circle cx="50" cy="84" r="6"/>`),
-  categorizedArt("crown-royal", "Royal Crown", "Symbols", `<path d="M50 14 66 40 88 16l-6 56H18L12 16l22 24z"/><rect x="16" y="78" width="68" height="10" rx="3"/>`),
+  categorizedArt("sunflower", "Sunflower", "Nature", `<g>${Array.from({ length: 10 }, (_, i) => `<ellipse cx="50" cy="23" rx="8" ry="18" transform="rotate(${i * 36} 50 50)" fill="#eab829"/>`).join("")}</g><circle cx="50" cy="50" r="15" fill="#754825"/><circle cx="44" cy="45" r="2" fill="#f4df8d"/><circle cx="55" cy="51" r="2" fill="#f4df8d"/>`),
+  categorizedArt("heart-bloom", "Heart Bloom", "Nature", `<path d="M50 88C18 65 9 51 9 35a19 19 0 0 1 37-5 19 19 0 0 1 37 5c0 16-9 30-33 53z" fill="#d85b72"/><path d="M50 74V37m0 24c-12-2-17-9-19-17m19 10c9-1 16-7 19-16" fill="none" stroke="#fff" stroke-width="5" stroke-linecap="round"/>`),
+  categorizedArt("earth-day", "Earth Day", "Nature", `<circle cx="50" cy="50" r="42" fill="#3f95c5"/><path d="M17 36 35 24l14 6-5 17-16 4-8 17-11-15zm38 25 13-16 20 5-3 24-20 12-8-12z" fill="#4e9a5b"/><circle cx="50" cy="50" r="42" fill="none" stroke="#15516e" stroke-width="4"/>`),
+  categorizedArt("mountain-sun", "Mountain Sunrise", "Nature", `<circle cx="72" cy="26" r="15" fill="#efb64b"/><path d="M4 83 35 27l21 34 13-18 27 40z" fill="#3c6970"/><path d="m27 42 8-15 9 15m20 9 5-8 6 10" fill="none" stroke="#fff" stroke-width="4" stroke-linecap="round"/>`),
+  categorizedArt("coffee-cup", "Coffee Cup", "Symbols", `<path d="M16 33h58v29a21 21 0 0 1-21 21H37a21 21 0 0 1-21-21z" fill="#bf7551"/><path d="M74 40h9a12 12 0 0 1 0 24H73M13 88h70M30 23c-6-7 3-10 0-17m20 17c-6-7 3-10 0-17" fill="none" stroke="#352c29" stroke-width="6" stroke-linecap="round"/>`),
+  categorizedArt("gift", "Gift Box", "Symbols", `<rect x="15" y="40" width="70" height="48" rx="3" fill="#d35758"/><rect x="8" y="30" width="84" height="15" rx="3" fill="#a63243"/><path d="M44 30c-17-1-24-10-18-17 8-10 22 1 24 17 2-16 16-27 24-17 6 7-1 16-18 17" fill="none" stroke="#e2b24b" stroke-width="6"/><path d="M45 30h10v58H45z" fill="#e2b24b"/>`),
+  categorizedArt("graduation", "Graduation Cap", "Symbols", `<path d="M5 36 50 15l45 21-45 21z" fill="#263953"/><path d="M23 49v22c15 12 39 12 54 0V49" fill="#3c5474"/><path d="M95 36v30" fill="none" stroke="#263953" stroke-width="6"/><circle cx="95" cy="70" r="5" fill="#dfa93c"/>`),
+  categorizedArt("running-shoe", "Running Shoe", "Sports", `<path d="M8 62c10 2 22-4 31-19l12 7 11 1 10 16 20 5v14H8z" fill="#386cab"/><path d="m38 44 8 16 17 8M47 50l-7 9m18-7-8 9M11 77h78" fill="none" stroke="#fff" stroke-width="4" stroke-linecap="round"/>`),
+  categorizedArt("turtle", "Sea Turtle", "Animals", `<ellipse cx="50" cy="51" rx="27" ry="24" fill="#4e8e78"/><circle cx="84" cy="51" r="11" fill="#72a986"/><path d="m29 39-14-13-9 9 17 15m6 14L15 78l-9-9 17-16m51-14 7-15 10 9-11 16m-6 17 7 14 10-9-11-14" fill="#72a986"/><path d="m50 30-12 13 5 20h16l5-20z" fill="none" stroke="#d4dca0" stroke-width="3"/>`),
 
   categorizedArt("helmet", "Football Helmet", "Sports", `<g>${line("M24 48a26 26 0 0 1 52 0v18H24z", 8)}${line("M76 52h14a9 9 0 0 1 0 18H62", 7)}${line("M44 48a8 8 0 1 0 0.1 0z", 6)}</g>`),
   categorizedArt("dumbbell", "Dumbbell", "Sports", `<path d="M8 40h9v20H8zM21 33h11v34H21zM68 33h11v34H68zM83 40h9v20h-9z"/><rect x="32" y="43" width="36" height="14" rx="2"/>`),
