@@ -37,6 +37,11 @@ export default async function PrivacyPage() {
             can reorder. Designs saved in the browser are kept on your own device until
             you clear them.
           </p>
+          <p>
+            If you create an account, we store your name, email address and a one-way
+            hash of your password. Orders placed while signed in are linked to that
+            account; earlier guest orders are not linked just because the email matches.
+          </p>
         </section>
 
         <section>
@@ -82,9 +87,9 @@ export default async function PrivacyPage() {
         <section>
           <h2 className="h3">Cookies</h2>
           <p>
-            This site stores your cart, your saved designs and your admin session in your
-            browser&rsquo;s local storage and cookies. No advertising or tracking cookies
-            are set.
+            This site stores your cart and saved designs in your browser. If you sign in,
+            an essential account session cookie keeps you signed in; administrators use
+            a separate session cookie. No advertising or tracking cookies are set.
           </p>
         </section>
 

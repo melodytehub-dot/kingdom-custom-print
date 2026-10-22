@@ -82,6 +82,20 @@ valid for 12 hours, with repeated failed attempts throttled. From there you can
 review and update orders, manage products and variants, edit site settings
 (shipping rates, production time, contact details) and browse customers.
 
+## Customer accounts
+
+`/account` supports customer registration, password sign-in, and order history
+for purchases made while signed in. Sessions are stored server-side in PostgreSQL;
+only a random session token is kept in an httpOnly cookie. Guest checkout still
+works, and older guest orders are not exposed to an account created later with
+the same email address. Apply `npm run db:migrate` before enabling the account
+routes on an existing database.
+
+The starter polo is added by `npm run db:seed-additional`. Confirm its final
+blank specification and pricing in the admin catalog before taking live orders.
+Automated password recovery and email verification require an email delivery
+service and are not configured yet.
+
 ## Deployment
 
 The project is linked to Vercel and reads `DATABASE_URL` from the Neon

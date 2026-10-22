@@ -30,7 +30,7 @@ try {
    assert.match(await page.locator('.pdp-view-caption').innerText(),new RegExp(colorName.replace(/[.*+?^${}()|[\]\\]/g,'\\$&'),'i'));
    colors++;
   }
-  for(const view of ['front','back','side']){
+  for(const view of (slug==='classic-pique-polo'?['front','back']:['front','back','side'])){
    await page.getByRole('button',{name:`View ${view}`,exact:true}).click();
    assert.equal(await page.getByRole('button',{name:`View ${view}`,exact:true}).getAttribute('aria-pressed'),'true');
    assert.equal(await page.locator('.pdp-photo-stage .product-photography').getAttribute('data-photo-view'),view);

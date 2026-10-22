@@ -40,6 +40,8 @@ try {
   await page.goto(`${base}/product/classic-pique-polo`, { waitUntil: "domcontentloaded" });
   await page.locator(".pdp-thumbs li").first().waitFor();
   assert.equal(await page.locator(".pdp-thumbs li").count(), 2);
+  await page.getByRole("button", { name: "View back" }).click();
+  assert.equal(await page.locator(".pdp-photo-stage .product-photography").getAttribute("data-photo-view"), "back");
   console.log("PASS polo product gallery has accurate front and back views");
 
   await page.goto(`${base}/customize/classic-pique-polo`, { waitUntil: "domcontentloaded" });
