@@ -12,7 +12,7 @@ export const revalidate = 60;
 
 const POD_CATEGORIES = [
   { name: "SHIRTS", href: "/shop?kind=tee", position: "0% 0%" },
-  { name: "POLOS", href: "/shop?kind=polo", image: "/img/products/polo-front.png" },
+  { name: "POLOS", href: "/shop?kind=polo", image: "/img/products/polo-black-crown.webp" },
   { name: "HOODIES", href: "/shop?kind=fleece", position: "100% 0%" },
   { name: "CAPS", href: "/shop?kind=cap", position: "0% 100%" },
   { name: "MERCH", href: "/shop?category=accessories", position: "100% 100%" },

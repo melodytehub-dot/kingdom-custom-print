@@ -6,6 +6,7 @@ import Image from "next/image";
 import Link from "next/link";
 import ProductPhotography from "./ProductPhotography";
 import Garment from "./Garment";
+import { photographyFamily } from "@/lib/product-presentation";
 import { formatUSD, lowestPrintedUnit } from "@/lib/pricing";
 import type { Product } from "@/lib/types";
 
@@ -36,12 +37,14 @@ export default function ProductCard({
 }) {
   const { has, toggle } = useWishlist();
   const saved = has(product.slug);
-  const [selectedColorIdx, setSelectedColorIdx] = useState(0);
+  const [selectedColorIdx, setSelectedColorIdx] = useState(() => product.kind === "polo" ? Math.max(0, product.colors.findIndex((color) => color.slug === "black")) : 0);
   const selectedColor = product.colors[selectedColorIdx] ?? product.colors[0];
   const baseHex = selectedColor?.hex ?? product.colors[0]?.hex ?? "#141414";
-  const rgb = baseHex.replace("#", "").match(/../g)?.map((part) => Number.parseInt(part, 16)) ?? [20, 20, 20];
-  const darkGarment = (rgb[0] * 0.299 + rgb[1] * 0.587 + rgb[2] * 0.114) < 145;
   const showSample = ["tee", "polo", "longsleeve", "hoodie", "crew"].includes(product.kind);
+  const photoFamily = photographyFamily(product) ?? (product.kind === "polo" ? "polo" : null);
+  const printedImage = product.kind === "polo" && selectedColor?.slug === "black"
+    ? "/img/products/polo-black-crown.webp"
+    : `/api/catalog-preview?family=${photoFamily}&color=${baseHex.replace("#", "")}`;
 
   const wasPrice = product.compareAt;
   const fromUnit = lowestPrintedUnit(product);
@@ -49,16 +52,16 @@ export default function ProductCard({
 
   return (
     <article className="mm-card">
-      {/* 1. Thumbnail Media with Dual-Image Hover Swap */}
+      {/* Catalog preview is a single finished image for the selected color. */}
       <div className={`mm-card-media mm-card-media-${product.kind}`}>
         <Link prefetch={false} href={`/product/${product.slug}?color=${encodeURIComponent(selectedColor?.slug ?? "")}`} tabIndex={-1} aria-label={product.name}>
-          {selectedColor ? (
-            <>
-              <ProductPhotography product={product} color={selectedColor} priority={priority} className="mm-card-img-primary" />
-              <ProductPhotography product={product} color={selectedColor} view="back" className="mm-card-img-secondary" />
-            </>
+          {selectedColor && showSample && photoFamily ? (
+            <Image unoptimized src={printedImage} alt={`${product.name} in ${selectedColor.name} with a crown print`} fill
+              sizes="(max-width: 640px) 50vw, 25vw" priority={priority} className="mm-card-img-primary"
+              style={{ objectFit: product.kind === "polo" ? "contain" : "cover" }} />
+          ) : selectedColor ? (
+            <ProductPhotography product={product} color={selectedColor} priority={priority} className="mm-card-img-primary" />
           ) : <Garment kind={product.kind} color={baseHex} className="mm-card-img-primary" />}
-          {showSample ? <span className={`mm-card-sample-print${darkGarment ? " is-light-ink" : ""}`} aria-hidden="true"><Image src="/img/sample-crown.png" alt="" fill sizes="80px" /></span> : null}
         </Link>
 
         {/* Floating Quick Action Buttons */}
