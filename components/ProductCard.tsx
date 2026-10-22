@@ -2,11 +2,9 @@
 
 import { useWishlist } from "@/lib/wishlist-context";
 import { useState } from "react";
-import Image from "next/image";
 import Link from "next/link";
 import ProductPhotography from "./ProductPhotography";
 import Garment from "./Garment";
-import { photographyFamily } from "@/lib/product-presentation";
 import { formatUSD, lowestPrintedUnit } from "@/lib/pricing";
 import type { Product } from "@/lib/types";
 
@@ -40,11 +38,6 @@ export default function ProductCard({
   const [selectedColorIdx, setSelectedColorIdx] = useState(() => product.kind === "polo" ? Math.max(0, product.colors.findIndex((color) => color.slug === "black")) : 0);
   const selectedColor = product.colors[selectedColorIdx] ?? product.colors[0];
   const baseHex = selectedColor?.hex ?? product.colors[0]?.hex ?? "#141414";
-  const showSample = ["tee", "polo", "longsleeve", "hoodie", "crew"].includes(product.kind);
-  const photoFamily = photographyFamily(product) ?? (product.kind === "polo" ? "polo" : null);
-  const printedImage = product.kind === "polo" && selectedColor?.slug === "black"
-    ? "/img/products/polo-black-crown.webp"
-    : `/api/catalog-preview?family=${photoFamily}&color=${baseHex.replace("#", "")}`;
 
   const wasPrice = product.compareAt;
   const fromUnit = lowestPrintedUnit(product);
@@ -55,11 +48,7 @@ export default function ProductCard({
       {/* Catalog preview is a single finished image for the selected color. */}
       <div className={`mm-card-media mm-card-media-${product.kind}`}>
         <Link prefetch={false} href={`/product/${product.slug}?color=${encodeURIComponent(selectedColor?.slug ?? "")}`} tabIndex={-1} aria-label={product.name}>
-          {selectedColor && showSample && photoFamily ? (
-            <Image unoptimized src={printedImage} alt={`${product.name} in ${selectedColor.name} with a crown print`} fill
-              sizes="(max-width: 640px) 50vw, 25vw" priority={priority} className="mm-card-img-primary"
-              style={{ objectFit: product.kind === "polo" ? "contain" : "cover" }} />
-          ) : selectedColor ? (
+          {selectedColor ? (
             <ProductPhotography product={product} color={selectedColor} priority={priority} className="mm-card-img-primary" />
           ) : <Garment kind={product.kind} color={baseHex} className="mm-card-img-primary" />}
         </Link>

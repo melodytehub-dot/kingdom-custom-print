@@ -9,6 +9,10 @@ const nextConfig: NextConfig = {
   },
   images: {
     formats: ["image/avif", "image/webp"],
+    localPatterns: [
+      { pathname: "/**", search: "" },
+      { pathname: "/img/printed-catalog/**", search: "?v=aligned-2" },
+    ],
     remotePatterns: [
       { protocol: "https", hostname: "**.supabase.co" },
       { protocol: "https", hostname: "**.blob.vercel-storage.com" },

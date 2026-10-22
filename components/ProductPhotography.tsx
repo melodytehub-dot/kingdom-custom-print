@@ -4,6 +4,7 @@ import AccessoryProfile from "./AccessoryProfile";
 import Garment from "./Garment";
 import { photographyFamily, type ProductView } from "@/lib/product-presentation";
 import { mockupsForProduct } from "@/lib/mockups";
+import { printedCatalogImage } from "@/lib/printed-catalog";
 import type { Product, ProductColor } from "@/lib/types";
 
 export default function ProductPhotography({ product, color, view = "front", className = "", priority = false, decorative = false, isolated = false }: {
@@ -17,6 +18,15 @@ export default function ProductPhotography({ product, color, view = "front", cla
   if (family && isolated) {
     const src = `/api/garment-preview?family=${family}&color=${(selected?.hex ?? "#FFFFFF").replace("#", "")}&view=${view}`;
     return <span className={`product-photography ${className}`} data-photo-color={selected?.slug} data-photo-view={view}><Image unoptimized src={src} alt={decorative ? "" : label} fill sizes="600px" style={{objectFit:"contain"}}/></span>;
+  }
+  const printed = !isolated && view === "front" && selected
+    ? printedCatalogImage(product.slug, selected.slug)
+    : null;
+  if (printed) {
+    return <span className={`product-photography ${className}`} data-photo-color={selected.slug} data-photo-view={view}>
+      <Image src={printed} alt={decorative ? "" : `${product.name} in ${selected.name} with crown print`} fill
+        sizes="(max-width: 640px) 50vw, 600px" priority={priority} style={{ objectFit: "contain" }} />
+    </span>;
   }
   if (!family) {
     if (view === "side") return <span className={`product-photography ${className}`} data-photo-color={selected?.slug} data-photo-view={view}><AccessoryProfile kind={product.kind} color={selected?.hex ?? "#FFFFFF"} title={label}/></span>;

@@ -14,6 +14,7 @@
     "db:repair-special-images": "node --env-file=.env.local scripts/repair-special-product-images.mjs",
     "db:repair-classic-sizes": "node --env-file=.env.local scripts/repair-classic-tee-sizes.mjs",
     "db:repair-rt2000-variants": "node --env-file=.env.local scripts/repair-rt2000-variants.mjs",
+    "images:printed-catalog": "node --env-file=.env.local scripts/generate-printed-catalog.mjs",
     "db:reset": "node --env-file=.env.local scripts/migrate.mjs --force && node --env-file=.env.local scripts/seed.mjs",
     "qa-audit": "node scripts/qa-audit.mjs",
     "qa-cart-flow": "node scripts/qa-cart-flow.mjs",
