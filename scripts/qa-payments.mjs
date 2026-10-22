@@ -18,6 +18,7 @@ function load(file, dependencies) {
 const pricing = load("lib/pricing.ts", {});
 const product = { id: 1, active: true, name: "Catalog tee", slug: "catalog-tee", kind: "tee", basePrice: 10, printFeePerSide: 4, priceBreaks: [], colors: [{ name: "Black", hex: "#111111" }], sizes: [{ label: "M", surcharge: 0 }, { label: "2XL", surcharge: 3 }] };
 let configured = false;
+let account = null;
 let orderInput;
 let sessionInput;
 let writes = 0;
@@ -29,6 +30,7 @@ const checkout = load("app/api/checkout/route.ts", {
   "@/lib/pricing": pricing,
   "@/lib/fonts": { FONTS: [{ id: "Anton" }] },
   "@/lib/design": { personalizationOf: () => "none" },
+  "@/lib/customer-auth": { sameOrigin: () => true, customerFromRequest: async () => account },
 });
 const payload = { email: "qa@example.com", name: "Test buyer", addressLine1: "1 Test Street", city: "Austin", postal: "78701", region: "TX", items: [{ productId: 1, productName: "Fake client name", quantity: 999, unitPrice: .01, total: .01, colorName: "Fake color", colorHex: "#ff0000", lines: [{ label: "M", qty: 2 }, { label: "2XL", qty: 1 }], design: { front: [], back: [] } }] };
 const request = data => new Request("https://kingdom.example/api/checkout", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(data) });
@@ -52,6 +54,14 @@ response = await checkout.POST(request({ ...payload, items: [{ ...payload.items[
 assert.equal(response.status, 400);
 assert.equal(writes, 1);
 console.log("PASS invalid sizes cannot create an order");
+account = { id: 7, email: "qa@example.com" };
+response = await checkout.POST(request({ ...payload, email: "another@example.com" }));
+assert.equal(response.status, 422);
+assert.equal(writes, 1);
+response = await checkout.POST(request(payload));
+assert.equal(response.status, 200);
+assert.equal(orderInput.accountId, 7);
+console.log("PASS signed-in orders stay linked to the account email and ID");
 const stripe = new Stripe("sk_test_local_fixture");
 const secret = "whsec_local_fixture";
 const previousSecret = process.env.STRIPE_WEBHOOK_SECRET;

@@ -1,0 +1,28 @@
+.account-page { padding-block: 56px 100px; min-height: 60vh; }
+.account-heading { display: flex; align-items: end; justify-content: space-between; gap: 20px; border-bottom: 1px solid #dedede; padding-bottom: 24px; margin-bottom: 32px; }
+.account-heading h1 { font-size: clamp(30px, 4rem, 44px); line-height: 1.1; margin: 10px 0 0; }
+.account-access { width: min(100%, 420px); margin-inline: auto; }
+.account-mode { display: grid; grid-template-columns: 1fr 1fr; border-bottom: 1px solid #ccc; margin-bottom: 26px; }
+.account-mode button { min-height: 48px; border: 0; border-bottom: 3px solid transparent; background: transparent; color: #555; font: inherit; font-weight: 600; cursor: pointer; }
+.account-mode button.active { border-color: #c8102e; color: #111; }
+.account-field { display: grid; gap: 8px; font-size: 14px; font-weight: 600; margin-bottom: 18px; }
+.account-field input { width: 100%; min-height: 48px; border: 1px solid #bdbdbd; border-radius: 3px; padding: 10px 12px; background: white; color: #111; font: inherit; font-size: 16px; }
+.account-field input:focus-visible { outline: 2px solid #c8102e; outline-offset: 2px; }
+.account-hint { color: #555; font-size: 13px; margin: -8px 0 16px; }
+.account-error { color: #a00020; font-size: 14px; margin: 0 0 16px; }
+.account-submit { width: 100%; min-height: 50px; border: 0; background: #141414; color: white; font: inherit; font-weight: 700; cursor: pointer; }
+.account-submit:disabled, .account-signout:disabled { opacity: .6; cursor: wait; }
+.account-signout { min-height: 42px; border: 1px solid #141414; background: white; padding: 0 18px; font: inherit; white-space: nowrap; cursor: pointer; }
+.account-content { display: grid; grid-template-columns: minmax(200px, 280px) minmax(0, 1fr); gap: 48px; }
+.account-profile h2, .account-orders h2 { font-size: 20px; margin: 0 0 10px; }
+.account-profile p { overflow-wrap: anywhere; color: #555; margin: 0 0 20px; }
+.account-profile a, .account-empty a { color: #b40020; text-decoration: underline; text-underline-offset: 3px; }
+.account-orders ul { list-style: none; margin: 0; padding: 0; }
+.account-orders li { border-bottom: 1px solid #dedede; }
+.account-orders li:first-child { border-top: 1px solid #dedede; }
+.account-orders li a { display: flex; justify-content: space-between; gap: 16px; padding: 18px 0; color: inherit; text-decoration: none; }
+.account-orders li span { display: grid; gap: 4px; }
+.account-orders li span:last-child { text-align: right; }
+.account-orders small { color: #666; text-transform: capitalize; }
+.account-empty { padding: 20px 0; color: #555; }
+@media (max-width: 650px) { .account-page { padding-block: 34px 70px; } .account-content { grid-template-columns: 1fr; gap: 36px; } }

@@ -134,6 +134,7 @@ export default function Garment({
   const isLong = kind === "longsleeve";
   const isHoodie = kind === "hoodie";
   const isCrew = kind === "crew";
+  const isPolo = kind === "polo";
   const sleeveBottom = isLong ? 300 : 268;
 
   return (
@@ -183,7 +184,12 @@ export default function Garment({
           strokeWidth="1.5"
         />
       )}
-      {(isCrew || !isHoodie) && (
+      {isPolo ? (
+        <g stroke={seam} strokeWidth="1.5">
+          <path d="M118 54 144 79 160 67 176 79 202 54 186 91 160 76 134 91z" fill={s.light} />
+          {!back ? <path d="M155 79v37h10V79M160 96v2" fill={color} /> : null}
+        </g>
+      ) : (isCrew || !isHoodie) && (
         <path
           d={
             back

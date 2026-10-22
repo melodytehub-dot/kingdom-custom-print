@@ -1,5 +1,6 @@
 export type ProductKind =
   | "tee"
+  | "polo"
   | "longsleeve"
   | "hoodie"
   | "crew"

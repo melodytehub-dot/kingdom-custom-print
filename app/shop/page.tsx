@@ -14,6 +14,7 @@ export const metadata = {
 
 const KIND_FILTERS = [
   { value: "tee", label: "Short Sleeve" },
+  { value: "polo", label: "Polo Shirts" },
   { value: "longsleeve", label: "Long Sleeve" },
   { value: "fleece", label: "Hoodies & Fleece" },
 ];
@@ -162,7 +163,7 @@ export default async function ShopPage({
 
       <section className="minimog-container" aria-label="Products">
         {products.length ? (
-          <ul className="mm-product-grid">
+          <ul className={`mm-product-grid${products.length === 1 ? " is-single" : ""}`}>
             {products.map((p, i) => (
               <li key={p.id}>
                 <ProductCard product={p} priority={i < 4} />

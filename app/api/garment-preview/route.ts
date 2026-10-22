@@ -2,7 +2,7 @@ import { readFile } from "node:fs/promises";
 import path from "node:path";
 
 export const runtime = "nodejs";
-const families = new Set(["tee", "vneck", "longsleeve", "fitted", "pocket", "youth", "hoodie", "crew", "cap", "mug", "tote"]);
+const families = new Set(["tee", "polo", "vneck", "longsleeve", "fitted", "pocket", "youth", "hoodie", "crew", "cap", "mug", "tote"]);
 const bases = new Map<string, Promise<string>>();
 
 // Literal asset paths keep serverless bundles limited to the required bases.
@@ -10,6 +10,8 @@ const readers: Record<string, () => Promise<Buffer>> = {
   "tee-front": () => readFile(path.join(process.cwd(), "public/img/mockups/garment/WHT_fr.webp")),
   "tee-back": () => readFile(path.join(process.cwd(), "public/img/mockups/garment/WHT_bk.webp")),
   "tee-side": () => readFile(path.join(process.cwd(), "public/img/catalog-models/tee-mask.png")),
+  "polo-front": () => readFile(path.join(process.cwd(), "public/img/products/polo-front.png")),
+  "polo-back": () => readFile(path.join(process.cwd(), "public/img/products/polo-back.png")),
   "vneck-front": () => readFile(path.join(process.cwd(), "public/img/mockups/families/vneck/WHT_fr.webp")),
   "vneck-back": () => readFile(path.join(process.cwd(), "public/img/mockups/families/vneck/WHT_bk.webp")),
   "vneck-side": () => readFile(path.join(process.cwd(), "public/img/catalog-models/vneck-mask.png")),
@@ -45,7 +47,7 @@ export async function GET(request: Request) {
   const family = params.get("family") ?? "tee";
   const side = params.get("view") ?? "front";
   const color = params.get("color") ?? "FFFFFF";
-  if (!families.has(family) || !["front", "back", "side"].includes(side) || (side === "side" && ["cap", "mug", "tote"].includes(family)) || !/^[a-f\d]{6}$/i.test(color)) {
+  if (!families.has(family) || !["front", "back", "side"].includes(side) || (side === "side" && ["polo", "cap", "mug", "tote"].includes(family)) || !/^[a-f\d]{6}$/i.test(color)) {
     return new Response("Invalid garment preview", { status: 400 });
   }
   const key = `${family}-${side}`;
@@ -59,7 +61,8 @@ export async function GET(request: Request) {
   const matrix = `${channels[0]} 0 0 0 0 0 ${channels[1]} 0 0 0 0 0 ${channels[2]} 0 0 0 0 0 1 0`;
   const viewBox = side === "side" ? "0 0 724 724" : "0 0 1024 1024";
   const imageBox = side === "side" ? 'x="-1448" width="2172" height="724"' : 'width="1024" height="1024"';
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="${viewBox}"><defs><filter id="fabric" color-interpolation-filters="sRGB"><feColorMatrix type="matrix" values="${matrix}"/></filter></defs><image ${imageBox} href="data:image/${side === "side" ? "png" : "webp"};base64,${await base}" filter="url(#fabric)"/></svg>`;
+  const format = side === "side" || family === "polo" ? "png" : "webp";
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="${viewBox}"><defs><filter id="fabric" color-interpolation-filters="sRGB"><feColorMatrix type="matrix" values="${matrix}"/></filter></defs><image ${imageBox} href="data:image/${format};base64,${await base}" filter="url(#fabric)"/></svg>`;
   return new Response(svg, { headers: {
     "Content-Type": "image/svg+xml",
     "Cache-Control": "public, max-age=86400, s-maxage=31536000",

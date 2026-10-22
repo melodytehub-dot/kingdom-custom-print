@@ -39,12 +39,12 @@ function validate(fields: Fields): Errors {
   return e;
 }
 
-export default function CheckoutForm({ settings, paymentsReady }: { settings: SiteSettings; paymentsReady: boolean }) {
+export default function CheckoutForm({ settings, paymentsReady, account }: { settings: SiteSettings; paymentsReady: boolean; account: { email: string; name: string } | null }) {
   const { items, hydrated, subtotal } = useCart();
 
   const [fields, setFields] = useState<Fields>({
-    email: "",
-    name: "",
+    email: account?.email ?? "",
+    name: account?.name ?? "",
     phone: "",
     addressLine1: "",
     addressLine2: "",
@@ -167,6 +167,7 @@ export default function CheckoutForm({ settings, paymentsReady }: { settings: Si
 
         <fieldset className="field-group">
           <legend className="legend">Contact</legend>
+          {account ? <p className="hint">Signed in as {account.email}. Your order will appear in <Link href="/account">your account</Link>.</p> : <p className="hint"><Link href="/account">Sign in</Link> to keep your order in your account.</p>}
           <div className="field-grid">
             <TextField
               id="email"
@@ -176,6 +177,7 @@ export default function CheckoutForm({ settings, paymentsReady }: { settings: Si
               value={fields.email}
               onChange={(v) => set("email", v)}
               error={errors.email}
+              readOnly={Boolean(account)}
               required
             />
             <TextField
@@ -357,6 +359,7 @@ function TextField({
   type = "text",
   autoComplete,
   required,
+  readOnly,
 }: {
   id: string;
   label: string;
@@ -366,6 +369,7 @@ function TextField({
   type?: string;
   autoComplete?: string;
   required?: boolean;
+  readOnly?: boolean;
 }) {
   return (
     <div className="field">
@@ -387,6 +391,7 @@ function TextField({
         aria-invalid={error ? "true" : undefined}
         aria-describedby={error ? `${id}-error` : undefined}
         onChange={(e) => onChange(e.target.value)}
+        readOnly={readOnly}
       />
       {error ? (
         <span className="error-text" id={`${id}-error`}>

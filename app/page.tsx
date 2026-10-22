@@ -12,6 +12,7 @@ export const revalidate = 60;
 
 const POD_CATEGORIES = [
   { name: "SHIRTS", href: "/shop?kind=tee", position: "0% 0%" },
+  { name: "POLOS", href: "/shop?kind=polo", image: "/img/products/polo-front.png" },
   { name: "HOODIES", href: "/shop?kind=fleece", position: "100% 0%" },
   { name: "CAPS", href: "/shop?kind=cap", position: "0% 100%" },
   { name: "MERCH", href: "/shop?category=accessories", position: "100% 100%" },
@@ -76,7 +77,7 @@ export default async function HomePage() {
       <nav className="mm-category-strip minimog-container" aria-label="Shop by category">
         {POD_CATEGORIES.map((category) => (
           <Link key={category.name} href={category.href} className="mm-category-link">
-            <span className="mm-category-art" aria-hidden="true" style={{ backgroundPosition: category.position }} />
+            <span className={`mm-category-art${"image" in category ? " mm-category-art-polo" : ""}`} aria-hidden="true" style={"image" in category ? { backgroundImage: `url(${category.image})` } : { backgroundPosition: category.position }} />
             <span>{category.name}</span>
           </Link>
         ))}

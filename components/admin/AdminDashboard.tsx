@@ -28,6 +28,7 @@ const TABS: { id: Tab; label: string }[] = [
 
 const KIND_OPTIONS: { value: ProductKind; label: string }[] = [
   { value: "tee", label: "T-shirt" },
+  { value: "polo", label: "Polo shirt" },
   { value: "longsleeve", label: "Long sleeve" },
   { value: "hoodie", label: "Hoodie" },
   { value: "crew", label: "Crewneck" },

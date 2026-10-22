@@ -13,7 +13,7 @@ import type { ProductKind } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
-const KINDS: ProductKind[] = ["tee", "longsleeve", "hoodie", "crew", "cap", "mug", "tote"];
+const KINDS: ProductKind[] = ["tee", "polo", "longsleeve", "hoodie", "crew", "cap", "mug", "tote"];
 const HEX_RE = /^#[0-9A-Fa-f]{6}$/;
 const SLUG_RE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 

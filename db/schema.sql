@@ -17,7 +17,7 @@ CREATE TABLE IF NOT EXISTS products (
   style_code  text NOT NULL DEFAULT '',
   category_id int REFERENCES categories(id) ON DELETE SET NULL,
   -- garment kind drives which customizer template renders
-  kind        text NOT NULL CHECK (kind IN ('tee','longsleeve','hoodie','crew','cap','mug','tote')),
+  kind        text NOT NULL CHECK (kind IN ('tee','polo','longsleeve','hoodie','crew','cap','mug','tote')),
   blurb       text NOT NULL DEFAULT '',
   description text NOT NULL DEFAULT '',
   -- fabric/weight spec shown on the product page
@@ -37,6 +37,9 @@ CREATE TABLE IF NOT EXISTS products (
 
 -- Idempotent add for databases created before the style number existed.
 ALTER TABLE products ADD COLUMN IF NOT EXISTS style_code text NOT NULL DEFAULT '';
+ALTER TABLE products DROP CONSTRAINT IF EXISTS products_kind_check;
+ALTER TABLE products ADD CONSTRAINT products_kind_check
+  CHECK (kind IN ('tee','polo','longsleeve','hoodie','crew','cap','mug','tote'));
 
 CREATE INDEX IF NOT EXISTS products_active_idx ON products (active, sort_order);
 CREATE INDEX IF NOT EXISTS products_featured_idx ON products (featured) WHERE featured;
@@ -87,10 +90,34 @@ CREATE TABLE IF NOT EXISTS customers (
   created_at timestamptz NOT NULL DEFAULT now()
 );
 
+-- Storefront accounts are separate from guest checkout contacts. A matching
+-- email alone must not grant access to orders placed before registration.
+CREATE TABLE IF NOT EXISTS customer_accounts (
+  id            serial PRIMARY KEY,
+  email         text NOT NULL UNIQUE,
+  name          text NOT NULL,
+  password_hash text NOT NULL,
+  created_at    timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS customer_sessions (
+  token_hash text PRIMARY KEY,
+  account_id int NOT NULL REFERENCES customer_accounts(id) ON DELETE CASCADE,
+  expires_at timestamptz NOT NULL
+);
+CREATE INDEX IF NOT EXISTS customer_sessions_account_idx ON customer_sessions (account_id);
+
+CREATE TABLE IF NOT EXISTS customer_auth_attempts (
+  key text PRIMARY KEY,
+  attempts int NOT NULL DEFAULT 0,
+  reset_at timestamptz NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS orders (
   id             serial PRIMARY KEY,
   reference      text NOT NULL UNIQUE,
   customer_id    int REFERENCES customers(id) ON DELETE SET NULL,
+  account_id     int REFERENCES customer_accounts(id) ON DELETE SET NULL,
   email          text NOT NULL,
   name           text NOT NULL,
   phone          text NOT NULL DEFAULT '',
@@ -113,6 +140,9 @@ CREATE TABLE IF NOT EXISTS orders (
   created_at     timestamptz NOT NULL DEFAULT now(),
   updated_at     timestamptz NOT NULL DEFAULT now()
 );
+
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS account_id int REFERENCES customer_accounts(id) ON DELETE SET NULL;
+CREATE INDEX IF NOT EXISTS orders_account_idx ON orders (account_id, created_at DESC);
 
 CREATE INDEX IF NOT EXISTS orders_created_idx ON orders (created_at DESC);
 CREATE INDEX IF NOT EXISTS orders_status_idx ON orders (status);

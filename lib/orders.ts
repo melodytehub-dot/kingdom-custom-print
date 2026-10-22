@@ -17,6 +17,7 @@ import type {
 } from "./types";
 
 export interface CheckoutInput {
+  accountId?: number | null;
   email: string;
   name: string;
   phone: string;
@@ -97,10 +98,10 @@ export async function createOrder(input: CheckoutInput): Promise<{
       RETURNING id`;
 
     const [order] = await tx<{ id: number }[]>`
-      INSERT INTO orders (reference, customer_id, email, name, phone,
+      INSERT INTO orders (reference, customer_id, account_id, email, name, phone,
         address_line1, address_line2, city, region, postal, country, notes,
         status, subtotal, shipping, total)
-      VALUES (${ref}, ${customer.id}, ${input.email}, ${input.name}, ${input.phone},
+      VALUES (${ref}, ${customer.id}, ${input.accountId ?? null}, ${input.email}, ${input.name}, ${input.phone},
         ${input.addressLine1}, ${input.addressLine2}, ${input.city}, ${input.region},
         ${input.postal}, ${input.country}, ${input.notes},
         'pending', ${subtotal}, ${shipping}, ${total})

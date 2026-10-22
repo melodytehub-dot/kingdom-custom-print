@@ -10,6 +10,7 @@ try {
   for (const width of [320, 390, 768, 820, 1024, 1440]) {
     await page.setViewportSize({ width, height: 900 });
     await page.goto(`${base}/shop`, { waitUntil: "load" });
+    await page.locator('.mm-card').first().waitFor({ state: 'attached', timeout: 15000 });
     assert.equal(await page.locator('[aria-label="Breadcrumb"], .breadcrumb, .mm-topbar, .mm-card-badges').count(), 0);
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), true, `No overflow at ${width}px`);
     const cardLayout = await page.locator('.mm-card').evaluateAll(cards => cards.slice(0, 4).map(card => {

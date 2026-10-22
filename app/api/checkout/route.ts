@@ -5,6 +5,7 @@ import { getProductById } from "@/lib/catalog";
 import { quoteProduct } from "@/lib/pricing";
 import { FONTS } from "@/lib/fonts";
 import { personalizationOf } from "@/lib/design";
+import { customerFromRequest, sameOrigin } from "@/lib/customer-auth";
 import type { CartItem, Design, DesignLayer, GarmentSide, RosterEntry } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -221,6 +222,7 @@ function clampNum(v: unknown, min: number, max: number, fallback: number): numbe
 }
 
 export async function POST(req: Request) {
+  if (!sameOrigin(req)) return NextResponse.json({ error: "Invalid request origin." }, { status: 403 });
   if (!paymentsConfigured()) {
     return NextResponse.json(
       { error: "Card checkout is temporarily unavailable. Your design is saved in your cart; please try again later." },
@@ -236,7 +238,11 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Invalid request." }, { status: 400 });
   }
 
-  const email = String(body.email ?? "").trim();
+  const email = String(body.email ?? "").trim().toLowerCase();
+  const account = await customerFromRequest(req);
+  if (account && email !== account.email) {
+    return NextResponse.json({ error: "Use the email on your account or sign out before checking out." }, { status: 422 });
+  }
   const name = String(body.name ?? "").trim();
   const addressLine1 = String(body.addressLine1 ?? "").trim();
 
@@ -273,6 +279,7 @@ export async function POST(req: Request) {
 
   try {
     const order = await createOrder({
+      accountId: account?.id ?? null,
       email,
       name,
       phone: String(body.phone ?? "").trim().slice(0, 40),
