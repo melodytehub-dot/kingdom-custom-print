@@ -11,12 +11,12 @@ import { getProducts } from "@/lib/catalog";
 export const revalidate = 60;
 
 const POD_CATEGORIES = [
-  { name: "SHIRTS", href: "/shop?kind=tee", image: "/img/printed-catalog/crown-classic-tee/black.webp" },
-  { name: "POLOS", href: "/shop?kind=polo", image: "/img/printed-catalog/classic-pique-polo/black.webp" },
-  { name: "HOODIES", href: "/shop?kind=fleece", image: "/img/printed-catalog/premium-pullover-hoodie/black.webp" },
-  { name: "CAPS", href: "/shop?kind=cap", image: "/img/printed-catalog/five-panel-cap/black.webp" },
-  { name: "TOTES", href: "/shop?kind=tote", image: "/img/printed-catalog/canvas-tote/natural.webp" },
-  { name: "MERCH", href: "/shop?kind=mug", image: "/img/printed-catalog/ceramic-mug/black.webp" },
+  { name: "SHIRTS", href: "/shop?kind=tee", image: "/img/category-prints/shirts.webp" },
+  { name: "POLOS", href: "/shop?kind=polo", image: "/img/category-prints/polos.webp" },
+  { name: "HOODIES", href: "/shop?kind=fleece", image: "/img/category-prints/hoodies.webp" },
+  { name: "CAPS", href: "/shop?kind=cap", image: "/img/category-prints/caps.webp" },
+  { name: "TOTES", href: "/shop?kind=tote", image: "/img/category-prints/totes.webp" },
+  { name: "MERCH", href: "/shop?kind=mug", image: "/img/category-prints/merch.webp" },
 ];
 
 const INSTA_IMAGES = [
@@ -78,7 +78,7 @@ export default async function HomePage() {
       <nav className="mm-category-strip minimog-container" aria-label="Shop by category">
         {POD_CATEGORIES.map((category) => (
           <Link key={category.name} href={category.href} className="mm-category-link">
-            <span className="mm-category-art" aria-hidden="true" style={{ backgroundImage: `url(${category.image}?v=blank-1)` }} />
+            <span className="mm-category-art" aria-hidden="true" style={{ backgroundImage: `url(${category.image})` }} />
             <span>{category.name}</span>
           </Link>
         ))}
