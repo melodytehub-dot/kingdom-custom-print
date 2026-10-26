@@ -91,6 +91,78 @@ try {
       && Math.abs(garmentAfterEdit.y - garmentBeforeEdit.y) < 1,
   );
 
+  /* The reference interaction: draw one box around several layers, then move
+     the temporary selection as a rigid unit. */
+  await page.locator('button.rot-tool[data-tool="text"]').click();
+  await page.getByRole("textbox", { name: "New text", exact: true }).fill("Pair test");
+  await page.getByRole("button", { name: "+ Add text", exact: true }).click();
+  const pairArtwork = page.locator(".rot-canvas-svg text").filter({ hasText: "PAIR TEST" }).first();
+  await pairArtwork.waitFor({ state: "visible" });
+  await select.click();
+
+  const dragMarquee = async (input = "mouse") => {
+    const boxes = await Promise.all([artwork.boundingBox(), pairArtwork.boundingBox()]);
+    const svgBox = await page.locator(".rot-canvas-svg").boundingBox();
+    if (!boxes[0] || !boxes[1] || !svgBox) return false;
+    const left = Math.max(svgBox.x + 6, Math.min(boxes[0].x, boxes[1].x) - 26);
+    const top = Math.max(svgBox.y + 6, Math.min(boxes[0].y, boxes[1].y) - 26);
+    const right = Math.min(svgBox.x + svgBox.width - 6, Math.max(boxes[0].x + boxes[0].width, boxes[1].x + boxes[1].width) + 26);
+    const bottom = Math.min(svgBox.y + svgBox.height - 6, Math.max(boxes[0].y + boxes[0].height, boxes[1].y + boxes[1].height) + 26);
+
+    if (input === "touch") {
+      const session = await page.context().newCDPSession(page);
+      await session.send("Emulation.setTouchEmulationEnabled", { enabled: true, maxTouchPoints: 1 });
+      const point = (x, y) => ({ x, y, id: 1, radiusX: 2, radiusY: 2, force: 1 });
+      await session.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: [point(left, top)] });
+      await session.send("Input.dispatchTouchEvent", { type: "touchMove", touchPoints: [point((left + right) / 2, (top + bottom) / 2)] });
+      await session.send("Input.dispatchTouchEvent", { type: "touchMove", touchPoints: [point(right, bottom)] });
+      const visible = await page.locator("[data-selection-marquee]").isVisible().catch(() => false);
+      await session.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
+      await session.detach();
+      return visible;
+    }
+
+    await page.mouse.move(left, top);
+    await page.mouse.down();
+    await page.mouse.move((left + right) / 2, (top + bottom) / 2, { steps: 3 });
+    const visible = await page.locator("[data-selection-marquee]").isVisible().catch(() => false);
+    await page.mouse.move(right, bottom, { steps: 4 });
+    await page.mouse.up();
+    return visible;
+  };
+
+  check("Select drag shows a marquee", await dragMarquee());
+  check(
+    "Mouse marquee selects both design layers",
+    await page.locator(".rot-selcount").textContent() === "2 selected"
+      && await page.locator("[data-group-frame]").count() === 1,
+  );
+
+  const beforePairMove = await Promise.all([artwork.boundingBox(), pairArtwork.boundingBox()]);
+  const firstSelectedBox = await artwork.boundingBox();
+  if (firstSelectedBox) {
+    const x = firstSelectedBox.x + firstSelectedBox.width / 2;
+    const y = firstSelectedBox.y + firstSelectedBox.height / 2;
+    await page.mouse.move(x, y);
+    await page.mouse.down();
+    await page.mouse.move(x + 42, y + 24, { steps: 8 });
+    await page.mouse.up();
+  }
+  const afterPairMove = await Promise.all([artwork.boundingBox(), pairArtwork.boundingBox()]);
+  const pairDeltas = beforePairMove.map((before, index) => ({
+    x: before && afterPairMove[index] ? afterPairMove[index].x - before.x : 0,
+    y: before && afterPairMove[index] ? afterPairMove[index].y - before.y : 0,
+  }));
+  check(
+    "Marquee selection moves as one rigid design",
+    pairDeltas.every((delta) => delta.x > 20 && delta.y > 10)
+      && Math.abs(pairDeltas[0].x - pairDeltas[1].x) < 2
+      && Math.abs(pairDeltas[0].y - pairDeltas[1].y) < 2,
+    JSON.stringify(pairDeltas),
+  );
+
+  await page.getByRole("button", { name: "Clear selection" }).click();
+
   await page.setViewportSize({ width: 390, height: 844 });
   const mobileSelect = await select.boundingBox();
   const mobileHand = await hand.boundingBox();
@@ -134,6 +206,14 @@ try {
       `${viewport.width}x${viewport.height}; overflow ${Math.round(overflow)}px`,
     );
   }
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  check("One-finger drag shows a mobile selection marquee", await dragMarquee("touch"));
+  check(
+    "One-finger marquee selects both design layers on mobile",
+    await page.locator(".rot-selcount").textContent() === "2 selected"
+      && await page.locator("[data-group-frame]").count() === 1,
+  );
   check("canvas tools run without page errors", errors.length === 0, errors.join(" | "));
 } catch (error) {
   check("canvas tool flow", false, error instanceof Error ? error.message : String(error));

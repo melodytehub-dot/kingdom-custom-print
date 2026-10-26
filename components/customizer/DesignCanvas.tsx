@@ -87,6 +87,18 @@ interface DragState {
   base: Box;
 }
 
+interface MarqueeState {
+  pointerId: number;
+  startClientX: number;
+  startClientY: number;
+  moved: boolean;
+  additive: boolean;
+  baseIds: string[];
+  rect: { left: number; top: number; width: number; height: number };
+  start: { x: number; y: number };
+  current: { x: number; y: number };
+}
+
 const clamp = (n: number, min: number, max: number) => Math.min(max, Math.max(min, n));
 const round2 = (n: number) => Math.round(n * 100) / 100;
 
@@ -166,6 +178,44 @@ export function selectionFrame(
   return { x: minX, y: minY, w, h, cx: minX + w / 2, cy: minY + h / 2 };
 }
 
+/**
+ * Layers touched by a drag-selection rectangle. Existing groups behave like a
+ * single object: catching one member selects all of its peers.
+ */
+export function marqueeSelectionIds(
+  layers: DesignLayer[],
+  area: Box,
+  areaOrigin: { x: number; y: number },
+  start: { x: number; y: number },
+  current: { x: number; y: number }
+): string[] {
+  const marquee = {
+    left: Math.min(start.x, current.x),
+    top: Math.min(start.y, current.y),
+    right: Math.max(start.x, current.x),
+    bottom: Math.max(start.y, current.y),
+  };
+  const direct = new Set<string>();
+  const groups = new Set<string>();
+
+  for (const layer of layers) {
+    const frame = selectionFrame([layer], area, areaOrigin);
+    if (!frame) continue;
+    const intersects =
+      frame.x <= marquee.right &&
+      frame.x + frame.w >= marquee.left &&
+      frame.y <= marquee.bottom &&
+      frame.y + frame.h >= marquee.top;
+    if (!intersects) continue;
+    direct.add(layer.id);
+    if (layer.groupId) groups.add(layer.groupId);
+  }
+
+  return layers
+    .filter((layer) => direct.has(layer.id) || Boolean(layer.groupId && groups.has(layer.groupId)))
+    .map((layer) => layer.id);
+}
+
 /** Geometry of the printable area in view units, shared with the stage. */
 export function printAreaView(side: GarmentSide, printArea?: PrintArea) {
   const configured = printArea ? areaFor(printArea, side) : null;
@@ -206,7 +256,9 @@ export default function DesignCanvas({
 }: CanvasProps) {
   const svgRef = useRef<SVGSVGElement>(null);
   const dragRef = useRef<DragState | null>(null);
+  const marqueeRef = useRef<MarqueeState | null>(null);
   const [dragging, setDragging] = useState<Tool | null>(null);
+  const [marquee, setMarquee] = useState<MarqueeState | null>(null);
   const uid = useId().replace(/:/g, "");
 
   const pa = useMemo(() => printAreaView(side, printArea), [side, printArea]);
@@ -283,6 +335,32 @@ export default function DesignCanvas({
     event.currentTarget.setPointerCapture(event.pointerId);
     if (nextTool !== "move") onGestureStart?.();
     setDragging(nextTool);
+  };
+
+  const startMarquee = (event: ReactPointerEvent<SVGSVGElement>) => {
+    if (interactionMode !== "select" || dragRef.current || marqueeRef.current) return;
+    if (event.button !== 0 && event.pointerType === "mouse") return;
+    const point = toView(event.clientX, event.clientY);
+    const rect = svgRef.current?.getBoundingClientRect();
+    if (!point || !rect) return;
+
+    event.preventDefault();
+    const additive = event.shiftKey || event.ctrlKey || event.metaKey;
+    const next: MarqueeState = {
+      pointerId: event.pointerId,
+      startClientX: event.clientX,
+      startClientY: event.clientY,
+      moved: false,
+      additive,
+      baseIds: additive ? selectedIds : [],
+      rect: { left: rect.left, top: rect.top, width: rect.width, height: rect.height },
+      start: point,
+      current: point,
+    };
+    marqueeRef.current = next;
+    setMarquee(next);
+    if (!additive) onSelect([]);
+    event.currentTarget.setPointerCapture(event.pointerId);
   };
 
   useEffect(() => {
@@ -431,6 +509,47 @@ export default function DesignCanvas({
     };
   }, [dragging, side, area, areaOrigin, onChange, onCommit, onSelect, onTap, onGestureStart]);
 
+  useEffect(() => {
+    if (!marquee) return;
+
+    const onMove = (event: PointerEvent) => {
+      const state = marqueeRef.current;
+      if (!state || event.pointerId !== state.pointerId) return;
+      event.preventDefault();
+      if (!state.moved) {
+        if (Math.hypot(event.clientX - state.startClientX, event.clientY - state.startClientY) <= 7) return;
+        state.moved = true;
+      }
+      state.current = {
+        x: clamp(((event.clientX - state.rect.left) / state.rect.width) * VIEW, 0, VIEW),
+        y: clamp(((event.clientY - state.rect.top) / state.rect.height) * VIEW, 0, VIEW),
+      };
+      const caught = marqueeSelectionIds(layers, area, areaOrigin, state.start, state.current);
+      const ids = state.additive ? [...new Set([...state.baseIds, ...caught])] : caught;
+      onSelect(ids);
+      setMarquee({ ...state });
+    };
+
+    const onUp = (event: PointerEvent) => {
+      const state = marqueeRef.current;
+      if (!state || event.pointerId !== state.pointerId) return;
+      marqueeRef.current = null;
+      setMarquee(null);
+      const svg = svgRef.current;
+      if (svg?.hasPointerCapture(event.pointerId)) svg.releasePointerCapture(event.pointerId);
+      if (!state.moved && !state.additive) onSelect([]);
+    };
+
+    window.addEventListener("pointermove", onMove, { passive: false });
+    window.addEventListener("pointerup", onUp);
+    window.addEventListener("pointercancel", onUp);
+    return () => {
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+      window.removeEventListener("pointercancel", onUp);
+    };
+  }, [marquee, layers, area, areaOrigin, onSelect]);
+
   // Keyboard nudging for the selected layer (desktop).
   useEffect(() => {
     if (interactionMode !== "select") return;
@@ -570,9 +689,7 @@ export default function DesignCanvas({
         className={`rot-canvas-svg is-${interactionMode}`}
         role="img"
         aria-label={`${side} preview with ${layers.length} design element${layers.length === 1 ? "" : "s"}`}
-        onPointerDown={() => {
-          if (interactionMode === "select" && !dragRef.current) onSelect([]);
-        }}
+        onPointerDown={startMarquee}
       >
         <defs>
           {levels.map((lv) => (
@@ -648,6 +765,24 @@ export default function DesignCanvas({
             />
           ))}
         </g>
+
+        {marquee?.moved ? (
+          <rect
+            data-selection-marquee
+            x={Math.min(marquee.start.x, marquee.current.x)}
+            y={Math.min(marquee.start.y, marquee.current.y)}
+            width={Math.abs(marquee.current.x - marquee.start.x)}
+            height={Math.abs(marquee.current.y - marquee.start.y)}
+            rx={4}
+            fill="#1689d6"
+            fillOpacity={0.1}
+            stroke="#1689d6"
+            strokeWidth={2}
+            strokeDasharray="9 6"
+            vectorEffect="non-scaling-stroke"
+            pointerEvents="none"
+          />
+        ) : null}
 
         <g>
           {overlayChildren}

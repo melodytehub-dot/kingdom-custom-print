@@ -367,6 +367,10 @@
   overflow: visible;
 }
 
+.rot-canvas-svg.is-select {
+  cursor: crosshair;
+}
+
   .rot-shirt.is-flipping .rot-canvas {
     animation: rot-flip 0.32s ease;
   }
