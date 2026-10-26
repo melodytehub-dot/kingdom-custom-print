@@ -25,7 +25,7 @@ export default function ProductPhotography({ product, color, view = "front", cla
   if (printed) {
     return <span className={`product-photography ${className}`} data-photo-color={selected.slug} data-photo-view={view}>
       <Image unoptimized src={printed} alt={decorative ? "" : `${product.name} blank in ${selected.name}`} fill
-        sizes="(max-width: 640px) 50vw, 600px" priority={priority} style={{ objectFit: "contain" }} />
+        sizes="(max-width: 640px) 50vw, 600px" loading={priority ? "eager" : "lazy"} style={{ objectFit: "contain" }} />
     </span>;
   }
   if (!family) {

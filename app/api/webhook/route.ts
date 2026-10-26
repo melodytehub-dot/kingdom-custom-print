@@ -41,7 +41,8 @@ export async function POST(req: Request) {
         session.id,
         typeof session.payment_intent === "string"
           ? session.payment_intent
-          : (session.payment_intent?.id ?? null)
+          : (session.payment_intent?.id ?? null),
+        event.id
       );
       break;
     }
@@ -49,7 +50,30 @@ export async function POST(req: Request) {
       const session = event.data.object;
       if (session.client_reference_id) {
         const { cancelOrder } = await import("@/lib/orders");
-        await cancelOrder(session.client_reference_id);
+        await cancelOrder(session.client_reference_id, { eventId: event.id });
+      }
+      break;
+    }
+    case "checkout.session.async_payment_failed": {
+      const session = event.data.object;
+      if (session.client_reference_id) {
+        const { cancelOrder } = await import("@/lib/orders");
+        await cancelOrder(session.client_reference_id, {
+          eventId: event.id,
+          note: "Stripe reported that the asynchronous payment failed.",
+        });
+      }
+      break;
+    }
+    case "charge.refunded": {
+      const charge = event.data.object;
+      if (charge.amount_refunded < charge.amount) break;
+      const paymentIntentId = typeof charge.payment_intent === "string"
+        ? charge.payment_intent
+        : charge.payment_intent?.id;
+      if (paymentIntentId) {
+        const { markOrderRefunded } = await import("@/lib/orders");
+        await markOrderRefunded(paymentIntentId, event.id);
       }
       break;
     }

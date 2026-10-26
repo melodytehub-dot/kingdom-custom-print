@@ -7,7 +7,13 @@ import Garment from "@/components/Garment";
 import ArrowRight from "@/components/icons/ArrowRight";
 import { formatUSD } from "@/lib/pricing";
 import { mockupsForProduct } from "@/lib/mockups";
-import { ORDER_STATUSES, type OrderStatus, type Product, type ProductKind } from "@/lib/types";
+import {
+  ADMIN_ORDER_TRANSITIONS,
+  ORDER_STATUSES,
+  type OrderStatus,
+  type Product,
+  type ProductKind,
+} from "@/lib/types";
 import type {
   AdminOrder,
   AdminOrderDetail,
@@ -104,8 +110,8 @@ export default function AdminDashboard({
 
       {!data.paymentsLive ? (
         <p className="banner-note" role="status">
-          Card payments are not connected on this deployment, so orders arrive as
-          invoice requests. Add the Stripe keys to enable checkout.
+          Card payments are not connected on this deployment. Checkout is disabled
+          until the Stripe keys and signed webhook are configured.
         </p>
       ) : null}
 
@@ -220,7 +226,8 @@ function Orders({
         setOrders((prev) =>
           prev.map((o) => (o.reference === reference ? { ...o, status } : o))
         );
-        setSelected((prev) => (prev && prev.reference === reference ? { ...prev, status } : prev));
+        const detailResponse = await fetch(`/api/admin/orders?ref=${encodeURIComponent(reference)}`);
+        if (detailResponse.ok) setSelected(await detailResponse.json());
       } catch {
         setError("Network error. Try again.");
       } finally {
@@ -380,6 +387,10 @@ function OrderDetailPanel({
   onStatus: (reference: string, status: OrderStatus) => void;
   onClose: () => void;
 }) {
+  const allowedStatuses = ADMIN_ORDER_TRANSITIONS[detail.status] ?? [];
+  const statusOptions = ORDER_STATUSES.filter(
+    (entry) => entry.value === detail.status || allowedStatuses.includes(entry.value)
+  );
   return (
     <div className="order-panel" role="region" aria-label={`Order ${detail.reference}`}>
       <div className="order-panel-head">
@@ -442,29 +453,75 @@ function OrderDetailPanel({
           <h4 className="panel-heading">Items</h4>
           <ul className="admin-items">
             {detail.items.map((item, i) => (
-              <li key={i}>
-                <div className="admin-item-thumb">
-                  {item.previewFront ?? item.previewBack ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={(item.previewFront ?? item.previewBack) as string} alt="" />
-                  ) : (
-                    <Garment kind={item.productKind} color={item.colorHex} />
-                  )}
+              <li key={i} className="admin-order-item">
+                <div className="admin-order-item-head">
+                  <div>
+                    <p className="small wrap-anywhere">
+                      <strong>{item.quantity} × {item.productName}</strong>
+                    </p>
+                    <p className="small muted wrap-anywhere">
+                      {item.colorName} ·{" "}
+                      {item.sizeBreakdown
+                        .filter((s) => s.qty > 0)
+                        .map((s) => `${s.label}×${s.qty}`)
+                        .join(", ")}
+                    </p>
+                  </div>
+                  <p className="tnum small">{formatUSD(item.unitPrice * item.quantity)}</p>
                 </div>
-                <div className="grow">
-                  <p className="small wrap-anywhere">
-                    <strong>{item.quantity} × {item.productName}</strong>
-                  </p>
-                  <p className="small muted wrap-anywhere">
-                    {item.colorName} ·{" "}
-                    {item.sizeBreakdown
-                      .filter((s) => s.qty > 0)
-                      .map((s) => `${s.label}×${s.qty}`)
-                      .join(", ")}
-                  </p>
-                  {item.designNotes ? <p className="small wrap-anywhere"><strong>Design notes:</strong> {item.designNotes}</p> : null}
+
+                <div className="admin-proof-grid" aria-label={`${item.productName} customer proof previews`}>
+                  {(["front", "back"] as const).map((side) => {
+                    const preview = side === "front" ? item.previewFront : item.previewBack;
+                    const layerCount = Array.isArray(item.design[side]) ? item.design[side].length : 0;
+                    return (
+                      <figure key={side} className="admin-proof">
+                        <div className="admin-proof-image">
+                          {preview ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img src={preview} alt={`${item.productName} ${side} customer proof`} />
+                          ) : (
+                            <Garment kind={item.productKind} color={item.colorHex} />
+                          )}
+                        </div>
+                        <figcaption>
+                          <strong>{side === "front" ? "Front" : "Back"}</strong>
+                          <span className="muted">{layerCount} design {layerCount === 1 ? "element" : "elements"}</span>
+                          {preview ? <a className="link" href={preview} download={`${detail.reference}-${i + 1}-${side}-proof.png`}>Download proof</a> : null}
+                        </figcaption>
+                      </figure>
+                    );
+                  })}
                 </div>
-                <p className="tnum small">{formatUSD(item.unitPrice * item.quantity)}</p>
+
+                <p className="hint">Customer-approved screen proof; verify dimensions and source quality before production.</p>
+                {sourceArtwork(item.design).length ? (
+                  <div className="admin-source-files">
+                    <strong className="small">Source artwork saved with order</strong>
+                    {sourceArtwork(item.design).map((art, artIndex) => (
+                      <a key={`${art.side}-${artIndex}`} className="link small" href={art.src} download={`${detail.reference}-${art.side}-artwork-${artIndex + 1}`}>
+                        Download {art.side} artwork {artIndex + 1}
+                      </a>
+                    ))}
+                  </div>
+                ) : null}
+                {item.designNotes ? <p className="small wrap-anywhere"><strong>Design notes:</strong> {item.designNotes}</p> : null}
+                {item.roster.length ? (
+                  <div className="table-scroll admin-roster-wrap">
+                    <table className="data-table admin-roster-table">
+                      <caption>Names and numbers ({item.roster.length})</caption>
+                      <thead><tr><th>Name</th><th>Number</th><th>Subtitle</th><th>Size</th></tr></thead>
+                      <tbody>
+                        {item.roster.map((entry) => (
+                          <tr key={entry.id}>
+                            <td>{entry.name || "—"}</td><td>{entry.number || "—"}</td>
+                            <td>{entry.subtitle || "—"}</td><td>{entry.size || "—"}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : null}
               </li>
             ))}
           </ul>
@@ -477,15 +534,42 @@ function OrderDetailPanel({
             id="status-select"
             className="select"
             value={detail.status}
-            disabled={saving}
+            disabled={saving || allowedStatuses.length === 0}
             onChange={(e) => onStatus(detail.reference, e.target.value as OrderStatus)}
           >
-            {ORDER_STATUSES.map((s) => (
+            {statusOptions.map((s) => (
               <option key={s.value} value={s.value}>
                 {s.label}
               </option>
             ))}
           </select>
+          <p className="hint">
+            {detail.status === "pending"
+              ? "Only Stripe can confirm payment. You may cancel this unpaid order."
+              : allowedStatuses.length
+                ? "Only the next valid fulfillment step is available."
+                : "This order has no further manual status changes."}
+          </p>
+
+          <h4 className="panel-heading">Status history</h4>
+          {detail.statusHistory.length ? (
+            <ol className="admin-status-history">
+              {detail.statusHistory.map((event, index) => (
+                <li key={`${event.createdAt}-${index}`} className="small">
+                  <strong>
+                    {ORDER_STATUSES.find((entry) => entry.value === event.toStatus)?.label
+                      ?? event.toStatus}
+                  </strong>{" "}
+                  <span className="muted">
+                    by {event.actor} · {new Date(event.createdAt).toLocaleString()}
+                  </span>
+                  {event.note ? <span className="wrap-anywhere"> — {event.note}</span> : null}
+                </li>
+              ))}
+            </ol>
+          ) : (
+            <p className="small muted">No recorded transitions yet.</p>
+          )}
 
           <dl className="summary-list">
             <div>
@@ -507,6 +591,19 @@ function OrderDetailPanel({
       </div>
     </div>
   );
+}
+
+function sourceArtwork(design: AdminOrderDetail["items"][number]["design"]) {
+  return (["front", "back"] as const).flatMap((side) => {
+    const layers = Array.isArray(design[side]) ? design[side] : [];
+    return layers.flatMap((layer) => {
+      if (!layer || typeof layer !== "object") return [];
+      const value = layer as { type?: unknown; src?: unknown };
+      return value.type === "image" && typeof value.src === "string"
+        ? [{ side, src: value.src }]
+        : [];
+    });
+  });
 }
 
 /* -------------------------------------------------------------------------

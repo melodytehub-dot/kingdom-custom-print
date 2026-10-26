@@ -38,8 +38,16 @@ export async function PATCH(req: Request) {
     return NextResponse.json({ error: "Unknown order or status." }, { status: 422 });
   }
 
-  const ok = await updateOrderStatus(reference, status);
-  if (!ok) return NextResponse.json({ error: "Order not found." }, { status: 404 });
+  const result = await updateOrderStatus(reference, status);
+  if (!result.ok && result.reason === "not-found") {
+    return NextResponse.json({ error: "Order not found." }, { status: 404 });
+  }
+  if (!result.ok) {
+    return NextResponse.json(
+      { error: "That status change is not allowed. Payment can only be confirmed by Stripe." },
+      { status: 409 }
+    );
+  }
 
   return NextResponse.json({ ok: true });
 }

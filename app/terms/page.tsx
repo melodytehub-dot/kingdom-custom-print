@@ -9,11 +9,7 @@ export const metadata: Metadata = {
 
 export default async function TermsPage() {
   const settings = await getSettings();
-  const updated = new Date().toLocaleDateString("en-US", {
-    year: "numeric",
-    month: "long",
-    day: "numeric",
-  });
+  const updated = "October 25, 2026";
 
   return (
     <>
@@ -59,18 +55,19 @@ export default async function TermsPage() {
         <section>
           <h2 className="h3">Pricing</h2>
           <p>
-            Prices are in the currency shown at checkout. Quantity breaks apply to the
-            total number of garments in the order. We may correct obvious pricing errors
-            before production and will contact you if that affects your order.
+            Prices are in US dollars. Quantity breaks are calculated separately for each
+            product configuration in the cart, matching the price shown in the designer
+            and checkout. We may correct obvious pricing errors before production and
+            will contact you if that affects your order.
           </p>
         </section>
 
         <section>
           <h2 className="h3">Custom goods</h2>
           <p>
-            Custom printed items cannot be returned for change of mind. Faults,
-            manufacturing errors or incorrect colors are covered — see the shipping and
-            returns page.
+            Custom printed items are made to the approved specification. Contact the
+            business promptly about a fault, manufacturing error, or incorrect item so
+            it can review the order and confirm the remedy available under its policy.
           </p>
         </section>
 

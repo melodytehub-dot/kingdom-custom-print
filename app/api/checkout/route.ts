@@ -1,5 +1,11 @@
 import { NextResponse } from "next/server";
-import { createOrder, attachStripeSession } from "@/lib/orders";
+import { randomUUID } from "node:crypto";
+import { createOrder, attachStripeSession, cancelOrder } from "@/lib/orders";
+import {
+  createOrderAccessSession,
+  ORDER_ACCESS_COOKIE,
+  orderAccessCookieOptions,
+} from "@/lib/order-access";
 import { siteUrl, stripeClient, paymentsConfigured } from "@/lib/stripe";
 import { getProductById } from "@/lib/catalog";
 import { quoteProduct } from "@/lib/pricing";
@@ -13,6 +19,7 @@ export const dynamic = "force-dynamic";
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 
 interface Body {
+  checkoutAttemptId?: string;
   email?: string;
   name?: string;
   phone?: string;
@@ -240,6 +247,9 @@ export async function POST(req: Request) {
   }
 
   const email = String(body.email ?? "").trim().toLowerCase();
+  const checkoutAttemptId = /^[0-9a-f]{8}-[0-9a-f-]{27}$/i.test(String(body.checkoutAttemptId ?? ""))
+    ? String(body.checkoutAttemptId)
+    : randomUUID();
   const account = await customerFromRequest(req);
   if (account && email !== account.email) {
     return NextResponse.json({ error: "Use the email on your account or sign out before checking out." }, { status: 422 });
@@ -253,6 +263,9 @@ export async function POST(req: Request) {
   if (addressLine1.length < 3) fieldErrors.addressLine1 = "Enter a street address.";
   if (!String(body.city ?? "").trim()) fieldErrors.city = "Enter a city.";
   if (!String(body.postal ?? "").trim()) fieldErrors.postal = "Enter a postal code.";
+  if (String(body.country ?? "US").toUpperCase() !== "US") {
+    fieldErrors.country = "Online checkout currently supports United States delivery only.";
+  }
 
   if (Object.keys(fieldErrors).length) {
     return NextResponse.json({ error: "Check the highlighted fields.", fieldErrors }, { status: 422 });
@@ -278,8 +291,12 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Please split this size run into smaller orders, or contact us for a bulk order." }, { status: 422 });
   }
 
+  let createdReference: string | null = null;
+  let createdOrderWasNew = false;
+  let stripeSessionId: string | null = null;
   try {
     const order = await createOrder({
+      checkoutAttemptId,
       accountId: account?.id ?? null,
       email,
       name,
@@ -293,6 +310,8 @@ export async function POST(req: Request) {
       notes: String(body.notes ?? "").trim().slice(0, 2000),
       items,
     });
+    createdReference = order.reference;
+    createdOrderWasNew = !order.reused;
 
     const base = siteUrl();
     const session = await stripe.checkout.sessions.create({
@@ -331,19 +350,39 @@ export async function POST(req: Request) {
       ],
       success_url: `${base}/order/success?ref=${encodeURIComponent(order.reference)}`,
       cancel_url: `${base}/cart?cancelled=1`,
-    });
+    }, { idempotencyKey: `checkout-${checkoutAttemptId}` });
+    stripeSessionId = session.id;
 
     if (!session.url) {
-      return NextResponse.json(
-        { error: "Payment could not be started. Please try again." },
-        { status: 502 }
-      );
+      throw new Error("Stripe Checkout returned no redirect URL.");
     }
 
     await attachStripeSession(order.reference, session.id);
-    return NextResponse.json({ url: session.url, reference: order.reference });
+    const accessToken = await createOrderAccessSession(order.reference);
+    const response = NextResponse.json({ url: session.url, reference: order.reference });
+    if (accessToken) {
+      response.cookies.set(ORDER_ACCESS_COOKIE, accessToken, orderAccessCookieOptions());
+    }
+    return response;
   } catch (err) {
     console.error("checkout error:", err);
+    if (stripeSessionId) {
+      try {
+        await stripe.checkout.sessions.expire(stripeSessionId);
+      } catch (expireError) {
+        console.error("checkout session cleanup error:", expireError);
+      }
+    }
+    if (createdReference && createdOrderWasNew) {
+      try {
+        await cancelOrder(createdReference, {
+          actor: "system",
+          note: "Checkout setup failed before the customer could complete payment.",
+        });
+      } catch (cleanupError) {
+        console.error("checkout order cleanup error:", cleanupError);
+      }
+    }
     return NextResponse.json(
       { error: "We could not start checkout. Please try again." },
       { status: 500 }

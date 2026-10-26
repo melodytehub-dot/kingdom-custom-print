@@ -14,11 +14,11 @@ const GROUPS: { title: string; items: { q: string; a: string }[] }[] = [
     items: [
       {
         q: "What file types can I upload?",
-        a: "PNG, JPG, WebP, HEIC, AVIF, GIF and SVG. Vector files such as SVG print sharpest at any size. For raster artwork, 300 DPI at the finished print size is the target — a design printing 12 inches wide should be at least 3600 × 3600 pixels.",
+        a: "PNG, JPG, WebP, HEIC, AVIF, GIF and SVG. The browser optimizes raster uploads for an on-screen placement proof, so keep your original high-resolution file. SVG stays sharpest; production staff must verify source quality before printing.",
       },
       {
         q: "Why is there a dashed outline on the garment?",
-        a: "That marks the printable area for the side you are viewing. Anything outside it will be cropped in production, so the outline is how you check your artwork will print whole.",
+        a: "That marks the configured printable area for the side you are viewing. Keep artwork inside it. The screen is a placement proof; production staff must still verify the blank, dimensions and source file before printing.",
       },
       {
         q: "Can I print on the sleeves?",
@@ -26,7 +26,7 @@ const GROUPS: { title: string; items: { q: string; a: string }[] }[] = [
       },
       {
         q: "Will my design be exactly what I see?",
-        a: "Yes. What you position in the designer is what we print, within the printable area. We will contact you before production if anything looks like it will not come out cleanly.",
+        a: "The designer records side, position, scale and rotation for the customer proof. Screens, garment photography and print methods vary, so it is not a press-ready color or resolution guarantee. Production staff review the saved proof and source artwork before printing.",
       },
     ],
   },
@@ -35,7 +35,7 @@ const GROUPS: { title: string; items: { q: string; a: string }[] }[] = [
     items: [
       {
         q: "Is there a minimum order?",
-        a: "No. A single garment is printed the same way as a hundred. Price breaks apply automatically as your total rises, so larger runs cost less per garment.",
+        a: "No. Price breaks apply to the quantity of each product configuration in the cart, so larger runs of the same configured item cost less per garment.",
       },
       {
         q: "Why is the price different on some products?",
@@ -64,7 +64,7 @@ const GROUPS: { title: string; items: { q: string; a: string }[] }[] = [
       },
       {
         q: "Can I order a size run to keep?",
-        a: "Yes. The designer saves drafts on your device, and you can reorder the same design later without designing it again.",
+        a: "The designer saves drafts on this device. Account orders remain visible while the account is available, but a one-click reorder workflow has not been added yet.",
       },
     ],
   },
@@ -85,7 +85,7 @@ const GROUPS: { title: string; items: { q: string; a: string }[] }[] = [
       },
       {
         q: "Can I change my order after placing it?",
-        a: "If it has not entered production we can usually change sizes or cancel. Once printing has started it is too late, so contact us quickly.",
+        a: "Contact us immediately. A size change or cancellation may be possible before production begins, but it is not guaranteed and cannot be made after printing starts.",
       },
     ],
   },

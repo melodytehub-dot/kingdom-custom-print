@@ -275,6 +275,14 @@ const { default: Customizer } = load("components/customizer/Customizer.tsx", {
     removeBackgroundLocally: async () => ({ dataUrl: "", source: "portrait", report: {} }),
     CutoutError: class CutoutError extends Error { constructor(reason, message) { super(message); this.reason = reason; } },
   },
+  "@/lib/hostedCutout": {
+    hostedCutoutDataUrl: async () => ({ dataUrl: "", aspect: 1 }),
+    hostedCutoutReady: () => false,
+  },
+  "@/lib/photoroomCutout": {
+    photoroomAltReady: () => false,
+    photoroomCutoutDataUrl: async () => ({ dataUrl: "", aspect: 1 }),
+  },
   "@/lib/cutoutActions": load("lib/cutoutActions.ts", { "@/lib/cutoutModels": { formatModelSize: () => "6 MB" } }),
   "@/lib/cutoutModels": {
     CUTOUT_MAX_EDGE: 1400, DETAILED_PLAN: ["general"], cutoutPlan: () => ["portrait"], formatModelSize: () => "6 MB",

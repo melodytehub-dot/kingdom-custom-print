@@ -26,7 +26,7 @@ export default function OrderDetail({ order }: { order: OrderSummary }) {
         </span>
       </div>
 
-      {order.status !== "cancelled" ? (
+      {order.status !== "cancelled" && order.status !== "refunded" ? (
         <ol className="status-track" aria-label="Order progress">
           {steps.map((s, i) => (
             <li
@@ -75,6 +75,18 @@ export default function OrderDetail({ order }: { order: OrderSummary }) {
                     ))}
                 </ul>
                 {item.designNotes ? <p className="small wrap-anywhere"><strong>Design notes:</strong> {item.designNotes}</p> : null}
+                {item.roster.length ? (
+                  <details className="small">
+                    <summary>Names &amp; numbers ({item.roster.length})</summary>
+                    <ul className="order-sizes">
+                      {item.roster.map((entry) => (
+                        <li key={entry.id}>
+                          {[entry.name, entry.number, entry.subtitle, entry.size].filter(Boolean).join(" · ")}
+                        </li>
+                      ))}
+                    </ul>
+                  </details>
+                ) : null}
               </div>
 
               <p className="order-item-qty tnum">×{item.quantity}</p>
@@ -104,8 +116,8 @@ export default function OrderDetail({ order }: { order: OrderSummary }) {
 
         {order.status === "pending" ? (
           <p className="hint">
-            Payment instructions have been sent to {order.email}. We start production
-            once payment clears.
+            Payment has not been confirmed. Production begins only after Stripe confirms
+            a successful payment.
           </p>
         ) : null}
       </div>

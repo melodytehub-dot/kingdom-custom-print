@@ -1,4 +1,4 @@
-import type { OrderStatus, ProductKind } from "./types";
+import type { OrderStatus, ProductKind, RosterEntry } from "./types";
 import type { Product } from "./types";
 
 export interface SiteSettings {
@@ -53,6 +53,7 @@ export interface AdminOrderItem {
   previewFront: string | null;
   previewBack: string | null;
   designNotes: string;
+  roster: RosterEntry[];
 }
 
 export interface AdminOrderDetail {
@@ -73,6 +74,13 @@ export interface AdminOrderDetail {
   total: number;
   createdAt: string;
   paidAt: string | null;
+  statusHistory: {
+    fromStatus: OrderStatus | null;
+    toStatus: OrderStatus;
+    actor: "stripe" | "admin" | "system";
+    note: string;
+    createdAt: string;
+  }[];
   items: AdminOrderItem[];
 }
 

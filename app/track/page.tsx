@@ -27,8 +27,8 @@ export default function TrackPage() {
 
         <div className="track-help">
           <p className="small muted">
-            Lost the reference? Email us with the name and email used on the order and we will
-            look it up.
+            If you checked out while signed in, your saved orders are available in your
+            account. Otherwise, contact us with the name and email used at checkout.
           </p>
           <div className="track-links">
             <Link href="/contact" className="link">

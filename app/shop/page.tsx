@@ -31,6 +31,12 @@ export default async function ShopPage({
     getProducts(),
   ]);
   const categories = allCategories;
+  // Polo is already a precise garment-type filter below. Showing the matching
+  // catalog category beside it produced two indistinguishable "Polo Shirts"
+  // controls on narrow screens.
+  const filterCategories = categories.filter(
+    (category) => !/(^|[-\s])polo(s)?([-\s]|$)/i.test(`${category.slug} ${category.name}`)
+  );
 
   const activeCategory = params.category ?? "";
   const activeKind = params.kind ?? "";
@@ -106,7 +112,7 @@ export default async function ShopPage({
             >
               All Blanks
             </Link>
-            {categories.map((category) => {
+            {filterCategories.map((category) => {
               const active = activeCategory === category.slug && !activeKind;
               return (
                 <Link

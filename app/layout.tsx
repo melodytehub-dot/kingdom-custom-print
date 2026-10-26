@@ -195,7 +195,7 @@ export default async function RootLayout({
   ]);
 
   return (
-    <html lang="en" className={FONT_VARS}>
+    <html lang="en" className={FONT_VARS} data-scroll-behavior="smooth">
       <body>
         <a className="skip-link" href="#main">
           Skip to content

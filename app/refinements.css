@@ -33,7 +33,7 @@ a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible
 .mm-search-input { min-width: 0; }
 .mm-search-category { max-width: 150px; }
 .mm-header-actions { flex-shrink: 0; gap: 20px; }
-.mm-account-action { color: #141414; font-size: 13px; font-weight: 700; text-decoration: none; white-space: nowrap; }
+.mm-account-action { display: inline-flex; min-height: 44px; align-items: center; padding: 0 4px; color: #141414; font-size: 13px; font-weight: 700; text-decoration: none; white-space: nowrap; }
 .mm-account-action:hover { color: var(--red); }
 @media (max-width: 768px) { .mm-account-action { display: none; } }
 .mm-nav-list { gap: clamp(20px, 3vw, 44px); }
@@ -189,11 +189,12 @@ a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible
 .mm-hero-slider-track { transition: transform 460ms cubic-bezier(0.16, 1, 0.3, 1); }
 .mm-hero-slide { position: relative; flex: 0 0 100%; width: 100%; height: 100%; overflow: hidden; }
 .mm-hero-slider::after { position: absolute; z-index: 1; inset: 0; background: rgba(16, 18, 20, 0.28); content: ""; pointer-events: none; }
-.mm-hero-slider-controls { position: absolute; z-index: 3; top: 16px; right: 16px; display: flex; align-items: center; justify-content: center; gap: 10px; min-height: 34px; padding: 2px 4px 2px 8px; border-radius: 6px; background: rgba(24, 26, 28, 0.62); }
-.mm-hero-slider-dots { display: flex; align-items: center; justify-content: center; gap: 7px; }
-.mm-hero-slider-dot { width: 8px; height: 8px; padding: 0; border: 1px solid #fff; border-radius: 8px; background: rgba(30, 32, 34, 0.42); box-shadow: 0 1px 3px rgba(0, 0, 0, 0.35); transition: width 180ms ease, background-color 180ms ease; }
-.mm-hero-slider-dot.is-active { width: 20px; background: #fff; }
-.mm-hero-slider-toggle { position: static; flex: none; display: grid; width: 32px; height: 32px; place-items: center; border: 1px solid rgba(255, 255, 255, 0.8); border-radius: 50%; background: rgba(24, 26, 28, 0.58); color: #fff; }
+.mm-hero-slider-controls { position: absolute; z-index: 3; top: 16px; right: 16px; display: flex; align-items: center; justify-content: center; gap: 0; min-height: 44px; padding: 0 2px; border-radius: 8px; background: rgba(24, 26, 28, 0.68); }
+.mm-hero-slider-dots { display: flex; align-items: center; justify-content: center; gap: 0; }
+.mm-hero-slider-dot { position: relative; width: 44px; height: 44px; padding: 0; border: 0; background: transparent; }
+.mm-hero-slider-dot::before { position: absolute; top: 50%; left: 50%; width: 8px; height: 8px; content: ""; transform: translate(-50%, -50%); border: 1px solid #fff; border-radius: 8px; background: rgba(30, 32, 34, 0.42); box-shadow: 0 1px 3px rgba(0, 0, 0, 0.35); transition: width 180ms ease, background-color 180ms ease; }
+.mm-hero-slider-dot.is-active::before { width: 20px; background: #fff; }
+.mm-hero-slider-toggle { position: static; flex: none; display: grid; width: 44px; height: 44px; place-items: center; border: 0; border-radius: 50%; background: transparent; color: #fff; }
 .mm-hero-slider-toggle span.is-pause { display: flex; width: 9px; height: 11px; justify-content: space-between; border-right: 2px solid currentColor; border-left: 2px solid currentColor; }
 .mm-hero-slider-toggle span.is-play { width: 0; height: 0; margin-left: 2px; border-top: 6px solid transparent; border-bottom: 6px solid transparent; border-left: 9px solid currentColor; }
 
@@ -204,7 +205,7 @@ a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible
 
 @media (prefers-reduced-motion: reduce) {
   .mm-hero-slider-track,
-  .mm-hero-slider-dot { transition: none; }
+  .mm-hero-slider-dot::before { transition: none; }
 }
 @media (hover: none) {
   .mm-card:hover .mm-card-img-primary { transform: none; }

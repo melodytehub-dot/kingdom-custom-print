@@ -136,7 +136,7 @@ export default async function HomePage() {
               }}
             >
               <span className="mm-banner-team-photo">
-                <Image src="/img/kingdom-team.webp" alt="Five people wearing Kingdom Custom Print shirts" fill sizes="(max-width: 768px) 100vw, 620px" className="mm-banner-photo mm-banner-photo-team" />
+                <Image src="/img/kingdom-team.webp" alt="Five people wearing Kingdom Custom Print shirts" fill sizes="(max-width: 768px) 100vw, 620px" className="mm-banner-photo mm-banner-photo-team" unoptimized />
               </span>
               <div className="mm-banner-content">
                 <h3 className="mm-banner-title">CROSSFIT & TEAMS</h3>
@@ -192,7 +192,7 @@ export default async function HomePage() {
                 Choose Your Garment
               </h3>
               <p style={{ color: "#666", fontSize: "14px", lineHeight: "1.6", margin: 0 }}>
-                Pick from heavyweight streetwear blanks, soft ringspun tees, or cozy fleeces across 30+ colors.
+                Pick from heavyweight streetwear blanks, soft ringspun tees, or cozy fleeces in the colors available for each style.
               </p>
             </div>
 
@@ -213,10 +213,10 @@ export default async function HomePage() {
                 03.
               </span>
               <h3 style={{ fontSize: "18px", marginBottom: "10px", fontFamily: "var(--font-body)", fontWeight: "600", textTransform: "none" }}>
-                Precision DTG Print
+                Production Review
               </h3>
               <p style={{ color: "#666", fontSize: "14px", lineHeight: "1.6", margin: 0 }}>
-                We prepare your artwork for printing and produce your garments to order.
+                We review the saved proof and available source artwork before producing your garments to order.
               </p>
             </div>
 
@@ -225,7 +225,7 @@ export default async function HomePage() {
                 04.
               </span>
               <h3 style={{ fontSize: "18px", marginBottom: "10px", fontFamily: "var(--font-body)", fontWeight: "600", textTransform: "none" }}>
-                Delivered With Tracking
+                Follow Order Progress
               </h3>
               <p style={{ color: "#666", fontSize: "14px", lineHeight: "1.6", margin: 0 }}>
                 Use your order reference to check progress as your garments move through production and shipping.
@@ -260,7 +260,7 @@ export default async function HomePage() {
               <div className="mm-feature-body">
                 <h3>Clear delivery options</h3>
                 <p>
-                  Review shipping at checkout and follow your order from production to delivery.
+                  Review shipping at checkout and follow your order through production to its shipped status.
                 </p>
               </div>
             </div>
@@ -270,7 +270,7 @@ export default async function HomePage() {
                 <Store size={24} />
               </div>
               <div className="mm-feature-body">
-                <h3>Locally Owned</h3>
+                <h3>Built for custom runs</h3>
                 <p>
                   Custom apparel for businesses, creative projects, events, and teams. Talk to us about your next run.
                 </p>

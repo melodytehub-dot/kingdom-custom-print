@@ -10,9 +10,11 @@ const VIEWPORTS = [
   { name: "desktop", width: 1440, height: 900 },
   { name: "laptop", width: 1280, height: 800 },
   { name: "tablet", width: 820, height: 1180 },
+  // A 1280px desktop viewport at 200% browser zoom exposes roughly 640 CSS px.
+  { name: "zoom-200", width: 640, height: 450 },
   { name: "mobile", width: 390, height: 844 },
   { name: "mobile-sm", width: 320, height: 700 },
-];
+].filter((viewport) => !process.env.QA_VIEWPORT || process.env.QA_VIEWPORT.split(",").includes(viewport.name));
 
 const ROUTES = [
   { path: "/", name: "home" },
@@ -33,8 +35,9 @@ const ROUTES = [
   { path: "/checkout", name: "checkout" },
   { path: "/order/success", name: "order-success" },
   { path: "/admin", name: "admin-login" },
+  { path: "/account", name: "account" },
   { path: "/nonexistent", name: "not-found" },
-];
+].filter((route) => !process.env.QA_ROUTE || process.env.QA_ROUTE.split(",").includes(route.name));
 
 const findings = [];
 const record = (level, route, vp, msg) => {
@@ -188,6 +191,36 @@ const run = async () => {
           record("CONSOLE", route.name, vp.name, e);
         }
 
+        // Full-page screenshots must not freeze lazy images before they enter
+        // the viewport. Walk the page once, wait for visible image decodes,
+        // then return to the top before capturing evidence.
+        if (vp.name === "desktop" || vp.name === "mobile") {
+          const incompleteImages = await page.evaluate(async () => {
+            const targetHeight = document.documentElement.scrollHeight;
+            for (let y = 0; y < targetHeight; y += Math.max(500, innerHeight * 0.8)) {
+              scrollTo(0, y);
+              await new Promise((resolve) => setTimeout(resolve, 120));
+            }
+            await new Promise((resolve) => setTimeout(resolve, 500));
+            const results = await Promise.all(Array.from(document.images)
+              .filter((image) => image.getBoundingClientRect().width > 0 && !image.closest('[aria-hidden="true"]'))
+              .map(async (image) => {
+                const decoded = image.complete && image.naturalWidth > 0
+                  ? true
+                  : await Promise.race([
+                      image.decode().then(() => true).catch(() => false),
+                      new Promise((resolve) => setTimeout(() => resolve(false), 5000)),
+                    ]);
+                return decoded ? null : (image.currentSrc || image.src);
+              }));
+            scrollTo(0, 0);
+            return results.filter(Boolean).slice(0, 5);
+          });
+          for (const source of incompleteImages) {
+            record("IMAGE-INCOMPLETE", route.name, vp.name, String(source).slice(0, 160));
+          }
+        }
+
         await page.screenshot({
           path: `${OUT}/${vp.name}-${route.name}.png`,
           fullPage: vp.name === "desktop" || vp.name === "mobile",
@@ -211,7 +244,7 @@ const run = async () => {
   console.log(JSON.stringify(byLevel, null, 2));
   console.log(`screenshots: ${OUT}`);
   fs.writeFileSync(`${OUT}/findings.json`, JSON.stringify(findings, null, 2));
-  if (findings.some(f => ["OVERFLOW", "CLIPPED", "NO-NAME", "JS-ERROR", "CONSOLE", "LOAD-FAIL"].includes(f.level))) process.exitCode = 1;
+  if (findings.some(f => ["OVERFLOW", "CLIPPED", "NO-NAME", "JS-ERROR", "CONSOLE", "LOAD-FAIL", "IMAGE-INCOMPLETE"].includes(f.level))) process.exitCode = 1;
   if (findings.length) {
     console.log("\nFirst 30 findings:");
     findings.slice(0, 30).forEach((f) => console.log(`  ${f.level} ${f.vp}/${f.route}: ${f.msg}`));

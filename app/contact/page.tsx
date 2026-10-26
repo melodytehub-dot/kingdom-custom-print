@@ -6,7 +6,7 @@ import { getSettings } from "@/lib/catalog";
 export const metadata: Metadata = {
   title: "Contact",
   description:
-    "Questions about artwork, sizing or a bulk run? Send us the details and we will come back to you.",
+    "Questions about artwork, sizing or a bulk run? Find the business contact options currently available.",
 };
 
 export default async function ContactPage() {

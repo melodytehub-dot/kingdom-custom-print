@@ -18,8 +18,8 @@ export default async function ShippingPage() {
         <p className="eyebrow">Shipping</p>
         <h1 className="display">Shipping and returns</h1>
         <p className="lede">
-          Every order is printed after you order it, so turnaround runs from artwork
-          approval rather than from the day you check out.
+          Every order is produced after it is placed. The production estimate begins
+          after payment and any required artwork review are complete.
         </p>
       </div>
 
@@ -27,9 +27,9 @@ export default async function ShippingPage() {
         <section>
           <h2 className="h3">Turnaround</h2>
           <p>
-            Production takes {settings.productionDays}. Artwork review happens first —
-            if we need to change something we will contact you, and the clock starts
-            from your approval.
+            The current production estimate is {settings.productionDays}. Artwork review
+            happens first; an order that needs changes does not enter production until
+            those changes are resolved.
           </p>
           <p>
             If you have a hard deadline, mention it when you order or send us a message
@@ -48,32 +48,31 @@ export default async function ShippingPage() {
               : "."}
           </p>
           <p>
-            We ship within the United States and to the countries listed at checkout.
-            Duties and import taxes for international orders are the recipient&rsquo;s
-            responsibility.
+            Online checkout currently supports United States delivery only. International
+            rates, duties, taxes, and delivery times are not built into this flat rate;
+            contact us for a quote before placing an international order.
           </p>
         </section>
 
         <section>
           <h2 className="h3">Returns</h2>
           <p>
-            Custom printed items are made to your specification, so they cannot be
-            returned for change of mind. That said, if something arrives with a print
-            fault, the wrong color or a manufacturing error, contact us and we will put
-            it right — reprinting or refunding as appropriate.
+            Custom printed items are made to your specification. Contact us promptly if
+            an item arrives with a print fault, the wrong color, or a manufacturing
+            error so the business can review the order and confirm the available remedy.
           </p>
           <p>
-            Report any issue within 14 days of delivery and include your order reference
-            and a photo of the item.
+            Include your order reference and clear photos of the item. The exact claim
+            window and remedy depend on the business policy confirmed for your order.
           </p>
         </section>
 
         <section>
           <h2 className="h3">Address changes</h2>
           <p>
-            If an order has not entered production yet we can usually redirect it. Once
-            printing has started we cannot change the destination, so please check your
-            address carefully before confirming.
+            An address correction may be possible before production or fulfillment begins,
+            but it is not guaranteed. Check your address carefully before paying and
+            contact the business immediately if it is wrong.
           </p>
         </section>
 

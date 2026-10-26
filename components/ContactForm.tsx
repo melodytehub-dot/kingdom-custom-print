@@ -79,6 +79,11 @@ export default function ContactForm({
 
   return (
     <form className="contact-form" onSubmit={submit} noValidate>
+      <p className={`banner-note${contactEmail ? "" : " is-error"}`} role="status">
+        {contactEmail
+          ? "This form prepares a message in your email app; the website does not send it automatically."
+          : "Online enquiries are not available until the business publishes a contact email."}
+      </p>
       {state ? (
         <p
           className={`banner-note${state.tone === "error" ? " is-error" : " is-ok"}`}
@@ -150,8 +155,8 @@ export default function ContactForm({
         </div>
       </div>
 
-      <button type="submit" className="btn btn-lg" disabled={busy}>
-        Send message
+      <button type="submit" className="btn btn-lg" disabled={busy || !contactEmail}>
+        Prepare email
       </button>
 
       <p className="hint">

@@ -114,8 +114,9 @@ export default function HeroImageSlider() {
               src={slide.src}
               alt={slide.alt}
               fill
-              sizes="100vw"
-              priority={index === 0}
+              sizes="(max-width: 768px) 100vw, 50vw"
+              preload={index === 0}
+              unoptimized={slide.src.endsWith(".webp")}
               style={{ objectFit: "cover", objectPosition: slide.position }}
             />
           </div>

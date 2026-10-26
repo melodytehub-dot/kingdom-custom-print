@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import Garment from "@/components/Garment";
 import ArrowRight from "@/components/icons/ArrowRight";
@@ -33,6 +33,7 @@ function validate(fields: Fields): Errors {
   if (!fields.city.trim()) e.city = "Enter a city.";
   if (!fields.region.trim()) e.region = "Enter a state or region.";
   if (!fields.postal.trim()) e.postal = "Enter a postal code.";
+  if (fields.country !== "US") e.country = "Online checkout currently supports United States delivery only.";
   if (fields.phone.trim() && !/^[\d\s()+-]{7,}$/.test(fields.phone.trim())) {
     e.phone = "Enter a valid phone number, or leave it blank.";
   }
@@ -57,6 +58,7 @@ export default function CheckoutForm({ settings, paymentsReady, account }: { set
   const [errors, setErrors] = useState<Errors>({});
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
+  const checkoutAttempt = useRef(crypto.randomUUID());
 
   const shipping = useMemo(() => {
     if (subtotal <= 0) return 0;
@@ -100,7 +102,7 @@ export default function CheckoutForm({ settings, paymentsReady, account }: { set
       const res = await fetch("/api/checkout", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...fields, items }),
+        body: JSON.stringify({ ...fields, items, checkoutAttemptId: checkoutAttempt.current }),
       });
       const data = (await res.json()) as {
         url?: string;
@@ -111,6 +113,7 @@ export default function CheckoutForm({ settings, paymentsReady, account }: { set
       };
 
       if (!res.ok) {
+        checkoutAttempt.current = crypto.randomUUID();
         if (data.fieldErrors) setErrors(data.fieldErrors);
         setFormError(data.error ?? "We could not start checkout.");
         return;
@@ -262,14 +265,16 @@ export default function CheckoutForm({ settings, paymentsReady, account }: { set
                 className="select"
                 value={fields.country}
                 onChange={(e) => set("country", e.target.value)}
+                aria-invalid={errors.country ? "true" : undefined}
+                aria-describedby={errors.country ? "country-error" : "country-hint"}
               >
                 <option value="US">United States</option>
-                <option value="CA">Canada</option>
-                <option value="GB">United Kingdom</option>
-                <option value="AU">Australia</option>
-                <option value="NZ">New Zealand</option>
-                <option value="IE">Ireland</option>
               </select>
+              {errors.country ? (
+                <span className="error-text" id="country-error">{errors.country}</span>
+              ) : (
+                <span className="hint" id="country-hint">International rates require a custom quote.</span>
+              )}
             </div>
             <div className="field span-2">
               <label className="label" htmlFor="notes">

@@ -133,23 +133,64 @@ CREATE TABLE IF NOT EXISTS orders (
   country        text NOT NULL DEFAULT 'US',
   notes          text NOT NULL DEFAULT '',
   status         text NOT NULL DEFAULT 'pending'
-                 CHECK (status IN ('pending','paid','in_proof','in_production','shipped','cancelled')),
+                 CHECK (status IN ('pending','paid','in_proof','in_production','shipped','refunded','cancelled')),
   subtotal       numeric(10,2) NOT NULL DEFAULT 0,
   shipping       numeric(10,2) NOT NULL DEFAULT 0,
   total          numeric(10,2) NOT NULL DEFAULT 0,
   -- set once the Stripe webhook confirms payment
   stripe_session_id text,
   stripe_payment_intent text,
+  checkout_attempt_id text,
   paid_at        timestamptz,
   created_at     timestamptz NOT NULL DEFAULT now(),
   updated_at     timestamptz NOT NULL DEFAULT now()
 );
 
 ALTER TABLE orders ADD COLUMN IF NOT EXISTS account_id int REFERENCES customer_accounts(id) ON DELETE SET NULL;
+ALTER TABLE orders DROP CONSTRAINT IF EXISTS orders_status_check;
+ALTER TABLE orders ADD CONSTRAINT orders_status_check
+  CHECK (status IN ('pending','paid','in_proof','in_production','shipped','refunded','cancelled'));
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS checkout_attempt_id text;
+CREATE UNIQUE INDEX IF NOT EXISTS orders_checkout_attempt_idx
+  ON orders (checkout_attempt_id) WHERE checkout_attempt_id IS NOT NULL;
 CREATE INDEX IF NOT EXISTS orders_account_idx ON orders (account_id, created_at DESC);
 
 CREATE INDEX IF NOT EXISTS orders_created_idx ON orders (created_at DESC);
 CREATE INDEX IF NOT EXISTS orders_status_idx ON orders (status);
+
+-- Short-lived proof that a guest verified an order with its checkout email.
+-- Only a hash is stored; the raw token lives in an httpOnly browser cookie.
+CREATE TABLE IF NOT EXISTS order_access_sessions (
+  token_hash text PRIMARY KEY,
+  order_id int NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
+  expires_at timestamptz NOT NULL,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS order_access_sessions_order_idx
+  ON order_access_sessions (order_id, expires_at);
+
+CREATE TABLE IF NOT EXISTS order_access_attempts (
+  key text PRIMARY KEY,
+  attempts int NOT NULL DEFAULT 0,
+  reset_at timestamptz NOT NULL
+);
+
+-- Payment and admin transitions are recorded separately from the mutable order
+-- row so the production team can see how an order reached its current state.
+CREATE TABLE IF NOT EXISTS order_status_events (
+  id bigserial PRIMARY KEY,
+  order_id int NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
+  from_status text,
+  to_status text NOT NULL,
+  actor text NOT NULL CHECK (actor IN ('stripe','admin','system')),
+  note text NOT NULL DEFAULT '',
+  external_event_id text,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE UNIQUE INDEX IF NOT EXISTS order_status_events_external_idx
+  ON order_status_events (external_event_id) WHERE external_event_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS order_status_events_order_idx
+  ON order_status_events (order_id, created_at DESC);
 
 -- One row per garment configuration inside an order.
 CREATE TABLE IF NOT EXISTS order_items (
@@ -170,8 +211,11 @@ CREATE TABLE IF NOT EXISTS order_items (
   -- data URL previews rendered at add-to-cart time
   preview_front text,
   preview_back  text,
+  roster        jsonb NOT NULL DEFAULT '[]'::jsonb,
   notes        text NOT NULL DEFAULT ''
 );
+
+ALTER TABLE order_items ADD COLUMN IF NOT EXISTS roster jsonb NOT NULL DEFAULT '[]'::jsonb;
 
 CREATE INDEX IF NOT EXISTS order_items_order_idx ON order_items (order_id);
 

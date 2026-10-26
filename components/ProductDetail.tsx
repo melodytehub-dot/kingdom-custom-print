@@ -93,7 +93,7 @@ export default function ProductDetail({ product, initialColor = "" }: { product:
             <li key={angle}>
               <button type="button" className={`pdp-thumb${angle === view ? " is-active" : ""}`}
                 onClick={() => setView(angle)} aria-label={`View ${angle}`} aria-pressed={angle === view}>
-                <ProductPhotography key={`${color?.slug}:${angle}`} product={product} color={color} view={angle} decorative />
+                <ProductPhotography key={`${color?.slug}:${angle}`} product={product} color={color} view={angle} decorative priority={angle === "front"} />
                 <span>{angle}</span>
               </button>
             </li>

@@ -45,7 +45,7 @@ export default async function Header({
               alt="Kingdom Custom Print"
               width={180}
               height={55}
-              priority
+              preload
               style={{ height: "46px", width: "auto", objectFit: "contain" }}
             />
           </Link>
