@@ -22,6 +22,38 @@ export interface StageFitOptions {
 
 export const STAGE_VIEW = 900;
 
+export interface StageOffset {
+  x: number;
+  y: number;
+}
+
+interface StageBounds {
+  size: number;
+  left: number;
+  ty: number;
+}
+
+/**
+ * Keeps a hand-panned garment reachable. The customer can move the canvas far
+ * enough to inspect an edge, but can never lose the whole garment off-screen.
+ */
+export function clampStageOffset(
+  offset: StageOffset,
+  stage: { width: number; height: number },
+  fit: StageBounds
+): StageOffset {
+  if (fit.size <= 0 || stage.width <= 0 || stage.height <= 0) return { x: 0, y: 0 };
+  const visible = Math.min(96, fit.size * 0.3);
+  const minX = visible - (fit.left + fit.size);
+  const maxX = stage.width - visible - fit.left;
+  const minY = visible - (fit.ty + fit.size);
+  const maxY = stage.height - visible - fit.ty;
+  return {
+    x: Math.min(maxX, Math.max(minX, offset.x)),
+    y: Math.min(maxY, Math.max(minY, offset.y)),
+  };
+}
+
 export function fitStage(width: number, height: number, zoom = 1, options: StageFitOptions = {}) {
   if (width <= 0 || height <= 0) return { size: 0, left: 0, ty: 0 };
   const portraitPhone = width <= 900 && height > width;

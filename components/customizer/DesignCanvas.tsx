@@ -34,6 +34,7 @@ interface CanvasProps {
   selectedIds: string[];
   compact?: boolean;
   renderSize?: number;
+  interactionMode?: "select" | "pan";
   onSelect: (ids: string[]) => void;
   onTap: (id: string) => void;
   onChange: (side: GarmentSide, id: string, patch: Partial<DesignLayer>) => void;
@@ -192,6 +193,7 @@ export default function DesignCanvas({
   selectedIds,
   compact = false,
   renderSize = VIEW,
+  interactionMode = "select",
   onSelect,
   onTap,
   onChange,
@@ -231,6 +233,7 @@ export default function DesignCanvas({
     nextTool: Tool,
     edge: Edge | null = null
   ) => {
+    if (interactionMode !== "select") return;
     if (event.button !== 0 && event.pointerType === "mouse") return;
     event.preventDefault();
     event.stopPropagation();
@@ -430,6 +433,7 @@ export default function DesignCanvas({
 
   // Keyboard nudging for the selected layer (desktop).
   useEffect(() => {
+    if (interactionMode !== "select") return;
     const picked = layers.filter((l) => selectedIds.includes(l.id));
     if (!picked.length || picked.every((l) => l.locked)) return;
 
@@ -479,7 +483,7 @@ export default function DesignCanvas({
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [selectedIds, layers, side, area, areaOrigin, onChange, onSelect, onCommit, onDelete]);
+  }, [interactionMode, selectedIds, layers, side, area, areaOrigin, onChange, onSelect, onCommit, onDelete]);
 
   const levels = useMemo(
     () => [...new Set(layers.map((l) => l.distress ?? 0).filter((n) => n > 0))],
@@ -509,7 +513,7 @@ export default function DesignCanvas({
   // the last one. A group's grab area sits under its members (tapping an element
   // still resolves to that element) while its frame and handles sit above them.
   const overlayChildren: React.ReactNode[] = [];
-  if (multi && frame) {
+  if (interactionMode === "select" && multi && frame) {
     overlayChildren.push(
       <rect
         key="group-grab"
@@ -524,24 +528,26 @@ export default function DesignCanvas({
       />
     );
   }
-  for (const layer of ordered) {
-    overlayChildren.push(
-      <LayerOverlay
-        key={layer.id}
-        layer={layer}
-        area={area}
-        areaOrigin={areaOrigin}
-        selected={selectedIds.includes(layer.id)}
-        solo={!multi && selectedIds.includes(layer.id)}
-        compact={compact}
-        handleScale={handleScale}
-        onPointerDown={startDrag}
-        onDelete={onDelete}
-        onEdit={onEdit}
-      />
-    );
+  if (interactionMode === "select") {
+    for (const layer of ordered) {
+      overlayChildren.push(
+        <LayerOverlay
+          key={layer.id}
+          layer={layer}
+          area={area}
+          areaOrigin={areaOrigin}
+          selected={selectedIds.includes(layer.id)}
+          solo={!multi && selectedIds.includes(layer.id)}
+          compact={compact}
+          handleScale={handleScale}
+          onPointerDown={startDrag}
+          onDelete={onDelete}
+          onEdit={onEdit}
+        />
+      );
+    }
   }
-  if (multi && frame) {
+  if (interactionMode === "select" && multi && frame) {
     overlayChildren.push(
       <GroupFrame
         key="group-frame"
@@ -561,10 +567,12 @@ export default function DesignCanvas({
       <svg
         ref={svgRef}
         viewBox={`0 0 ${VIEW} ${VIEW}`}
-        className="rot-canvas-svg"
+        className={`rot-canvas-svg is-${interactionMode}`}
         role="img"
         aria-label={`${side} preview with ${layers.length} design element${layers.length === 1 ? "" : "s"}`}
-        onPointerDown={() => { if (!dragRef.current) onSelect([]); }}
+        onPointerDown={() => {
+          if (interactionMode === "select" && !dragRef.current) onSelect([]);
+        }}
       >
         <defs>
           {levels.map((lv) => (

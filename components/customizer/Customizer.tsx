@@ -1,11 +1,18 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type PointerEvent as ReactPointerEvent,
+} from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import DesignCanvas, { printAreaView } from "./DesignCanvas";
-import { fitStage } from "./stageGeometry";
+import { clampStageOffset, fitStage } from "./stageGeometry";
 import {
   ArtPanel,
   AddTextPanel,
@@ -37,10 +44,12 @@ import {
   DollarIcon,
   DuplicateIcon,
   GroupIcon,
+  HandIcon,
   HeadsetIcon,
   LayersIcon,
   LockIcon,
   PersonalizeIcon,
+  PointerIcon,
   RedoIcon,
   RotateShirtIcon,
   SaveIcon,
@@ -119,6 +128,7 @@ import type {
 } from "@/lib/types";
 
 type Step = "design" | "quantity" | "review";
+type CanvasMode = "select" | "pan";
 type Panel =
   | "none"
   | "products"
@@ -264,6 +274,9 @@ export default function Customizer({
   const [focusToken, setFocusToken] = useState(0);
   const [flipping, setFlipping] = useState(false);
   const [zoom, setZoom] = useState(1);
+  const [canvasMode, setCanvasMode] = useState<CanvasMode>("select");
+  const [stagePan, setStagePan] = useState({ x: 0, y: 0 });
+  const [panning, setPanning] = useState(false);
   const [previews, setPreviews] = useState<{ front: string | null; back: string | null }>({
     front: null,
     back: null,
@@ -272,6 +285,13 @@ export default function Customizer({
   const fileInput = useRef<HTMLInputElement>(null);
   const stageRef = useRef<HTMLElement>(null);
   const panelRef = useRef<HTMLElement>(null);
+  const stagePanRef = useRef<{
+    pointerId: number;
+    startX: number;
+    startY: number;
+    originX: number;
+    originY: number;
+  } | null>(null);
   const openFilePicker = useCallback(() => {
     fileInput.current?.click();
   }, []);
@@ -523,6 +543,7 @@ export default function Customizer({
   const openLayerPanel = (id: string) => {
     const layer = design[side].find((l) => l.id === id);
     if (!layer) return;
+    setCanvasMode("select");
     setSelectedIds([id]);
     setPanel(layer.type === "text" ? "text" : "image");
   };
@@ -570,6 +591,7 @@ export default function Customizer({
     setFlipping(true);
     window.setTimeout(() => setFlipping(false), 320);
     setSide((s) => (s === "front" ? "back" : "front"));
+    setStagePan({ x: 0, y: 0 });
     setSelectedIds([]);
     setPanel((p) => (SPLIT_PANELS.includes(p) ? "none" : p));
   };
@@ -610,6 +632,7 @@ export default function Customizer({
   const addText = (style: Partial<TextLayer> = {}) => {
     const layer = newTextLayer({ ...(darkShirt ? { color: "#FFFFFF" } : {}), ...style });
     setDesign((prev) => ({ ...prev, [side]: [...prev[side], layer] }));
+    setCanvasMode("select");
     setSelectedIds([layer.id]);
     setPanel("text");
   };
@@ -617,6 +640,7 @@ export default function Customizer({
   const addImageLayer = (src: string, name: string, aspect: number) => {
     const layer = newImageLayer(src, name, aspect, { origSrc: src, fx: { ...DEFAULT_FX } });
     setDesign((prev) => ({ ...prev, [side]: [...prev[side], layer] }));
+    setCanvasMode("select");
     setSelectedIds([layer.id]);
     setPanel("image");
   };
@@ -1128,6 +1152,7 @@ export default function Customizer({
     setRoster(rows);
     syncLinesFromRoster(rows);
     setSide(nn.side);
+    setStagePan({ x: 0, y: 0 });
     setSelectedIds([]);
     setPanel("none");
     setNotice({
@@ -1151,6 +1176,8 @@ export default function Customizer({
     setSelectedIds([]);
     setPanel("none");
     setZoom(1);
+    setCanvasMode("select");
+    setStagePan({ x: 0, y: 0 });
     setNotice({ tone: "ok", text: "Started a fresh design." });
   };
 
@@ -1418,6 +1445,46 @@ export default function Customizer({
     [stageBox, zoom, visibleStageH, focusY]
   );
 
+  const updateStagePan = useCallback((x: number, y: number) => {
+    setStagePan(clampStageOffset({ x, y }, { width: stageBox.w, height: stageBox.h }, fit));
+  }, [fit, stageBox.h, stageBox.w]);
+
+  const startStagePan = (event: ReactPointerEvent<HTMLElement>) => {
+    if (canvasMode !== "pan" || step !== "design") return;
+    if (event.pointerType === "mouse" && event.button !== 0) return;
+    const target = event.target;
+    if (target instanceof Element && target.closest(".rot-canvas-mode, .rot-share, .rot-quickadd, .rot-selbar")) return;
+    event.preventDefault();
+    stagePanRef.current = {
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      startY: event.clientY,
+      originX: stagePan.x,
+      originY: stagePan.y,
+    };
+    event.currentTarget.setPointerCapture(event.pointerId);
+    setPanning(true);
+  };
+
+  const moveStagePan = (event: ReactPointerEvent<HTMLElement>) => {
+    const gesture = stagePanRef.current;
+    if (!gesture || gesture.pointerId !== event.pointerId) return;
+    event.preventDefault();
+    updateStagePan(
+      gesture.originX + event.clientX - gesture.startX,
+      gesture.originY + event.clientY - gesture.startY
+    );
+  };
+
+  const endStagePan = (event: ReactPointerEvent<HTMLElement>) => {
+    if (stagePanRef.current?.pointerId !== event.pointerId) return;
+    stagePanRef.current = null;
+    setPanning(false);
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+  };
+
   /* ---- what the rail highlights ---- */
   const railActive =
     panel === "products"
@@ -1656,7 +1723,7 @@ export default function Customizer({
   const canUngroup = wholeGroup;
   // On phones the editor is a bottom sheet that covers the bar, so it steps
   // aside; the sheet's own action bar handles the focused element.
-  const showSelectionBar = step === "design" && selectedIds.length > 0 && !overlayPanel;
+  const showSelectionBar = canvasMode === "select" && step === "design" && selectedIds.length > 0 && !overlayPanel;
 
   const tools: { id: string; label: string; icon: React.ReactNode; onClick: () => void }[] = [
     {
@@ -1873,6 +1940,7 @@ export default function Customizer({
                       className={`rot-side-thumb${side === view ? " is-active" : ""}`}
                       onClick={() => {
                         setSide(view);
+                        setStagePan({ x: 0, y: 0 });
                         setSelectedIds([]);
                         setPanel((p) => (SPLIT_PANELS.includes(p) ? "none" : p));
                       }}
@@ -1885,7 +1953,14 @@ export default function Customizer({
                     </button>
                   ))}
                 </div>
-                <button type="button" className="rot-stage-chip" onClick={() => setZoom((z) => (z > 1 ? 1 : 1.12))}>
+                <button
+                  type="button"
+                  className="rot-stage-chip"
+                  onClick={() => {
+                    setZoom((z) => (z > 1 ? 1 : 1.12));
+                    setStagePan({ x: 0, y: 0 });
+                  }}
+                >
                   {zoom > 1 ? "Fit" : "Zoom"}
                 </button>
                 <button type="button" className="rot-stage-chip rot-start-over" onClick={startOver}>
@@ -1905,7 +1980,43 @@ export default function Customizer({
               </div>
             </div>
 
-          <section className="rot-stage" ref={stageRef} aria-label="Design preview">
+          <section
+            className={`rot-stage is-mode-${canvasMode}${panning ? " is-panning" : ""}`}
+            ref={stageRef}
+            aria-label="Design preview"
+            onPointerDown={startStagePan}
+            onPointerMove={moveStagePan}
+            onPointerUp={endStagePan}
+            onPointerCancel={endStagePan}
+          >
+            <div className="rot-canvas-mode" role="toolbar" aria-label="Canvas interaction tool">
+              <button
+                type="button"
+                className={canvasMode === "select" ? "is-active" : ""}
+                aria-pressed={canvasMode === "select"}
+                aria-label="Mouse select tool"
+                title="Mouse / Select tool"
+                onClick={() => setCanvasMode("select")}
+              >
+                <PointerIcon size={20} />
+                <span>Select</span>
+              </button>
+              <button
+                type="button"
+                className={canvasMode === "pan" ? "is-active" : ""}
+                aria-pressed={canvasMode === "pan"}
+                aria-label="Hand pan tool"
+                title="Hand / Pan tool"
+                onClick={() => {
+                  setCanvasMode("pan");
+                  setPanel("none");
+                  setMultiSelect(false);
+                }}
+              >
+                <HandIcon size={20} />
+                <span>Hand</span>
+              </button>
+            </div>
             {fit.size > 0 ? (
               <div
                 className={`rot-shirt${flipping ? " is-flipping" : ""}`}
@@ -1913,7 +2024,7 @@ export default function Customizer({
                   width: fit.size,
                   height: fit.size,
                   left: fit.left,
-                  transform: `translateY(${fit.ty}px)`,
+                  transform: `translate3d(${stagePan.x}px, ${fit.ty + stagePan.y}px, 0)`,
                 }}
               >
                 <DesignCanvas
@@ -1926,6 +2037,7 @@ export default function Customizer({
                   selectedIds={selectedIds}
                   compact={compact}
                   renderSize={fit.size}
+                  interactionMode={canvasMode}
                   onSelect={handleSelect}
                   onTap={handleTap}
                   onChange={patch}

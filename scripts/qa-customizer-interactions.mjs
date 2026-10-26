@@ -17,7 +17,7 @@ function load(file, dependencies, globals = {}) {
   return exports;
 }
 
-const { fitStage } = load("components/customizer/stageGeometry.ts", {});
+const { fitStage, clampStageOffset } = load("components/customizer/stageGeometry.ts", {});
 for (const width of [320, 375, 390, 430, 768, 901, 1440]) {
   for (const height of [130, 180, 260, 500, 800]) {
     const fit = fitStage(width, height);
@@ -38,6 +38,25 @@ assert.equal(fitStage(844, 390).size, 366);
 assert.equal(fitStage(0, 500).size, 0);
 assert.equal(fitStage(320, 0).size, 0);
 console.log("PASS stage fits both dimensions across 35 mobile/desktop stage sizes");
+
+const panFit = fitStage(390, 632, 1.12);
+const clampedPan = clampStageOffset(
+  { x: 10_000, y: -10_000 },
+  { width: 390, height: 632 },
+  panFit
+);
+const visibleStrip = Math.min(96, panFit.size * .3);
+assert.ok(Math.abs(panFit.left + clampedPan.x - (390 - visibleStrip)) < .001);
+assert.ok(Math.abs(panFit.ty + clampedPan.y + panFit.size - visibleStrip) < .001);
+assert.deepEqual(
+  { ...clampStageOffset({ x: 24, y: -35 }, { width: 390, height: 632 }, panFit) },
+  { x: 24, y: -35 }
+);
+assert.deepEqual(
+  { ...clampStageOffset({ x: 40, y: 40 }, { width: 0, height: 0 }, { size: 0, left: 0, ty: 0 }) },
+  { x: 0, y: 0 }
+);
+console.log("PASS hand tool pan remains movable while the garment stays recoverable");
 
 let cursor = 0;
 let slots = [];
