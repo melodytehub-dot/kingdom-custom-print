@@ -4,10 +4,6 @@ import { cloudflare } from "@cloudflare/vite-plugin";
 import { kvDataAdapter } from "@vinext/cloudflare/cache/kv-data-adapter";
 import path from "node:path";
 
-// Vinext consumes next.config.ts, but Cloudflare's native cloudflare:workers
-// module must remain external to the Worker build rather than using Next's stub.
-process.env.KCP_VINEXT = "1";
-
 export default defineConfig({
   plugins: [
     vinext({
