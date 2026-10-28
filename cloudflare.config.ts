@@ -14,6 +14,7 @@ export default defineConfig({
     env: {
       ASSETS: bindings.assets(),
       VINEXT_KV_CACHE: bindings.kv(),
+      HYPERDRIVE: bindings.hyperdrive({ id: "a8072149025844fda414261954600d3e" }),
     },
   }),
 });

@@ -1,11 +1,12 @@
 import postgres from "postgres";
+import { env as cloudflareEnv } from "cloudflare:workers";
 
 declare global {
   var __kcpSql: ReturnType<typeof postgres> | undefined;
 }
 
 function createClient() {
-  const url = process.env.DATABASE_URL;
+  const url = cloudflareEnv.HYPERDRIVE?.connectionString ?? process.env.DATABASE_URL;
   if (!url) {
     throw new Error(
       "DATABASE_URL is not configured. Add it to .env.local — see .env.example."

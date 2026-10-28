@@ -1,6 +1,21 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  ...(!process.env.KCP_VINEXT
+    ? {
+        turbopack: {
+          resolveAlias: {
+            "cloudflare:workers": "./lib/cloudflare-workers.stub.ts",
+          },
+        },
+      }
+    : {}),
+  webpack(config) {
+    if (!process.env.KCP_VINEXT) {
+      config.resolve.alias["cloudflare:workers"] = "./lib/cloudflare-workers.stub.ts";
+    }
+    return config;
+  },
   reactStrictMode: true,
   devIndicators: false,
   poweredByHeader: false,
