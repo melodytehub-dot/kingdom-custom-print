@@ -655,32 +655,39 @@ export default function Customizer({
   };
 
   const addTemplate = (template: DesignTemplate) => {
-    if (template.previewSrc) {
+    const elements = template.elements ?? [];
+    if (!elements.length && template.previewSrc) {
       addImageLayer(template.previewSrc, `Template: ${template.name}`, template.aspect ?? 1);
-      setNotice({ tone: "ok", text: `${template.name} added to the ${side}. You can move, resize, rotate, or recolor it.` });
+      setNotice({ tone: "warn", text: `${template.name} was added as a single image because its editable source artwork is unavailable.` });
       return;
     }
 
     const additions: DesignLayer[] = [];
-    for (const element of template.elements) {
+    for (const element of elements) {
       if (element.type === "text") {
         additions.push(newTextLayer({
           ...element.layer,
-          ...(darkShirt ? { color: "#FFFFFF" } : {}),
+          ...(!template.id.startsWith("lumise-template-") && darkShirt ? { color: "#FFFFFF" } : {}),
         }));
         continue;
       }
 
-      const item = ART_LIBRARY.find((artItem) => artItem.id === element.layer.artId);
-      if (!item) continue;
-      const src = darkShirt && item.src.startsWith("data:image/svg+xml;utf8,")
-        ? `data:image/svg+xml;utf8,${encodeURIComponent(decodeURIComponent(item.src.slice("data:image/svg+xml;utf8,".length)).replaceAll("#141414", "#FFFFFF"))}`
-        : item.src;
-      additions.push(newImageLayer(src, `Template: ${template.name} / ${item.name}`, 1, {
-        x: element.layer.x,
-        y: element.layer.y,
-        scaleX: element.layer.scaleX,
-        scaleY: element.layer.scaleY,
+      const layer = element.layer;
+      const item = ART_LIBRARY.find((artItem) => artItem.id === layer.artId);
+      if (!layer.src && !item) continue;
+      const originalSrc = layer.src ?? item!.src;
+      const src = !layer.src && darkShirt && originalSrc.startsWith("data:image/svg+xml;utf8,")
+        ? `data:image/svg+xml;utf8,${encodeURIComponent(decodeURIComponent(originalSrc.slice("data:image/svg+xml;utf8,".length)).replaceAll("#141414", "#FFFFFF"))}`
+        : originalSrc;
+      additions.push(newImageLayer(src, layer.name ?? `Template: ${template.name} / ${item?.name ?? "Artwork"}`, layer.aspect ?? item?.aspect ?? 1, {
+        x: layer.x,
+        y: layer.y,
+        scaleX: layer.scaleX,
+        scaleY: layer.scaleY,
+        rotation: layer.rotation ?? 0,
+        opacity: layer.opacity ?? 1,
+        flipH: layer.flipH ?? false,
+        flipV: layer.flipV ?? false,
         origSrc: src,
         fx: { ...DEFAULT_FX },
       }));

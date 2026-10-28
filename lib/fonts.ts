@@ -46,6 +46,16 @@ const GOOGLE_FONT_FAMILIES = [
   "Quicksand", "Righteous", "Roboto", "Roboto Slab", "Rubik", "Satisfy",
   "Space Grotesk", "Space Mono", "Special Elite", "Teko", "Ubuntu",
   "Unbounded", "Work Sans", "Yeseva One", "Zilla Slab",
+  // Font families used by text layers in the imported Lumise templates.
+  "Aladin", "Arizonia", "Audiowide", "Baumans", "Berkshire Swash",
+  "Black Ops One", "Bungee Inline", "Bungee Shade", "Caveat Brush",
+  "Coda Caption", "Cookie", "Crete Round", "Damion", "Delius Swash Caps",
+  "Ewert", "Faster One", "Flamenco", "Fredericka the Great", "Frijole",
+  "Handlee", "Holtwood One SC", "Josefin Slab", "Keania One",
+  "Londrina Shadow", "Monoton", "Niconne", "Nosifer", "Oxygen",
+  "Patua One", "Racing Sans One", "Rubik Mono One", "Slabo 27px",
+  "Suez One", "Tangerine", "Titillium Web", "Vast Shadow", "Vinhan",
+  "Yellowtail", "Yesteryear", "Zilla Slab Highlight",
 ] as const;
 
 const googleFonts: FontOption[] = GOOGLE_FONT_FAMILIES.map((family) => {

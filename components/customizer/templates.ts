@@ -28,14 +28,22 @@ type TemplateText = Pick<
   | "strokeColor"
   | "strokeWidth"
   | "arc"
-> & { x: number; y: number };
+> & Partial<Pick<TextLayer, "scaleX" | "scaleY" | "rotation" | "opacity" | "flipH" | "flipV">>
+  & { x: number; y: number };
 
 type TemplateArt = {
-  artId: string;
+  artId?: string;
+  src?: string;
+  name?: string;
+  aspect?: number;
   x: number;
   y: number;
   scaleX: number;
   scaleY: number;
+  rotation?: number;
+  opacity?: number;
+  flipH?: boolean;
+  flipV?: boolean;
 };
 
 export interface DesignTemplate {
@@ -47,7 +55,7 @@ export interface DesignTemplate {
   artId?: string;
   previewSrc?: string;
   aspect?: number;
-  elements: Array<{ type: "text"; layer: TemplateText } | { type: "art"; layer: TemplateArt }>;
+  elements?: Array<{ type: "text"; layer: TemplateText } | { type: "art"; layer: TemplateArt }>;
 }
 
 const title = (text: string, y: number, fontSize = 11, color = "#141414", arc = 0): TemplateText => ({
