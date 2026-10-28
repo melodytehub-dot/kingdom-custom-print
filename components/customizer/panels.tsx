@@ -10,7 +10,7 @@ import type { SavedDraft } from "@/lib/design";
 import { PERSONALIZATION_FEE, formatUSD, lowestPrintedUnit, type PriceQuote } from "@/lib/pricing";
 import { sizeSummary } from "@/lib/sizes";
 import { TEE_MOCKUPS, type TeeMockup } from "@/lib/mockups";
-import { FONTS, svgFontStack } from "@/lib/fonts";
+import { ensureFontLoaded, FONTS, svgFontStack } from "@/lib/fonts";
 import { ART_CATEGORIES, ART_LIBRARY, type ArtItem } from "./art";
 import { DESIGN_TEMPLATES, TEMPLATE_CATEGORIES, type DesignTemplate } from "./templates";
 import { useLumiseLibrary } from "./lumise-library";
@@ -810,7 +810,10 @@ export function NamesTools({
           label: f.label.toUpperCase(),
         }))}
         fontOf={svgFontStack}
-        onChange={(v) => onChange({ font: v })}
+        onChange={(v) => {
+          onChange({ font: v });
+          void ensureFontLoaded(v).catch(() => undefined);
+        }}
       />
       <div className={`rot-row${off ? " is-disabled" : ""}`}>
         <span className="rot-row-label">Color</span>

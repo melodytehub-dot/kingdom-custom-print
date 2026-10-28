@@ -4,11 +4,13 @@ export interface FontOption {
   /** CSS custom property set by next/font (empty for plain system stacks). */
   cssVar: string;
   fallback: string;
+  /** Google Fonts family loaded only when a customer selects it. */
+  googleFamily?: string;
   /** Scripts the face can render; web-safe stacks cover Greek and Hebrew. */
   scripts?: ("latin" | "greek" | "hebrew")[];
 }
 
-export const FONTS: FontOption[] = [
+const BUILT_IN_FONTS: FontOption[] = [
   { value: "anton", label: "Anton", cssVar: "--font-anton", fallback: "'Arial Narrow', Impact, sans-serif" },
   { value: "bebas", label: "Bebas Neue", cssVar: "--font-bebas", fallback: "Impact, 'Arial Narrow', sans-serif" },
   { value: "archivo", label: "Archivo Black", cssVar: "--font-archivo", fallback: "'Arial Black', sans-serif" },
@@ -29,7 +31,38 @@ export const FONTS: FontOption[] = [
   { value: "courier", label: "Courier New", cssVar: "", fallback: "'Courier New', Courier, monospace", scripts: ["latin", "greek", "hebrew"] },
 ];
 
+// Lumise's font picker advertises 800+ Google Fonts. Keep a useful print-focused
+// catalog here and fetch each font only when it is selected, so the editor does
+// not download dozens of unused font files when it opens.
+const GOOGLE_FONT_FAMILIES = [
+  "ABeeZee", "Abril Fatface", "Alegreya", "Alfa Slab One", "Amatic SC",
+  "Architects Daughter", "Arvo", "Barlow", "Barlow Condensed", "Bitter",
+  "Bodoni Moda", "Cabin", "Caveat", "Cinzel", "Comfortaa",
+  "Cormorant Garamond", "Crimson Text", "DM Sans", "DM Serif Display",
+  "Dancing Script", "Fira Sans", "Fjalla One", "Fredoka", "Great Vibes",
+  "IBM Plex Mono", "Inconsolata", "Josefin Sans", "Kanit", "Lato",
+  "League Spartan", "Libre Baskerville", "Lora", "Manrope", "Merriweather Sans",
+  "Mulish", "Nunito", "Open Sans", "Orbitron", "PT Sans", "Poppins",
+  "Quicksand", "Righteous", "Roboto", "Roboto Slab", "Rubik", "Satisfy",
+  "Space Grotesk", "Space Mono", "Special Elite", "Teko", "Ubuntu",
+  "Unbounded", "Work Sans", "Yeseva One", "Zilla Slab",
+] as const;
+
+const googleFonts: FontOption[] = GOOGLE_FONT_FAMILIES.map((family) => {
+  const value = family.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+  return {
+    value: `google-${value}`,
+    label: family,
+    cssVar: "",
+    fallback: `"${family}", sans-serif`,
+    googleFamily: family,
+  };
+});
+
+export const FONTS: FontOption[] = [...BUILT_IN_FONTS, ...googleFonts];
+
 const BY_VALUE = new Map(FONTS.map((f) => [f.value, f]));
+const GOOGLE_FONT_LOADS = new Map<string, Promise<void>>();
 
 function option(value: string): FontOption {
   return BY_VALUE.get(value) ?? FONTS[0];
@@ -58,4 +91,29 @@ export type FontScript = "latin" | "greek" | "hebrew";
 /** Fonts that can render the given script (Latin is the default for brand faces). */
 export function fontsForScript(script: FontScript): FontOption[] {
   return FONTS.filter((f) => (f.scripts ?? ["latin"]).includes(script));
+}
+
+/** Load a selected Lumise-style Google Font in the browser before applying it. */
+export function ensureFontLoaded(value: string): Promise<void> {
+  const font = option(value);
+  const googleFamily = font.googleFamily;
+  if (!googleFamily || typeof document === "undefined") return Promise.resolve();
+
+  const cached = GOOGLE_FONT_LOADS.get(font.value);
+  if (cached) return cached;
+
+  const load = new Promise<void>((resolve, reject) => {
+    const link = document.createElement("link");
+    link.rel = "stylesheet";
+    link.href = `https://fonts.googleapis.com/css2?family=${encodeURIComponent(googleFamily)}&display=swap`;
+    link.onload = () => {
+      void document.fonts.load(`400 16px "${googleFamily}"`).then(() => resolve(), reject);
+    };
+    link.onerror = () => reject(new Error(`Could not load ${font.label}`));
+    document.head.append(link);
+  });
+
+  GOOGLE_FONT_LOADS.set(font.value, load);
+  void load.catch(() => GOOGLE_FONT_LOADS.delete(font.value));
+  return load;
 }

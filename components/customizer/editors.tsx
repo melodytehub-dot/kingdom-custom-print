@@ -2,7 +2,7 @@
 
 import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import type { ImageFx, ImageLayer, TextLayer } from "@/lib/types";
-import { FONTS, fontsForScript, svgFontStack, type FontScript } from "@/lib/fonts";
+import { ensureFontLoaded, FONTS, fontsForScript, svgFontStack, type FontScript } from "@/lib/fonts";
 import { DEFAULT_FX, dominantColours } from "@/lib/imageFx";
 import {
   BackArrowIcon,
@@ -427,12 +427,23 @@ export function FontView({
   onBack: () => void;
 }) {
   const [query, setQuery] = useState("");
+  const [loadingFont, setLoadingFont] = useState<string | null>(null);
+  const [fontError, setFontError] = useState("");
   const list = fontsForScript(script).filter((font) => font.label.toLowerCase().includes(query.trim().toLowerCase()));
+
+  useEffect(() => {
+    const selectedFont = FONTS.find((font) => font.value === value);
+    void ensureFontLoaded(value).catch(() => {
+      setFontError(`Could not load ${selectedFont?.label ?? "the selected font"}.`);
+    });
+  }, [value]);
+
   return (
     <div className="rot-editor">
       <div className="rot-editor-scroll">
         <PanelHeader eyebrow="Text Editor" title="Choose a Font" onBack={onBack} />
         <input className="rot-art-search" type="search" aria-label="Search fonts" placeholder="Search fonts" value={query} onChange={(event) => setQuery(event.target.value)} />
+        {fontError ? <p role="alert">{fontError} Check your connection and try again.</p> : null}
         {!list.length ? <p role="status">No fonts found.</p> : null}
         <ul className="rot-fontlist">
           {list.map((f) => (
@@ -441,10 +452,18 @@ export function FontView({
                 type="button"
                 className={`rot-fontitem${f.value === value ? " is-active" : ""}`}
                 style={{ fontFamily: svgFontStack(f.value) }}
-                onClick={() => onPick(f.value)}
+                disabled={loadingFont !== null}
+                onClick={() => {
+                  setLoadingFont(f.value);
+                  setFontError("");
+                  void ensureFontLoaded(f.value)
+                    .then(() => onPick(f.value))
+                    .catch(() => setFontError(`Could not load ${f.label}.`))
+                    .finally(() => setLoadingFont(null));
+                }}
                 aria-pressed={f.value === value}
               >
-                {f.label}
+                {loadingFont === f.value ? `Loading ${f.label}…` : f.label}
               </button>
             </li>
           ))}
@@ -504,6 +523,10 @@ export function TextEditor({
   useEffect(() => {
     if (focusToken > 0) area.current?.focus();
   }, [focusToken]);
+
+  useEffect(() => {
+    void ensureFontLoaded(layer.font).catch(() => undefined);
+  }, [layer.font]);
 
   // A layer switch always returns to the main view.
   useEffect(() => {
