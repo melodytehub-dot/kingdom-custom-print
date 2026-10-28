@@ -28,6 +28,7 @@ type Edge = "n" | "s" | "e" | "w" | "ne" | "nw" | "se" | "sw";
 interface CanvasProps {
   frontSrc: string;
   backSrc: string;
+  fabricColor?: string;
   side: GarmentSide;
   printArea?: PrintArea;
   design: Design;
@@ -47,6 +48,13 @@ interface CanvasProps {
 }
 
 export const VIEW = 900;
+
+function fabricColorMatrix(color: string): string | null {
+  const channels = color.match(/^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i);
+  if (!channels) return null;
+  const [red, green, blue] = channels.slice(1).map((value) => parseInt(value, 16) / 255);
+  return `${red} 0 0 0 0  0 ${green} 0 0 0  0 0 ${blue} 0 0  0 0 0 1 0`;
+}
 
 interface Box {
   w: number;
@@ -237,6 +245,7 @@ const DISTRESS_THRESHOLD = [0, 0.3, 0.42, 0.52];
 export default function DesignCanvas({
   frontSrc,
   backSrc,
+  fabricColor,
   side,
   printArea,
   design,
@@ -267,6 +276,8 @@ export default function DesignCanvas({
 
   const layers = design[side];
   const photo = side === "front" ? frontSrc : backSrc;
+  const fabricMatrix = fabricColor ? fabricColorMatrix(fabricColor) : null;
+  const fabricFilterId = `${uid}-fabric`;
 
   const toView = useCallback((clientX: number, clientY: number) => {
     const svg = svgRef.current;
@@ -701,6 +712,11 @@ export default function DesignCanvas({
         onPointerDown={startMarquee}
       >
         <defs>
+          {fabricMatrix ? (
+            <filter id={fabricFilterId} colorInterpolationFilters="sRGB">
+              <feColorMatrix type="matrix" values={fabricMatrix} />
+            </filter>
+          ) : null}
           {levels.map((lv) => (
             <filter
               key={lv}
@@ -737,6 +753,7 @@ export default function DesignCanvas({
           width={VIEW}
           height={VIEW}
           preserveAspectRatio="xMidYMid meet"
+          filter={fabricMatrix ? `url(#${fabricFilterId})` : undefined}
           pointerEvents="none"
         />
 

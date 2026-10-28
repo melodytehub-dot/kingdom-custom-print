@@ -139,9 +139,8 @@ export function mockupByCode(code: string): TeeMockup | undefined {
   return TEE_MOCKUPS.find((m) => m.code === code);
 }
 
-/** Returns the correct silhouette family and only the colors offered by a blank. */
-export function mockupsForProduct(product: ProductLike): TeeMockup[] {
-  const family = product.slug === "v-neck-tee"
+function mockupFamily(product: ProductLike): string | null {
+  return product.slug === "v-neck-tee"
     ? "vneck"
     : product.slug === "long-sleeve-tee"
       ? "longsleeve"
@@ -154,18 +153,31 @@ export function mockupsForProduct(product: ProductLike): TeeMockup[] {
             : product.kind === "polo"
               ? "polo"
               : product.kind === "hoodie"
-              ? "hoodie"
-              : product.kind === "crew"
-                ? "crew"
-                : product.kind === "cap"
-                  ? "cap"
-                  : product.kind === "mug"
-                    ? "mug"
-                    : product.kind === "tote"
-                      ? "tote"
-                      : product.kind === "longsleeve"
-                        ? "longsleeve"
-                        : null;
+                ? "hoodie"
+                : product.kind === "crew"
+                  ? "crew"
+                  : product.kind === "cap"
+                    ? "cap"
+                    : product.kind === "mug"
+                      ? "mug"
+                      : product.kind === "tote"
+                        ? "tote"
+                        : product.kind === "longsleeve"
+                          ? "longsleeve"
+                          : null;
+}
+
+/** White garment source used in the SVG canvas, where fabric tinting is applied inline. */
+export function mockupBaseForProduct(product: ProductLike, view: "front" | "back"): string {
+  const family = mockupFamily(product) ?? "tee";
+  if (family === "tee") return `/img/mockups/garment/WHT_${view === "front" ? "fr" : "bk"}.webp`;
+  if (family === "polo") return `/img/products/polo-${view}.png`;
+  return `/img/mockups/families/${family}/WHT_${view === "front" ? "fr" : "bk"}.webp`;
+}
+
+/** Returns the correct silhouette family and only the colors offered by a blank. */
+export function mockupsForProduct(product: ProductLike): TeeMockup[] {
+  const family = mockupFamily(product);
   const usedCodes = new Set<string>();
   return product.colors.map((color) => {
     const base = bestMockupForProductColor(color, usedCodes);

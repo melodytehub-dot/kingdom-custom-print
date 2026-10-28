@@ -110,7 +110,7 @@ import {
   type CutoutModelKind,
 } from "@/lib/cutoutModels";
 import { drawPreview } from "./preview";
-import { mockupByCode, mockupsForProduct, TEE_MOCKUPS, type TeeMockup } from "@/lib/mockups";
+import { mockupBaseForProduct, mockupByCode, mockupsForProduct, TEE_MOCKUPS, type TeeMockup } from "@/lib/mockups";
 import { useCart } from "@/lib/cart-context";
 import { quoteProduct, formatUSD } from "@/lib/pricing";
 import type {
@@ -2069,8 +2069,9 @@ export default function Customizer({
               >
                 <DesignCanvas
                   key={`${mockup.code}-${side}`}
-                  frontSrc={mockup.front}
-                  backSrc={mockup.back}
+                  frontSrc={mockupBaseForProduct(product, "front")}
+                  backSrc={mockupBaseForProduct(product, "back")}
+                  fabricColor={mockup.hex}
                   side={side}
                   printArea={product.printArea}
                   design={design}
