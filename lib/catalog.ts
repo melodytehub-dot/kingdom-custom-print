@@ -31,7 +31,7 @@ interface ProductRow {
   sort_order: number;
 }
 
-const PRODUCT_COLUMNS = sql`
+const productColumns = () => sql`
   p.id, p.slug, p.name, p.style_code, p.kind, p.category_id,
   c.slug AS category_slug, c.name AS category_name,
   p.blurb, p.description, p.material,
@@ -142,7 +142,7 @@ export async function getProducts(options?: {
   const activeFilter = options?.includeInactive ? sql`` : sql`AND p.active = true`;
 
   const rows = await sql<ProductRow[]>`
-    SELECT ${PRODUCT_COLUMNS}
+    SELECT ${productColumns()}
     FROM products p
     LEFT JOIN categories c ON c.id = p.category_id
     WHERE (${options?.categorySlug ?? null}::text IS NULL OR c.slug = ${options?.categorySlug ?? null})
@@ -161,7 +161,7 @@ export async function getProductBySlug(
   includeInactive = false
 ): Promise<Product | null> {
   const rows = await sql<ProductRow[]>`
-    SELECT ${PRODUCT_COLUMNS}
+    SELECT ${productColumns()}
     FROM products p
     LEFT JOIN categories c ON c.id = p.category_id
     WHERE p.slug = ${slug} AND (${includeInactive} = true OR p.active = true)
@@ -174,7 +174,7 @@ export async function getProductBySlug(
 
 export async function getProductById(id: number): Promise<Product | null> {
   const rows = await sql<ProductRow[]>`
-    SELECT ${PRODUCT_COLUMNS}
+    SELECT ${productColumns()}
     FROM products p
     LEFT JOIN categories c ON c.id = p.category_id
     WHERE p.id = ${id}
