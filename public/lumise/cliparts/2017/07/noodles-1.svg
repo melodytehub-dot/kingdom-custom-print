@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Generator: Adobe Illustrator 16.0.0, SVG Export Plug-In . SVG Version: 6.00 Build 0)  -->
+<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
+<svg version="1.1" id="Layer_1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" x="0px" y="0px"
+	 width="350px" height="350px" viewBox="0 0 350 350" enable-background="new 0 0 350 350" xml:space="preserve">
+<g id="XMLID_1518_">
+	<g id="XMLID_1519_">
+		<g id="XMLID_1520_">
+			<polygon id="XMLID_34_" fill="#BD3C1A" points="232.923,75.4 208.378,50.5 91.822,50.5 91.822,75.4 			"/>
+			
+				<rect id="XMLID_33_" x="154.253" y="34.622" transform="matrix(0.3484 0.9373 -0.9373 0.3484 203.3064 -90.4362)" fill="#FF5023" width="24.899" height="132.789"/>
+		</g>
+		<polygon id="XMLID_1521_" fill="#FFDA44" points="258.178,191.601 208.378,191.601 208.378,50.5 233.277,50.5 258.178,125.2 		"/>
+		<g id="XMLID_1522_">
+			<path id="XMLID_1523_" fill="#FFDA44" d="M244.019,245.55c3.772-8.93,5.859-18.746,5.859-29.05c0-41.255-33.445-74.7-74.7-74.7
+				s-74.7,33.445-74.7,74.7c0,10.304,2.087,20.12,5.859,29.05H244.019z"/>
+			<path id="XMLID_1524_" fill="#FFAD41" d="M175.178,245.55c0-19.025,0-37.351,0-103.75c-41.255,0-74.7,33.445-74.7,74.7
+				c0,10.304,2.087,20.12,5.859,29.05H175.178z"/>
+		</g>
+		<path id="XMLID_1525_" fill="#FFE98F" d="M233.277,50.5v78.85c0,6.875,5.575,12.45,12.45,12.45c6.876,0,12.45-5.575,12.45-12.45
+			V50.5H233.277z"/>
+	</g>
+	<polygon id="XMLID_1526_" fill="#FF5023" points="92,166.7 67.1,224.8 83.7,233.1 108.6,175 	"/>
+	<polygon id="XMLID_1527_" fill="#FF734F" points="258,166.7 282.9,224.8 266.301,233.1 241.4,175 	"/>
+	<polygon id="XMLID_1528_" fill="#BD3C1A" points="92,166.7 108.6,299.5 241.4,299.5 258,166.7 	"/>
+	<polygon id="XMLID_1529_" fill="#FF5023" points="136.267,166.7 141.8,299.5 199.9,299.5 205.434,166.7 	"/>
+	<polygon id="XMLID_1530_" fill="#802812" points="92,166.7 108.6,299.5 150.1,299.5 144.566,166.7 	"/>
+	<g id="XMLID_1531_">
+		<ellipse id="XMLID_1532_" fill="#FFFFFF" cx="175" cy="233.1" rx="33.199" ry="16.6"/>
+		<path id="XMLID_1533_" fill="#FFE98F" d="M175,249.7c-18.336,0-33.2-7.432-33.2-16.601c0-9.168,14.863-16.6,33.2-16.6"/>
+	</g>
+	<g id="XMLID_1534_">
+		<polygon id="XMLID_1535_" fill="#FF734F" points="92,166.7 125.2,233.1 224.8,233.1 258,166.7 		"/>
+		<polygon id="XMLID_1536_" fill="#FF5023" points="175,166.7 92,166.7 125.2,233.1 175,233.1 		"/>
+	</g>
+</g>
+</svg>

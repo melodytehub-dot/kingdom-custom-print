@@ -23,6 +23,7 @@
     "qa-customizer-controls": "node scripts/qa-customizer-controls.mjs",
     "qa-canvas-tools": "node scripts/qa-canvas-tools.mjs",
     "qa-customizer-interactions": "node scripts/qa-customizer-interactions.mjs",
+    "qa-lumise-library": "node scripts/qa-lumise-library.mjs",
     "qa-customizer-grouping": "node scripts/qa-customizer-grouping.mjs",
     "qa-grouping": "node scripts/qa-grouping.mjs",
     "qa-cutout": "node scripts/qa-cutout.mjs",

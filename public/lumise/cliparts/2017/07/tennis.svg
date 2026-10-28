@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Generator: Adobe Illustrator 16.0.0, SVG Export Plug-In . SVG Version: 6.00 Build 0)  -->
+<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
+<svg version="1.1" id="Layer_1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" x="0px" y="0px"
+	 width="350px" height="350px" viewBox="0 0 350 350" enable-background="new 0 0 350 350" xml:space="preserve">
+<g>
+	<g>
+		<path fill="#262626" d="M231.307,195.67c0.24,1.074-0.441,2.148-1.516,2.389l-40.252,9.001c-1.074,0.24-2.148-0.441-2.389-1.516
+			l-15.349-68.636c-0.24-1.073,0.442-2.148,1.515-2.388l40.253-9c1.074-0.24,2.148,0.442,2.389,1.515L231.307,195.67z"/>
+	</g>
+	<circle fill="#262626" cx="189.187" cy="109.874" r="17.76"/>
+	
+		<polyline fill="none" stroke="#262626" stroke-width="8" stroke-linecap="round" stroke-linejoin="round" stroke-miterlimit="10" points="
+		196.28,194.783 208.336,231.907 204.314,274.558 	"/>
+	
+		<polyline fill="none" stroke="#262626" stroke-width="8" stroke-linecap="round" stroke-linejoin="round" stroke-miterlimit="10" points="
+		219.129,193.025 231.186,230.149 227.163,272.801 	"/>
+	
+		<polyline fill="none" stroke="#262626" stroke-width="8" stroke-linecap="round" stroke-linejoin="round" stroke-miterlimit="10" points="
+		195.515,168.979 210.098,137.828 253.744,131.18 	"/>
+	
+		<polyline fill="none" stroke="#262626" stroke-width="8" stroke-linecap="round" stroke-linejoin="round" stroke-miterlimit="10" points="
+		195.147,142.234 163.792,156.372 126.345,132.98 	"/>
+	<g>
+		<circle fill="#F34D17" cx="106" cy="93.206" r="17.759"/>
+		
+			<rect x="113.658" y="93.282" transform="matrix(0.9075 -0.42 0.42 0.9075 -37.2802 59.4149)" fill="#F34D17" width="5.273" height="42.182"/>
+	</g>
+	<circle fill="#F34D17" cx="255.541" cy="104.397" r="6.198"/>
+</g>
+</svg>

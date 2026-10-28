@@ -13,6 +13,7 @@ import { TEE_MOCKUPS, type TeeMockup } from "@/lib/mockups";
 import { FONTS, svgFontStack } from "@/lib/fonts";
 import { ART_CATEGORIES, ART_LIBRARY, type ArtItem } from "./art";
 import { DESIGN_TEMPLATES, TEMPLATE_CATEGORIES, type DesignTemplate } from "./templates";
+import { useLumiseLibrary } from "./lumise-library";
 import {
   ColorView,
   PanelHeader,
@@ -20,7 +21,7 @@ import {
   inkName,
 } from "./editors";
 import { CheckGlyph, DuplicateIcon, GroupIcon, MinusGlyph, PlusGlyph, TrashIcon, UngroupIcon } from "./icons";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 
 /* -------------------------------------------------------------------------
    Products
@@ -246,11 +247,21 @@ export function AddTextPanel({ onAdd, onClose }: { onAdd: (patch: Partial<TextLa
 
 export function ArtPanel({ onAdd, onClose }: { onAdd: (item: ArtItem) => void; onClose: () => void }) {
   const [query, setQuery] = useState("");
-  const [category, setCategory] = useState<(typeof ART_CATEGORIES)[number]>("All");
-  const results = ART_LIBRARY.filter((item) =>
-    (category === "All" || (item.category ?? "Symbols") === category)
-    && item.name.toLowerCase().includes(query.trim().toLowerCase()),
+  const [category, setCategory] = useState("All");
+  const [visibleCount, setVisibleCount] = useState(60);
+  const lumise = useLumiseLibrary<ArtItem>("/lumise/cliparts.json");
+  const categories = useMemo(
+    () => ["All", ...new Set([...ART_CATEGORIES.filter((item) => item !== "All"), ...lumise.categories])],
+    [lumise.categories],
   );
+  const results = useMemo(() => {
+    const normalizedQuery = query.trim().toLowerCase();
+    return [...ART_LIBRARY, ...lumise.items].filter((item) =>
+      (category === "All" || (item.category ?? "Symbols") === category)
+      && (!normalizedQuery || `${item.name} ${(item.tags ?? []).join(" ")}`.toLowerCase().includes(normalizedQuery)),
+    );
+  }, [category, lumise.items, query]);
+  const visibleResults = results.slice(0, visibleCount);
   return (
     <div className="rot-scroll">
       <PanelHeader
@@ -258,13 +269,15 @@ export function ArtPanel({ onAdd, onClose }: { onAdd: (item: ArtItem) => void; o
         title="Clipart"
         onClose={onClose}
       />
-      <input className="rot-art-search" type="search" aria-label="Search artwork" placeholder="Search artwork" value={query} onChange={(event) => setQuery(event.target.value)} />
-      <select className="rot-art-category" aria-label="Artwork category" value={category} onChange={(event) => setCategory(event.target.value as (typeof ART_CATEGORIES)[number])}>
-        {ART_CATEGORIES.map((option) => <option key={option} value={option}>{option === "All" ? "All artwork" : option}</option>)}
+      <input className="rot-art-search" type="search" aria-label="Search artwork" placeholder="Search 3,000+ graphics" value={query} onChange={(event) => { setQuery(event.target.value); setVisibleCount(60); }} />
+      <select className="rot-art-category" aria-label="Artwork category" value={category} onChange={(event) => { setCategory(event.target.value); setVisibleCount(60); }}>
+        {categories.map((option) => <option key={option} value={option}>{option === "All" ? "All artwork" : option}</option>)}
       </select>
-      {!results.length ? <p role="status">No artwork found.</p> : null}
+      {lumise.loading ? <p className="rot-library-status" role="status">Loading the full clipart library…</p> : null}
+      {lumise.error ? <p className="rot-library-status is-error" role="status">The extended clipart library could not be loaded.</p> : null}
+      {!lumise.loading && !results.length ? <p role="status">No artwork found.</p> : null}
       <ul className="rot-artgrid">
-        {results.map((item) => (
+        {visibleResults.map((item) => (
           <li key={item.id}>
             <button type="button" onClick={() => onAdd(item)} title={item.name}>
               {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -274,6 +287,11 @@ export function ArtPanel({ onAdd, onClose }: { onAdd: (item: ArtItem) => void; o
           </li>
         ))}
       </ul>
+      {visibleCount < results.length ? (
+        <button type="button" className="rot-library-more" onClick={() => setVisibleCount((count) => count + 60)}>
+          Load more graphics · {results.length - visibleCount} remaining
+        </button>
+      ) : null}
     </div>
   );
 }
@@ -423,34 +441,46 @@ export function LayersPanel({
 
 export function TemplatesPanel({ onAdd, onClose }: { onAdd: (template: DesignTemplate) => void; onClose: () => void }) {
   const [query, setQuery] = useState("");
-  const [category, setCategory] = useState<(typeof TEMPLATE_CATEGORIES)[number]>("All");
+  const [category, setCategory] = useState("All");
+  const [visibleCount, setVisibleCount] = useState(40);
+  const lumise = useLumiseLibrary<DesignTemplate>("/lumise/templates.json");
   const normalizedQuery = query.trim().toLowerCase();
-  const results = DESIGN_TEMPLATES.filter((item) =>
-    (category === "All" || item.category === category)
-    && (!normalizedQuery || `${item.name} ${item.category} ${item.subtitle} ${item.tags.join(" ")}`.toLowerCase().includes(normalizedQuery)),
+  const categories = useMemo(
+    () => ["All", ...new Set([...TEMPLATE_CATEGORIES.filter((item) => item !== "All"), ...lumise.categories])],
+    [lumise.categories],
   );
+  const results = useMemo(
+    () => [...DESIGN_TEMPLATES, ...lumise.items].filter((item) =>
+      (category === "All" || item.category === category)
+      && (!normalizedQuery || `${item.name} ${item.category} ${item.subtitle} ${item.tags.join(" ")}`.toLowerCase().includes(normalizedQuery)),
+    ),
+    [category, lumise.items, normalizedQuery],
+  );
+  const visibleResults = results.slice(0, visibleCount);
 
   return (
     <div className="rot-scroll">
       <PanelHeader eyebrow="Design Library" title="Templates" onClose={onClose} />
-      <input className="rot-art-search" type="search" aria-label="Search templates" placeholder="Search templates" value={query} onChange={(event) => setQuery(event.target.value)} />
-      <select className="rot-art-category" aria-label="Template category" value={category} onChange={(event) => setCategory(event.target.value as (typeof TEMPLATE_CATEGORIES)[number])}>
-        {TEMPLATE_CATEGORIES.map((option) => <option key={option} value={option}>{option === "All" ? "All categories" : option}</option>)}
+      <input className="rot-art-search" type="search" aria-label="Search templates" placeholder="Search 300+ templates" value={query} onChange={(event) => { setQuery(event.target.value); setVisibleCount(40); }} />
+      <select className="rot-art-category" aria-label="Template category" value={category} onChange={(event) => { setCategory(event.target.value); setVisibleCount(40); }}>
+        {categories.map((option) => <option key={option} value={option}>{option === "All" ? "All categories" : option}</option>)}
       </select>
-      {!results.length ? <p role="status">No templates found.</p> : null}
+      {lumise.loading ? <p className="rot-library-status" role="status">Loading the full template library…</p> : null}
+      {lumise.error ? <p className="rot-library-status is-error" role="status">The extended template library could not be loaded.</p> : null}
+      {!lumise.loading && !results.length ? <p role="status">No templates found.</p> : null}
       <ul className="rot-template-grid">
-        {results.map((item) => {
-          const previewArt = ART_LIBRARY.find((artItem) => artItem.id === item.artId);
-          const previewText = item.elements.filter((element) => element.type === "text").map((element) => element.layer);
+        {visibleResults.map((item) => {
+          const previewArt = item.artId ? ART_LIBRARY.find((artItem) => artItem.id === item.artId) : undefined;
+          const previewText = (item.elements ?? []).filter((element) => element.type === "text").map((element) => element.layer);
           const [headline, tagline] = previewText;
           return (
             <li key={item.id}>
               <button type="button" className="rot-template-card" onClick={() => onAdd(item)} aria-label={`Use ${item.name} template`}>
                 <span className="rot-template-preview" aria-hidden="true">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
-                  {previewArt ? <img src={previewArt.src} alt="" /> : null}
-                  {headline ? <strong style={{ fontFamily: svgFontStack(headline.font), color: headline.color }}>{headline.text}</strong> : null}
-                  {tagline ? <small>{tagline.text}</small> : null}
+                  {item.previewSrc ? <img className="is-full" src={item.previewSrc} alt="" /> : previewArt ? <img src={previewArt.src} alt="" /> : null}
+                  {!item.previewSrc && headline ? <strong style={{ fontFamily: svgFontStack(headline.font), color: headline.color }}>{headline.text}</strong> : null}
+                  {!item.previewSrc && tagline ? <small>{tagline.text}</small> : null}
                   <span className="rot-template-free">FREE</span>
                 </span>
                 <span className="rot-template-info"><strong>{item.name}</strong><small>{item.category}</small></span>
@@ -459,6 +489,11 @@ export function TemplatesPanel({ onAdd, onClose }: { onAdd: (template: DesignTem
           );
         })}
       </ul>
+      {visibleCount < results.length ? (
+        <button type="button" className="rot-library-more" onClick={() => setVisibleCount((count) => count + 40)}>
+          Load more templates · {results.length - visibleCount} remaining
+        </button>
+      ) : null}
     </div>
   );
 }

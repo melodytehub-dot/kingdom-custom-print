@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Generator: Adobe Illustrator 16.0.0, SVG Export Plug-In . SVG Version: 6.00 Build 0)  -->
+<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
+<svg version="1.1" id="Capa_1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" x="0px" y="0px"
+	 width="350px" height="350px" viewBox="0 0 350 350" enable-background="new 0 0 350 350" xml:space="preserve">
+<g>
+	<path fill="#E6E6E6" d="M238.964,97.329H111.035c-5.026,0-9.138-4.112-9.138-9.138v-4.569c0-5.025,4.112-9.138,9.138-9.138h127.929
+		c5.026,0,9.138,4.112,9.138,9.138v4.569C248.102,93.217,243.99,97.329,238.964,97.329z"/>
+	<polygon fill="#D2D5D7" points="124.742,74.484 124.742,51.64 143.018,51.64 156.725,74.484 	"/>
+	<g>
+		<polygon fill="#E6E6E6" points="238.964,165.862 243.534,143.018 106.466,143.018 111.035,165.862 		"/>
+		<polygon fill="#E6E6E6" points="119.903,257.24 124.742,298.36 229.826,298.36 234.396,257.24 		"/>
+	</g>
+	<polygon fill="#F75B57" points="243.534,257.24 111.035,257.24 101.897,165.862 248.102,165.862 	"/>
+	<ellipse fill="#F9DA49" cx="175" cy="211.551" rx="41.12" ry="27.413"/>
+	<path fill="#D2D5D7" d="M248.102,143.018H101.897c-5.026,0-9.138-4.112-9.138-9.138v-27.414c0-5.026,4.112-9.138,9.138-9.138
+		h146.204c5.027,0,9.139,4.112,9.139,9.138v27.414C257.24,138.906,253.129,143.018,248.102,143.018z"/>
+</g>
+</svg>

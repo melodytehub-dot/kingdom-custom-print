@@ -1,4 +1,4 @@
-/** Browser regression for the Select and Hand canvas interaction tools. */
+/** Browser regression for automatic canvas selection/panning and mobile controls. */
 import { chromium } from "playwright";
 
 const BASE = process.env.QA_BASE ?? "http://localhost:3000";
@@ -24,7 +24,7 @@ try {
 
   const select = page.getByRole("button", { name: "Mouse select tool" });
   const hand = page.getByRole("button", { name: "Hand pan tool" });
-  check("Select and Hand tools are visible on desktop", await select.isVisible() && await hand.isVisible());
+  check("Desktop keeps Select and removes the Hand toggle", await select.isVisible() && await hand.count() === 0);
   check("Select is the safe default", await select.getAttribute("aria-pressed") === "true");
 
   await page.locator('button.rot-tool[data-tool="text"]').click();
@@ -33,22 +33,16 @@ try {
   const artwork = page.locator(".rot-canvas-svg text").filter({ hasText: "PAN TEST" }).first();
   await artwork.waitFor({ state: "visible" });
 
-  await hand.click();
-  check(
-    "Hand mode closes the editor and protects artwork handles",
-    await hand.getAttribute("aria-pressed") === "true"
-      && await page.locator(".rot").getAttribute("data-layout") === "none"
-      && await page.locator('.rot-canvas-svg rect[stroke="#2f7bff"]').count() === 0,
-  );
+  await page.keyboard.press("Escape");
 
   const stage = page.locator(".rot-stage");
   const garment = page.locator(".rot-shirt");
   const beforeGarment = await garment.boundingBox();
   const beforeArtwork = await artwork.boundingBox();
-  const stageBox = await stage.boundingBox();
-  if (stageBox) {
-    const x = stageBox.x + stageBox.width / 2;
-    const y = stageBox.y + stageBox.height / 2;
+  const svgBeforePan = await page.locator(".rot-canvas-svg").boundingBox();
+  if (svgBeforePan) {
+    const x = svgBeforePan.x + svgBeforePan.width / 2;
+    const y = svgBeforePan.y + svgBeforePan.height * 0.1;
     await page.mouse.move(x, y);
     await page.mouse.down();
     await page.mouse.move(x + 48, y + 34, { steps: 8 });
@@ -61,7 +55,7 @@ try {
   const artworkDx = beforeArtwork && afterArtwork ? afterArtwork.x - beforeArtwork.x : 0;
   const artworkDy = beforeArtwork && afterArtwork ? afterArtwork.y - beforeArtwork.y : 0;
   check(
-    "Hand drag pans the garment and artwork together",
+    "Dragging blank garment space automatically pans garment and artwork together",
     Math.abs(garmentDx) > 20
       && Math.abs(garmentDy) > 15
       && Math.abs(garmentDx - artworkDx) < 2
@@ -69,8 +63,7 @@ try {
     `garment ${Math.round(garmentDx)},${Math.round(garmentDy)}; artwork ${Math.round(artworkDx)},${Math.round(artworkDy)}`,
   );
 
-  await select.click();
-  check("Select mode restores artwork hit targets", await select.getAttribute("aria-pressed") === "true");
+  check("Artwork remains directly selectable after automatic panning", await select.getAttribute("aria-pressed") === "true");
   const selectedArtwork = await artwork.boundingBox();
   const garmentBeforeEdit = await garment.boundingBox();
   if (selectedArtwork) {
@@ -98,16 +91,27 @@ try {
   await page.getByRole("button", { name: "+ Add text", exact: true }).click();
   const pairArtwork = page.locator(".rot-canvas-svg text").filter({ hasText: "PAIR TEST" }).first();
   await pairArtwork.waitFor({ state: "visible" });
-  await select.click();
+  await page.keyboard.press("Escape");
 
   const dragMarquee = async (input = "mouse") => {
     const boxes = await Promise.all([artwork.boundingBox(), pairArtwork.boundingBox()]);
-    const svgBox = await page.locator(".rot-canvas-svg").boundingBox();
+    const svg = page.locator(".rot-canvas-svg");
+    const svgBox = await svg.boundingBox();
     if (!boxes[0] || !boxes[1] || !svgBox) return false;
-    const left = Math.max(svgBox.x + 6, Math.min(boxes[0].x, boxes[1].x) - 26);
-    const top = Math.max(svgBox.y + 6, Math.min(boxes[0].y, boxes[1].y) - 26);
-    const right = Math.min(svgBox.x + svgBox.width - 6, Math.max(boxes[0].x + boxes[0].width, boxes[1].x + boxes[1].width) + 26);
-    const bottom = Math.min(svgBox.y + svgBox.height - 6, Math.max(boxes[0].y + boxes[0].height, boxes[1].y + boxes[1].height) + 26);
+    const print = await svg.evaluate((node) => ({
+      x: Number(node.dataset.printX),
+      y: Number(node.dataset.printY),
+      width: Number(node.dataset.printWidth),
+      height: Number(node.dataset.printHeight),
+    }));
+    const printLeft = svgBox.x + (print.x / 900) * svgBox.width;
+    const printTop = svgBox.y + (print.y / 900) * svgBox.height;
+    const printRight = printLeft + (print.width / 900) * svgBox.width;
+    const printBottom = printTop + (print.height / 900) * svgBox.height;
+    const left = Math.max(printLeft + 4, Math.min(boxes[0].x, boxes[1].x) - 26);
+    const top = Math.max(printTop + 4, Math.min(boxes[0].y, boxes[1].y) - 26);
+    const right = Math.min(printRight - 4, Math.max(boxes[0].x + boxes[0].width, boxes[1].x + boxes[1].width) + 26);
+    const bottom = Math.min(printBottom - 4, Math.max(boxes[0].y + boxes[0].height, boxes[1].y + boxes[1].height) + 26);
 
     if (input === "touch") {
       const session = await page.context().newCDPSession(page);
@@ -164,16 +168,27 @@ try {
   await page.getByRole("button", { name: "Clear selection" }).click();
 
   await page.setViewportSize({ width: 390, height: 844 });
-  const mobileSelect = await select.boundingBox();
-  const mobileHand = await hand.boundingBox();
+  const mobileControls = page.locator(".rot-mobile-canvas-controls");
+  const mobileButtons = [
+    mobileControls.getByRole("button", { name: "Undo" }),
+    mobileControls.getByRole("button", { name: "Redo" }),
+    mobileControls.getByRole("button", { name: /Rotate to the/ }),
+    mobileControls.getByRole("button", { name: "Zoom in" }),
+    mobileControls.getByRole("button", { name: "Zoom out" }),
+  ];
+  const mobileButtonBoxes = await Promise.all(mobileButtons.map((button) => button.boundingBox()));
   check(
-    "Mobile Select and Hand targets are at least 44px",
-    Boolean(mobileSelect && mobileHand)
-      && mobileSelect.width >= 44 && mobileSelect.height >= 44
-      && mobileHand.width >= 44 && mobileHand.height >= 44,
-    mobileSelect && mobileHand
-      ? `${Math.round(mobileSelect.width)}x${Math.round(mobileSelect.height)}, ${Math.round(mobileHand.width)}x${Math.round(mobileHand.height)}`
-      : "missing controls",
+    "Mobile replaces Select and Hand with five 44px canvas controls",
+    await page.locator(".rot-canvas-mode").isHidden()
+      && mobileButtonBoxes.every((box) => box && box.width >= 44 && box.height >= 44),
+    mobileButtonBoxes.map((box) => box ? `${Math.round(box.width)}x${Math.round(box.height)}` : "missing").join(", "),
+  );
+  const railBackground = await page.locator(".rot-rail").evaluate((rail) => getComputedStyle(rail).backgroundColor);
+  const railColor = await page.locator('.rot-tool[data-tool="text"]').evaluate((tool) => getComputedStyle(tool).color);
+  check(
+    "Mobile bottom tool bar uses the requested dark treatment",
+    railBackground === "rgb(32, 35, 41)" && railColor === "rgb(242, 244, 247)",
+    `${railBackground}; ${railColor}`,
   );
 
   for (const viewport of [
@@ -185,11 +200,10 @@ try {
   ]) {
     await page.setViewportSize({ width: viewport.width, height: viewport.height });
     await page.waitForTimeout(80);
-    const [toolbarBox, currentStageBox, currentSelect, currentHand, overflow] = await Promise.all([
-      page.locator(".rot-canvas-mode").boundingBox(),
+    const [toolbarBox, currentStageBox, controlBoxes, overflow] = await Promise.all([
+      mobileControls.boundingBox(),
       stage.boundingBox(),
-      select.boundingBox(),
-      hand.boundingBox(),
+      Promise.all(mobileButtons.map((button) => button.boundingBox())),
       page.locator("body").evaluate((body) => body.scrollWidth - window.innerWidth),
     ]);
     const toolbarInsideStage = Boolean(toolbarBox && currentStageBox)
@@ -197,9 +211,7 @@ try {
       && toolbarBox.y >= currentStageBox.y
       && toolbarBox.x + toolbarBox.width <= currentStageBox.x + currentStageBox.width + 1
       && toolbarBox.y + toolbarBox.height <= currentStageBox.y + currentStageBox.height + 1;
-    const targetsUsable = Boolean(currentSelect && currentHand)
-      && currentSelect.width >= 44 && currentSelect.height >= 44
-      && currentHand.width >= 44 && currentHand.height >= 44;
+    const targetsUsable = controlBoxes.every((box) => box && box.width >= 44 && box.height >= 44);
     check(
       `${viewport.label} keeps canvas tools responsive`,
       overflow <= 1 && toolbarInsideStage && targetsUsable,

@@ -1,14 +1,6 @@
 import type { TextLayer } from "@/lib/types";
 
-export type TemplateCategory =
-  | "Team & Sports"
-  | "Faith"
-  | "Nature"
-  | "Classic"
-  | "Business"
-  | "Events & Celebrations"
-  | "Holidays"
-  | "Pets";
+export type TemplateCategory = string;
 
 export const TEMPLATE_CATEGORIES = [
   "All",
@@ -52,7 +44,9 @@ export interface DesignTemplate {
   category: TemplateCategory;
   subtitle: string;
   tags: string[];
-  artId: string;
+  artId?: string;
+  previewSrc?: string;
+  aspect?: number;
   elements: Array<{ type: "text"; layer: TemplateText } | { type: "art"; layer: TemplateArt }>;
 }
 

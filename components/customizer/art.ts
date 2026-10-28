@@ -75,9 +75,11 @@ export interface ArtItem {
   name: string;
   src: string;
   category?: ArtCategory;
+  tags?: string[];
+  aspect?: number;
 }
 
-export type ArtCategory = "Symbols" | "Sports" | "Faith" | "Nature" | "Animals";
+export type ArtCategory = string;
 
 export const ART_CATEGORIES = ["All", "Symbols", "Sports", "Faith", "Nature", "Animals"] as const;
 

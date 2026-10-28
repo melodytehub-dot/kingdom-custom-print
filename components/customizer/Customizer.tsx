@@ -44,7 +44,6 @@ import {
   DollarIcon,
   DuplicateIcon,
   GroupIcon,
-  HandIcon,
   HeadsetIcon,
   LayersIcon,
   LockIcon,
@@ -596,6 +595,11 @@ export default function Customizer({
     setPanel((p) => (SPLIT_PANELS.includes(p) ? "none" : p));
   };
 
+  const adjustZoom = (delta: number) => {
+    setZoom((current) => Math.min(1.6, Math.max(1, Math.round((current + delta) * 10) / 10)));
+    setStagePan({ x: 0, y: 0 });
+  };
+
   const shareDesign = async () => {
     if (busy) return;
     setBusy(true);
@@ -646,11 +650,17 @@ export default function Customizer({
   };
 
   const addArt = (item: ArtItem) => {
-    addImageLayer(item.src, item.name, 1);
+    addImageLayer(item.src, item.name, item.aspect ?? 1);
     setNotice({ tone: "ok", text: `${item.name} added to the ${side}.` });
   };
 
   const addTemplate = (template: DesignTemplate) => {
+    if (template.previewSrc) {
+      addImageLayer(template.previewSrc, `Template: ${template.name}`, template.aspect ?? 1);
+      setNotice({ tone: "ok", text: `${template.name} added to the ${side}. You can move, resize, rotate, or recolor it.` });
+      return;
+    }
+
     const additions: DesignLayer[] = [];
     for (const element of template.elements) {
       if (element.type === "text") {
@@ -1450,10 +1460,10 @@ export default function Customizer({
   }, [fit, stageBox.h, stageBox.w]);
 
   const startStagePan = (event: ReactPointerEvent<HTMLElement>) => {
-    if (canvasMode !== "pan" || step !== "design") return;
+    if (step !== "design" || event.defaultPrevented) return;
     if (event.pointerType === "mouse" && event.button !== 0) return;
     const target = event.target;
-    if (target instanceof Element && target.closest(".rot-canvas-mode, .rot-share, .rot-quickadd, .rot-selbar")) return;
+    if (target instanceof Element && target.closest(".rot-canvas-mode, .rot-mobile-canvas-controls, .rot-share, .rot-quickadd, .rot-selbar")) return;
     event.preventDefault();
     stagePanRef.current = {
       pointerId: event.pointerId,
@@ -1611,7 +1621,7 @@ export default function Customizer({
             busy={fxBusy}
             busyLabel={fxStatus ?? undefined}
             progress={fxProgress}
-            eyebrow={ART_LIBRARY.some((a) => a.src === selected.origSrc) ? "Add Art" : "Upload Art"}
+            eyebrow={ART_LIBRARY.some((a) => a.src === selected.origSrc) || selected.origSrc?.startsWith("/lumise/") ? "Add Art" : "Upload Art"}
             actions={actionsFor(selected)}
             altCutout={
               photoroomAltReady()
@@ -1989,6 +1999,44 @@ export default function Customizer({
             onPointerUp={endStagePan}
             onPointerCancel={endStagePan}
           >
+            <div className="rot-mobile-canvas-controls" aria-label="Canvas controls">
+              <div className="rot-mobile-history" role="group" aria-label="History">
+                <button type="button" onClick={undo} disabled={!hist.canUndo || transforming} aria-label="Undo" title="Undo">
+                  <UndoIcon size={22} />
+                </button>
+                <button type="button" onClick={redo} disabled={!hist.canRedo || transforming} aria-label="Redo" title="Redo">
+                  <RedoIcon size={22} />
+                </button>
+              </div>
+              <div className="rot-mobile-view-controls" role="group" aria-label="Garment view and zoom">
+                <button
+                  type="button"
+                  onClick={rotateSide}
+                  aria-label={`Rotate to the ${side === "front" ? "back" : "front"}`}
+                  title="Rotate garment"
+                >
+                  <RotateShirtIcon />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => adjustZoom(0.1)}
+                  disabled={zoom >= 1.6}
+                  aria-label="Zoom in"
+                  title="Zoom in"
+                >
+                  <span aria-hidden="true">+</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => adjustZoom(-0.1)}
+                  disabled={zoom <= 1}
+                  aria-label="Zoom out"
+                  title="Zoom out"
+                >
+                  <span aria-hidden="true">−</span>
+                </button>
+              </div>
+            </div>
             <div className="rot-canvas-mode" role="toolbar" aria-label="Canvas interaction tool">
               <button
                 type="button"
@@ -2000,21 +2048,6 @@ export default function Customizer({
               >
                 <PointerIcon size={20} />
                 <span>Select</span>
-              </button>
-              <button
-                type="button"
-                className={canvasMode === "pan" ? "is-active" : ""}
-                aria-pressed={canvasMode === "pan"}
-                aria-label="Hand pan tool"
-                title="Hand / Pan tool"
-                onClick={() => {
-                  setCanvasMode("pan");
-                  setPanel("none");
-                  setMultiSelect(false);
-                }}
-              >
-                <HandIcon size={20} />
-                <span>Hand</span>
               </button>
             </div>
             {fit.size > 0 ? (

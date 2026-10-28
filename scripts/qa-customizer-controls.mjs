@@ -48,12 +48,15 @@ try {
   check("desktop tool labels stay inside the Rush-style rail", desktopLabelOverflow.length === 0, desktopLabelOverflow.join(", "));
   await page.setViewportSize({ width: 390, height: 844 });
   check(
-    "mobile keeps compact header actions and exposes the rotate control",
+    "mobile keeps compact header actions and exposes floating rotate and zoom controls",
     !(await footer.isVisible())
       && await page.locator(".rot-header-save").isVisible()
       && await page.locator(".rot-header-next").isVisible()
       && !(await page.locator(".rot-side-switcher").isVisible())
-      && await page.locator(".rot-rotate-compact").isVisible(),
+      && !(await page.locator(".rot-rotate-compact").isVisible())
+      && await page.locator(".rot-mobile-canvas-controls").getByRole("button", { name: /Rotate to the/ }).isVisible()
+      && await page.locator(".rot-mobile-canvas-controls").getByRole("button", { name: "Zoom in" }).isVisible()
+      && await page.locator(".rot-mobile-canvas-controls").getByRole("button", { name: "Zoom out" }).isVisible(),
   );
 
   const photo = page.locator("image.rot-shirt-photo").first();
@@ -254,6 +257,7 @@ try {
   const totalTemplateCards = await page.locator(".rot-template-card").count();
   check("template gallery offers a varied ready-made set", totalTemplateCards >= 8, `${totalTemplateCards} templates`);
   await page.locator("select[aria-label='Template category']").selectOption("Nature");
+  await page.locator(".rot-template-card").first().waitFor({ state: "visible" });
   const natureTemplateCards = await page.locator(".rot-template-card").count();
   check("template categories narrow the gallery", natureTemplateCards > 0 && natureTemplateCards < totalTemplateCards, `Nature ${natureTemplateCards} of ${totalTemplateCards}`);
   await page.getByRole("searchbox", { name: "Search templates" }).fill("ocean");

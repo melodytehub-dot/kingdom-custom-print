@@ -344,6 +344,11 @@ export default function DesignCanvas({
     const rect = svgRef.current?.getBoundingClientRect();
     if (!point || !rect) return;
 
+    // Blank space inside the printable area draws a selection marquee. Blank
+    // garment space outside it bubbles to the stage and pans the whole shirt,
+    // so Select and Hand behavior remain available without a mode switch.
+    if (point.x < pa.x || point.x > pa.x + pa.w || point.y < pa.y || point.y > pa.y + pa.h) return;
+
     event.preventDefault();
     const additive = event.shiftKey || event.ctrlKey || event.metaKey;
     const next: MarqueeState = {
@@ -689,6 +694,10 @@ export default function DesignCanvas({
         className={`rot-canvas-svg is-${interactionMode}`}
         role="img"
         aria-label={`${side} preview with ${layers.length} design element${layers.length === 1 ? "" : "s"}`}
+        data-print-x={pa.x}
+        data-print-y={pa.y}
+        data-print-width={pa.w}
+        data-print-height={pa.h}
         onPointerDown={startMarquee}
       >
         <defs>
