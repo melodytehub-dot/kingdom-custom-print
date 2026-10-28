@@ -6,6 +6,9 @@ export default defineConfig({
     entrypoint: "worker.ts",
     compatibilityDate: "2026-10-28",
     compatibilityFlags: ["nodejs_compat"],
+    observability: {
+      issues: { enabled: true },
+    },
     triggers: [
       triggers.fetch({ pattern: "kingdomcustomprint.com/*", zone: "kingdomcustomprint.com" }),
       triggers.fetch({ pattern: "www.kingdomcustomprint.com/*", zone: "kingdomcustomprint.com" }),

@@ -69,16 +69,16 @@ async function loadVariants(ids: number[]) {
   const [colorRows, sizeRows, breakRows, imageRows] = await Promise.all([
     sql<VariantRow[]>`
       SELECT id, product_id, slug, name, hex FROM product_colors
-      WHERE product_id = ANY(${ids}::int[]) ORDER BY sort_order, id`,
+      WHERE product_id = ANY(${sql.array(ids, 1007)}) ORDER BY sort_order, id`,
     sql<SizeRow[]>`
       SELECT id, product_id, label, surcharge FROM product_sizes
-      WHERE product_id = ANY(${ids}::int[]) ORDER BY sort_order, id`,
+      WHERE product_id = ANY(${sql.array(ids, 1007)}) ORDER BY sort_order, id`,
     sql<BreakRow[]>`
       SELECT product_id, min_qty, amount_off FROM price_breaks
-      WHERE product_id = ANY(${ids}::int[]) ORDER BY min_qty DESC`,
+      WHERE product_id = ANY(${sql.array(ids, 1007)}) ORDER BY min_qty DESC`,
     sql<ImageRow[]>`
       SELECT id, product_id, url, alt FROM product_images
-      WHERE product_id = ANY(${ids}::int[]) ORDER BY sort_order, id`,
+      WHERE product_id = ANY(${sql.array(ids, 1007)}) ORDER BY sort_order, id`,
   ]);
 
   return {
