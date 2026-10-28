@@ -47,27 +47,41 @@
     "qa-order-transitions": "node --env-file=.env.local scripts/qa-order-transitions.mjs",
     "qa-account-flow": "node --env-file=.env.local scripts/qa-account-flow.mjs",
     "qa-slow-network": "node scripts/qa-slow-network.mjs",
-    "qa-product-gallery": "node scripts/qa-product-gallery.mjs"
+    "qa-product-gallery": "node scripts/qa-product-gallery.mjs",
+    "dev:vinext": "vite dev --port 3001",
+    "build:vinext": "vite build",
+    "build:cloudflare": "npm run build:vinext && node scripts/prepare-cloudflare-assets.mjs",
+    "start:vinext": "vite preview",
+    "deploy:vinext": "npm run build:cloudflare && vinext-cloudflare deploy --skip-build"
   },
   "dependencies": {
     "@huggingface/transformers": "^4.3.1",
+    "@vinext/cloudflare": "1.2.1",
     "google-auth-library": "^10.9.1",
     "heic-to": "^1.6.6",
     "next": "16.4.3",
     "postgres": "^3.4.5",
-    "react": "19.3.0",
-    "react-dom": "19.3.0",
+    "react": "19.3.1",
+    "react-dom": "19.3.1",
+    "react-server-dom-webpack": "19.3.1",
     "sharp": "^0.35.5",
-    "stripe": "^16.12.0"
+    "stripe": "^16.12.0",
+    "vinext": "1.3.1"
   },
   "devDependencies": {
+    "@cloudflare/vite-plugin": "2.0.0-beta.v.6",
     "@types/node": "^20.16.11",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
+    "@vitejs/plugin-react": "6.1.2",
+    "@vitejs/plugin-rsc": "0.5.38",
+    "cf": "1.0.0-beta.24",
     "eslint": "^9.39.5",
     "eslint-config-next": "16.4.3",
     "playwright": "^1.63.0",
     "typescript": "^5.6.3",
-    "vercel": "^62.1.0"
-  }
+    "vercel": "^62.1.0",
+    "vite": "8.3.0"
+  },
+  "type": "module"
 }
