@@ -41,7 +41,13 @@ export default {
       const body = new ReadableStream<Uint8Array>({
         async pull(controller) {
           try {
-            const { done, value } = await reader.read();
+            // Server components may continue rendering after app.fetch returns
+            // its streaming response. Re-enter the request database context for
+            // each read so deferred catalog queries still have Hyperdrive.
+            const { done, value } = await runWithDatabaseContext(
+              databaseContext,
+              () => reader.read()
+            );
             if (done) {
               controller.close();
               await closeDatabaseContext(databaseContext);
