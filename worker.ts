@@ -23,6 +23,7 @@ const app = vinextWorker as WorkerHandler;
 
 export default {
   async fetch(request: Request, env: WorkerEnvironment, ctx: WorkerExecutionContext) {
+    globalThis.__kcpWorkerConnectionString ??= env.HYPERDRIVE.connectionString;
     const databaseContext: DatabaseContext = {
       connectionString: env.HYPERDRIVE.connectionString,
     };

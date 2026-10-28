@@ -7,14 +7,6 @@ export default defineConfig({
     compatibilityDate: "2026-10-28",
     compatibilityFlags: ["nodejs_compat"],
     observability: {
-      enabled: true,
-      redactQueryString: true,
-      logs: {
-        enabled: true,
-        invocationLogs: true,
-        headSamplingRate: 1,
-        persist: false,
-      },
       issues: { enabled: true },
     },
     triggers: [

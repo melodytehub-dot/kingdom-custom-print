@@ -3,6 +3,8 @@ import { getDatabaseContext } from "./db-context";
 
 declare global {
   var __kcpSql: ReturnType<typeof postgres> | undefined;
+  var __kcpWorkerSql: ReturnType<typeof postgres> | undefined;
+  var __kcpWorkerConnectionString: string | undefined;
 }
 
 function createClient(url: string, isWorkerRequest = false) {
@@ -30,6 +32,14 @@ function getClient() {
   if (context) {
     context.client ??= createClient(context.connectionString, true);
     return context.client;
+  }
+
+  // Async render work can resume after the Worker has returned its streaming
+  // response, outside the request AsyncLocalStorage scope. Hyperdrive's URL is
+  // isolate-stable, so retain a Worker client as a safe fallback for that work.
+  if (globalThis.__kcpWorkerConnectionString) {
+    globalThis.__kcpWorkerSql ??= createClient(globalThis.__kcpWorkerConnectionString, true);
+    return globalThis.__kcpWorkerSql;
   }
 
   const url = process.env.DATABASE_URL;

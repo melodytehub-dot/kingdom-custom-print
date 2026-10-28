@@ -29,13 +29,7 @@ export default async function ShopPage({
   const [allCategories, allProducts] = await Promise.all([
     getCategories(),
     getProducts(),
-  ]).catch((error: unknown) => {
-    console.error("[shop] catalog render failed", {
-      message: error instanceof Error ? error.message : "Unknown catalog error",
-      code: error && typeof error === "object" && "code" in error ? error.code : undefined,
-    });
-    throw error;
-  });
+  ]);
   const categories = allCategories;
   // Polo is already a precise garment-type filter below. Showing the matching
   // catalog category beside it produced two indistinguishable "Polo Shirts"
