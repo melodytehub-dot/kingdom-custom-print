@@ -20,6 +20,20 @@ function createClient(url: string, isWorkerRequest = false) {
     // Neon returns numerics as strings to preserve precision; parse them here.
     types: {
       numeric: postgres.BigInt,
+      // Worker requests disable type discovery, so postgres.js does not load
+      // the serializer map for built-in array OIDs. Register int4[] explicitly
+      // because catalog queries pass product IDs through sql.array(..., 1007).
+      int4array: {
+        to: 1007,
+        from: [],
+        serialize: (values: number[]) => {
+          if (!values.every(Number.isSafeInteger)) {
+            throw new TypeError("int4[] values must contain safe integers");
+          }
+          return `{${values.join(",")}}`;
+        },
+        parse: (value: string) => value,
+      },
     },
     transform: {
       undefined: null,
