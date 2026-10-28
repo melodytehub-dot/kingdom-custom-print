@@ -9,7 +9,8 @@ import { sizeDisplayLabel, splitSizeGroups } from "@/lib/sizes";
 import type { SavedDraft } from "@/lib/design";
 import { PERSONALIZATION_FEE, formatUSD, lowestPrintedUnit, type PriceQuote } from "@/lib/pricing";
 import { sizeSummary } from "@/lib/sizes";
-import { TEE_MOCKUPS, type TeeMockup } from "@/lib/mockups";
+import { mockupBaseForProduct, TEE_MOCKUPS, type TeeMockup } from "@/lib/mockups";
+import { GarmentPreview } from "./GarmentPreview";
 import { ensureFontLoaded, FONTS, svgFontStack } from "@/lib/fonts";
 import { ART_CATEGORIES, ART_LIBRARY, type ArtItem } from "./art";
 import { DESIGN_TEMPLATES, TEMPLATE_CATEGORIES, type DesignTemplate } from "./templates";
@@ -75,8 +76,7 @@ export function ProductsPanel({
       />
 
       <div className="rot-product">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={mockup.front} alt="" />
+        <GarmentPreview className="rot-product-preview" src={mockupBaseForProduct(product, "front")} color={mockup.hex} />
         <div>
           <p className="rot-product-name">{product.name}</p>
           {product.styleCode ? <p className="rot-muted">Style {product.styleCode}</p> : null}
@@ -141,9 +141,11 @@ export function ProductsPanel({
               if (!onSwitchProduct(p)) event.preventDefault();
             }}
           >
-            {p.id === product.id || p.images[0] ? (
+            {p.id === product.id ? (
+              <GarmentPreview className="rot-blank-preview" src={mockupBaseForProduct(product, "front")} color={mockup.hex} />
+            ) : p.images[0] ? (
               // eslint-disable-next-line @next/next/no-img-element
-              <img src={p.id === product.id ? mockup.front : p.images[0].url} alt="" />
+              <img src={p.images[0].url} alt="" />
             ) : (
               <Image src="/brand/kingdom-logo.png" alt="" width={40} height={24} />
             )}

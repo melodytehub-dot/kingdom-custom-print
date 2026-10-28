@@ -12,6 +12,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import DesignCanvas, { printAreaView } from "./DesignCanvas";
+import { GarmentPreview } from "./GarmentPreview";
 import { clampStageOffset, fitStage } from "./stageGeometry";
 import {
   ArtPanel,
@@ -1964,22 +1965,19 @@ export default function Customizer({
                       aria-pressed={side === view}
                       aria-label={view === "front" ? "Front view" : "Back view"}
                     >
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src={view === "front" ? mockup.front : mockup.back} alt="" />
+                      <GarmentPreview
+                        className="rot-side-preview"
+                        src={mockupBaseForProduct(product, view)}
+                        color={mockup.hex}
+                      />
                       <span>{view}</span>
                     </button>
                   ))}
                 </div>
-                <button
-                  type="button"
-                  className="rot-stage-chip"
-                  onClick={() => {
-                    setZoom((z) => (z > 1 ? 1 : 1.12));
-                    setStagePan({ x: 0, y: 0 });
-                  }}
-                >
-                  {zoom > 1 ? "Fit" : "Zoom"}
-                </button>
+                <div className="rot-desktop-zoom-controls" role="group" aria-label="Canvas zoom">
+                  <button type="button" className="rot-stage-chip rot-zoom-button" onClick={() => adjustZoom(0.1)} disabled={zoom >= 1.6} aria-label="Zoom in" title="Zoom in">+</button>
+                  <button type="button" className="rot-stage-chip rot-zoom-button" onClick={() => adjustZoom(-0.1)} disabled={zoom <= 1} aria-label="Zoom out" title="Zoom out">−</button>
+                </div>
                 <button type="button" className="rot-stage-chip rot-start-over" onClick={startOver}>
                   Start over
                 </button>
