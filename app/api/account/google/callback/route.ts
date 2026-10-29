@@ -2,7 +2,7 @@ import { randomBytes, timingSafeEqual } from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { sql } from "@/lib/db";
 import { CUSTOMER_COOKIE, createCustomerSession, customerCookieOptions, normalizedEmail } from "@/lib/customer-auth";
-import { googleClient, GOOGLE_NONCE_COOKIE, GOOGLE_STATE_COOKIE, GOOGLE_VERIFIER_COOKIE } from "@/lib/google-auth";
+import { googleClient, googleRedirectUri, GOOGLE_NONCE_COOKIE, GOOGLE_STATE_COOKIE, GOOGLE_VERIFIER_COOKIE } from "@/lib/google-auth";
 
 export const runtime = "nodejs";
 
@@ -38,7 +38,21 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const { tokens } = await client.getToken({ code, codeVerifier: verifier });
+    const tokenResponse = await fetch("https://oauth2.googleapis.com/token", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({
+        code,
+        code_verifier: verifier,
+        client_id: process.env.GOOGLE_CLIENT_ID!,
+        client_secret: process.env.GOOGLE_CLIENT_SECRET!,
+        redirect_uri: googleRedirectUri(request.url),
+        grant_type: "authorization_code",
+      }),
+      cache: "no-store",
+    });
+    if (!tokenResponse.ok) throw new Error(`Google token exchange failed (${tokenResponse.status})`);
+    const tokens = await tokenResponse.json() as { id_token?: string };
     if (!tokens.id_token) return finish(request, "invalid-token");
     const ticket = await client.verifyIdToken({ idToken: tokens.id_token, audience: process.env.GOOGLE_CLIENT_ID });
     const profile = ticket.getPayload();
