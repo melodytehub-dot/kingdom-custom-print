@@ -37,6 +37,7 @@ export async function GET(request: NextRequest) {
     return finish(request, "invalid-state");
   }
 
+  let stage = "token";
   try {
     const tokenResponse = await fetch("https://oauth2.googleapis.com/token", {
       method: "POST",
@@ -51,9 +52,13 @@ export async function GET(request: NextRequest) {
       }),
       cache: "no-store",
     });
-    if (!tokenResponse.ok) throw new Error(`Google token exchange failed (${tokenResponse.status})`);
+    if (!tokenResponse.ok) {
+      console.warn("Google token exchange rejected", tokenResponse.status);
+      return finish(request, `unavailable-token-${tokenResponse.status}`);
+    }
     const tokens = await tokenResponse.json() as { id_token?: string };
     if (!tokens.id_token) return finish(request, "invalid-token");
+    stage = "verification";
     const ticket = await client.verifyIdToken({ idToken: tokens.id_token, audience: process.env.GOOGLE_CLIENT_ID });
     const profile = ticket.getPayload();
     if (!profile?.sub || !profile.email_verified || !profile.email || !sameSecret(nonce, profile.nonce ?? null)) {
@@ -69,6 +74,7 @@ export async function GET(request: NextRequest) {
     const name = String(profile.name || email.split("@")[0]).slice(0, 100);
     const authoritative = email.endsWith("@gmail.com") || Boolean(profile.hd);
 
+    stage = "account";
     const [linked] = await sql<{ id: number }[]>`SELECT id FROM customer_accounts WHERE google_sub = ${profile.sub} LIMIT 1`;
     let accountId = linked?.id;
     if (!accountId) {
@@ -88,10 +94,11 @@ export async function GET(request: NextRequest) {
       }
     }
     if (!accountId) return finish(request, "invalid-account");
+    stage = "session";
     const token = await createCustomerSession(accountId);
     return finish(request, "ok", token);
   } catch (error) {
     console.error("Google sign-in failed", error);
-    return finish(request, "unavailable");
+    return finish(request, `unavailable-${stage}`);
   }
 }
