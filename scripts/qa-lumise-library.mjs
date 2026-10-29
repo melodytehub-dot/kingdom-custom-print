@@ -30,8 +30,17 @@ try {
   const harambe = page.getByRole("button", { name: "Use Harambe template" });
   await harambe.waitFor({ state: "visible" });
   await harambe.click();
-  await page.locator('image[href*="/lumise/templates/"]').waitFor({ state: "attached" });
-  console.log("PASS a migrated Lumise template can be searched and added on mobile");
+  const templateText = page.locator(".rot-canvas-svg text").filter({ hasText: "ARAMBE" }).first();
+  await templateText.waitFor({ state: "visible", timeout: 15000 });
+  await page.locator('image[href*="/lumise/template-elements/"]').first().waitFor({ state: "attached" });
+  const metrics = await templateText.evaluate((node) => {
+    const svg = node.closest("svg");
+    const areaWidth = Number(svg.getAttribute("data-print-width")) * svg.getBoundingClientRect().width / 900;
+    return { width: node.getBoundingClientRect().width, areaWidth };
+  });
+  const expected = templates.items.find((item) => item.name === "Harambe").elements.find((element) => element.layer.text === "ARAMBE").layer.sourceWidthPct / 100;
+  assert.ok(Math.abs(metrics.width / metrics.areaWidth - expected) < 0.04, "Imported text width should match its source proportions");
+  console.log("PASS a migrated Lumise template retains editable text, artwork and source text width on mobile");
 
   await Promise.all([
     page.waitForResponse((response) => response.url().endsWith("/lumise/cliparts.json") && response.ok()),

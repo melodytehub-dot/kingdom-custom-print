@@ -78,6 +78,7 @@ function normalizeText(object, zone) {
     y: (number(object.top, zone.top + zone.height / 2) - number(zone.top, 0)) / zone.height * 100,
     scaleX: Math.max(0.05, Math.abs(number(object.scaleX, 1))),
     scaleY: Math.max(0.05, Math.abs(number(object.scaleY, 1))),
+    sourceWidthPct: Math.max(0, number(object.width, 0) * Math.abs(number(object.scaleX, 1)) / zone.width * 100),
     rotation: number(object.angle, 0),
     opacity: Math.max(0, Math.min(1, number(object.opacity, 1))),
     flipH: Boolean(object.flipX),
@@ -90,7 +91,9 @@ function normalizeText(object, zone) {
     italic: object.fontStyle === "italic",
     uppercase: false,
     align: ["left", "right"].includes(object.textAlign) ? object.textAlign : "center",
-    letterSpacing: number(object.charSpacing, 0) / fontSizePx * 100,
+    // Fabric stores character spacing in thousandths of an em; the editor
+    // stores it as a percentage of the font size.
+    letterSpacing: number(object.charSpacing, 0) / 10,
     lineHeight: Math.max(0.5, Math.min(3, number(object.lineHeight, 1.05))),
     strokeColor: stroke,
     strokeWidth: strokePx / fontSizePx * 100,
@@ -127,6 +130,8 @@ function normalizeArtwork(object, zone, template, index) {
       src: localSrc,
       name: String(object.name ?? object.title ?? `${template.name} artwork ${index + 1}`),
       aspect,
+      widthPct: objectWidthPct,
+      heightPct: objectHeightPct,
       x: (number(object.left, zone.left + zone.width / 2) - number(zone.left, 0)) / zone.width * 100,
       y: (number(object.top, zone.top + zone.height / 2) - number(zone.top, 0)) / zone.height * 100,
       scaleX: Math.max(0.05, objectWidthPct / baseWidthPct),

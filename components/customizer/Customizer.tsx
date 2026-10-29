@@ -13,6 +13,7 @@ import Image from "next/image";
 import { useRouter } from "next/navigation";
 import DesignCanvas, { printAreaView } from "./DesignCanvas";
 import { GarmentPreview } from "./GarmentPreview";
+import { measureTextLayer } from "./textGeometry";
 import { clampStageOffset, fitStage } from "./stageGeometry";
 import {
   ArtPanel,
@@ -49,7 +50,6 @@ import {
   LayersIcon,
   LockIcon,
   PersonalizeIcon,
-  PointerIcon,
   RedoIcon,
   RotateShirtIcon,
   SaveIcon,
@@ -112,6 +112,7 @@ import {
 } from "@/lib/cutoutModels";
 import { drawPreview } from "./preview";
 import { mockupBaseForProduct, mockupByCode, mockupsForProduct, TEE_MOCKUPS, type TeeMockup } from "@/lib/mockups";
+import { ensureFontLoaded } from "@/lib/fonts";
 import { useCart } from "@/lib/cart-context";
 import { quoteProduct, formatUSD } from "@/lib/pricing";
 import type {
@@ -128,7 +129,6 @@ import type {
 } from "@/lib/types";
 
 type Step = "design" | "quantity" | "review";
-type CanvasMode = "select" | "pan";
 type Panel =
   | "none"
   | "products"
@@ -274,7 +274,6 @@ export default function Customizer({
   const [focusToken, setFocusToken] = useState(0);
   const [flipping, setFlipping] = useState(false);
   const [zoom, setZoom] = useState(1);
-  const [canvasMode, setCanvasMode] = useState<CanvasMode>("select");
   const [stagePan, setStagePan] = useState({ x: 0, y: 0 });
   const [panning, setPanning] = useState(false);
   const [previews, setPreviews] = useState<{ front: string | null; back: string | null }>({
@@ -297,6 +296,8 @@ export default function Customizer({
   }, []);
   const [stageBox, setStageBox] = useState({ w: 0, h: 0 });
   const [compact, setCompact] = useState(true);
+  const dismissCanvasTapRef = useRef(false);
+  const [, refreshFontMetrics] = useState(0);
   const [shortViewport, setShortViewport] = useState(false);
   const [panelHeight, setPanelHeight] = useState(0);
 
@@ -334,6 +335,15 @@ export default function Customizer({
   const personalization = personalizationOf(design);
   const quote = quoteProduct(product, { sides, lines: sizeLines, personalization });
   const layers = design[side];
+  const designFonts = useMemo(() => [...new Set([...design.front, ...design.back].filter((layer): layer is TextLayer => layer.type === "text").map((layer) => layer.font))].sort().join("|"), [design]);
+  useEffect(() => {
+    if (!designFonts) return;
+    let active = true;
+    void Promise.allSettled(designFonts.split("|").map(ensureFontLoaded)).then(() => {
+      if (active) refreshFontMetrics((value) => value + 1);
+    });
+    return () => { active = false; };
+  }, [designFonts]);
   // Panels and editors belong to one layer; a group or multi-pick has no editor.
   const selectedId = selectedIds.length === 1 ? selectedIds[0] : null;
   const selected = selectedId ? layers.find((l) => l.id === selectedId) : undefined;
@@ -543,7 +553,6 @@ export default function Customizer({
   const openLayerPanel = (id: string) => {
     const layer = design[side].find((l) => l.id === id);
     if (!layer) return;
-    setCanvasMode("select");
     setSelectedIds([id]);
     setPanel(layer.type === "text" ? "text" : "image");
   };
@@ -555,6 +564,10 @@ export default function Customizer({
    * that element's editor.
    */
   const handleTap = (id: string) => {
+    if (dismissCanvasTapRef.current) {
+      dismissCanvasTapRef.current = false;
+      return;
+    }
     const layer = layers.find((l) => l.id === id);
     if (!layer) return;
 
@@ -637,7 +650,6 @@ export default function Customizer({
   const addText = (style: Partial<TextLayer> = {}) => {
     const layer = newTextLayer({ ...(darkShirt ? { color: "#FFFFFF" } : {}), ...style });
     setDesign((prev) => ({ ...prev, [side]: [...prev[side], layer] }));
-    setCanvasMode("select");
     setSelectedIds([layer.id]);
     setPanel("text");
   };
@@ -645,7 +657,6 @@ export default function Customizer({
   const addImageLayer = (src: string, name: string, aspect: number) => {
     const layer = newImageLayer(src, name, aspect, { origSrc: src, fx: { ...DEFAULT_FX } });
     setDesign((prev) => ({ ...prev, [side]: [...prev[side], layer] }));
-    setCanvasMode("select");
     setSelectedIds([layer.id]);
     setPanel("image");
   };
@@ -655,7 +666,7 @@ export default function Customizer({
     setNotice({ tone: "ok", text: `${item.name} added to the ${side}.` });
   };
 
-  const addTemplate = (template: DesignTemplate) => {
+  const addTemplate = async (template: DesignTemplate) => {
     const elements = template.elements ?? [];
     if (!elements.length && template.previewSrc) {
       addImageLayer(template.previewSrc, `Template: ${template.name}`, template.aspect ?? 1);
@@ -664,12 +675,24 @@ export default function Customizer({
     }
 
     const additions: DesignLayer[] = [];
+    const textFonts = elements.filter((element) => element.type === "text").map((element) => element.layer.font);
+    await Promise.race([
+      Promise.allSettled(textFonts.map(ensureFontLoaded)),
+      new Promise((resolve) => window.setTimeout(resolve, 4000)),
+    ]);
+    const area = printAreaView(side, product.printArea);
     for (const element of elements) {
       if (element.type === "text") {
-        additions.push(newTextLayer({
-          ...element.layer,
+        const { sourceWidthPct, ...textStyle } = element.layer;
+        const text = newTextLayer({
+          ...textStyle,
           ...(!template.id.startsWith("lumise-template-") && darkShirt ? { color: "#FFFFFF" } : {}),
-        }));
+        });
+        if (sourceWidthPct && !text.arc) {
+          const width = Math.max(...measureTextLayer(text, area.h).widths);
+          if (width > 0) text.scaleX = (sourceWidthPct / 100 * area.w) / width;
+        }
+        additions.push(text);
         continue;
       }
 
@@ -677,14 +700,17 @@ export default function Customizer({
       const item = ART_LIBRARY.find((artItem) => artItem.id === layer.artId);
       if (!layer.src && !item) continue;
       const originalSrc = layer.src ?? item!.src;
+      const aspect = layer.aspect ?? item?.aspect ?? 1;
+      const baseWidth = Math.min(area.w, area.h * aspect);
+      const baseHeight = baseWidth / aspect;
       const src = !layer.src && darkShirt && originalSrc.startsWith("data:image/svg+xml;utf8,")
         ? `data:image/svg+xml;utf8,${encodeURIComponent(decodeURIComponent(originalSrc.slice("data:image/svg+xml;utf8,".length)).replaceAll("#141414", "#FFFFFF"))}`
         : originalSrc;
-      additions.push(newImageLayer(src, layer.name ?? `Template: ${template.name} / ${item?.name ?? "Artwork"}`, layer.aspect ?? item?.aspect ?? 1, {
+      additions.push(newImageLayer(src, layer.name ?? `Template: ${template.name} / ${item?.name ?? "Artwork"}`, aspect, {
         x: layer.x,
         y: layer.y,
-        scaleX: layer.scaleX,
-        scaleY: layer.scaleY,
+        scaleX: layer.widthPct != null ? area.w * layer.widthPct / 100 / baseWidth : layer.scaleX,
+        scaleY: layer.heightPct != null ? area.h * layer.heightPct / 100 / baseHeight : layer.scaleY,
         rotation: layer.rotation ?? 0,
         opacity: layer.opacity ?? 1,
         flipH: layer.flipH ?? false,
@@ -1194,7 +1220,6 @@ export default function Customizer({
     setSelectedIds([]);
     setPanel("none");
     setZoom(1);
-    setCanvasMode("select");
     setStagePan({ x: 0, y: 0 });
     setNotice({ tone: "ok", text: "Started a fresh design." });
   };
@@ -1471,7 +1496,7 @@ export default function Customizer({
     if (step !== "design" || event.defaultPrevented) return;
     if (event.pointerType === "mouse" && event.button !== 0) return;
     const target = event.target;
-    if (target instanceof Element && target.closest(".rot-canvas-mode, .rot-mobile-canvas-controls, .rot-share, .rot-quickadd, .rot-selbar")) return;
+    if (target instanceof Element && target.closest(".rot-mobile-canvas-controls, .rot-share, .rot-quickadd, .rot-selbar")) return;
     event.preventDefault();
     stagePanRef.current = {
       pointerId: event.pointerId,
@@ -1741,7 +1766,7 @@ export default function Customizer({
   const canUngroup = wholeGroup;
   // On phones the editor is a bottom sheet that covers the bar, so it steps
   // aside; the sheet's own action bar handles the focused element.
-  const showSelectionBar = canvasMode === "select" && step === "design" && selectedIds.length > 0 && !overlayPanel;
+  const showSelectionBar = step === "design" && selectedIds.length > 0 && !overlayPanel;
 
   const tools: { id: string; label: string; icon: React.ReactNode; onClick: () => void }[] = [
     {
@@ -1860,8 +1885,14 @@ export default function Customizer({
         if (file) { event.preventDefault(); void onUpload(file); }
       }}
       onPointerDownCapture={(event) => {
+        dismissCanvasTapRef.current = false;
         if (step !== "design" || panel === "none") return;
         const target = event.target;
+        if (compact && target instanceof Element && target.closest(".rot-stage") && !target.closest(".rot-mobile-canvas-controls, .rot-share, .rot-quickadd, .rot-selbar")) {
+          dismissCanvasTapRef.current = true;
+          setPanel("none");
+          return;
+        }
         if (target instanceof Element && target.closest(".rot-panel, .rot-rail, .rot-quickadd, .rot-canvas, .rot-selbar")) return;
         closePanel();
       }}
@@ -1996,7 +2027,7 @@ export default function Customizer({
             </div>
 
           <section
-            className={`rot-stage is-mode-${canvasMode}${panning ? " is-panning" : ""}`}
+            className={`rot-stage${panning ? " is-panning" : ""}`}
             ref={stageRef}
             aria-label="Design preview"
             onPointerDown={startStagePan}
@@ -2042,19 +2073,6 @@ export default function Customizer({
                 </button>
               </div>
             </div>
-            <div className="rot-canvas-mode" role="toolbar" aria-label="Canvas interaction tool">
-              <button
-                type="button"
-                className={canvasMode === "select" ? "is-active" : ""}
-                aria-pressed={canvasMode === "select"}
-                aria-label="Mouse select tool"
-                title="Mouse / Select tool"
-                onClick={() => setCanvasMode("select")}
-              >
-                <PointerIcon size={20} />
-                <span>Select</span>
-              </button>
-            </div>
             {fit.size > 0 ? (
               <div
                 className={`rot-shirt${flipping ? " is-flipping" : ""}`}
@@ -2076,7 +2094,6 @@ export default function Customizer({
                   selectedIds={selectedIds}
                   compact={compact}
                   renderSize={fit.size}
-                  interactionMode={canvasMode}
                   onSelect={handleSelect}
                   onTap={handleTap}
                   onChange={patch}

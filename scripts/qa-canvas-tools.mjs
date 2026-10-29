@@ -24,8 +24,15 @@ try {
 
   const select = page.getByRole("button", { name: "Mouse select tool" });
   const hand = page.getByRole("button", { name: "Hand pan tool" });
-  check("Desktop keeps Select and removes the Hand toggle", await select.isVisible() && await hand.count() === 0);
-  check("Select is the safe default", await select.getAttribute("aria-pressed") === "true");
+  check("Desktop hides Select and Hand toggles", await select.count() === 0 && await hand.count() === 0);
+  const zoomIn = page.locator(".rot-desktop-zoom-controls").getByRole("button", { name: "Zoom in" });
+  const zoomOut = page.locator(".rot-desktop-zoom-controls").getByRole("button", { name: "Zoom out" });
+  const zoomBounds = await zoomOut.boundingBox();
+  check("Desktop zoom out stays inside the visible toolbar", Boolean(zoomBounds && zoomBounds.x >= 0 && zoomBounds.x + zoomBounds.width <= 1366));
+  await zoomIn.click();
+  check("Desktop zoom out becomes usable after zooming in", await zoomOut.isEnabled());
+  await zoomOut.click();
+  check("Desktop zoom returns to its minimum", await zoomOut.isDisabled());
 
   await page.locator('button.rot-tool[data-tool="text"]').click();
   await page.getByRole("textbox", { name: "New text", exact: true }).fill("Pan test");
@@ -63,7 +70,6 @@ try {
     `garment ${Math.round(garmentDx)},${Math.round(garmentDy)}; artwork ${Math.round(artworkDx)},${Math.round(artworkDy)}`,
   );
 
-  check("Artwork remains directly selectable after automatic panning", await select.getAttribute("aria-pressed") === "true");
   const selectedArtwork = await artwork.boundingBox();
   const garmentBeforeEdit = await garment.boundingBox();
   if (selectedArtwork) {
@@ -220,6 +226,12 @@ try {
   }
 
   await page.setViewportSize({ width: 390, height: 844 });
+  await page.locator('button.rot-tool[data-tool="text"]').click();
+  const textPanel = page.getByRole("textbox", { name: "New text", exact: true });
+  await textPanel.waitFor({ state: "visible" });
+  const mobileStage = await stage.boundingBox();
+  if (mobileStage) await page.mouse.click(mobileStage.x + mobileStage.width / 2, mobileStage.y + 80);
+  check("Tapping the mobile design surface hides the open panel", await textPanel.isHidden());
   check("One-finger drag shows a mobile selection marquee", await dragMarquee("touch"));
   check(
     "One-finger marquee selects both design layers on mobile",

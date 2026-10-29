@@ -29,13 +29,15 @@ type TemplateText = Pick<
   | "strokeWidth"
   | "arc"
 > & Partial<Pick<TextLayer, "scaleX" | "scaleY" | "rotation" | "opacity" | "flipH" | "flipV">>
-  & { x: number; y: number };
+  & { x: number; y: number; sourceWidthPct?: number };
 
 type TemplateArt = {
   artId?: string;
   src?: string;
   name?: string;
   aspect?: number;
+  widthPct?: number;
+  heightPct?: number;
   x: number;
   y: number;
   scaleX: number;
