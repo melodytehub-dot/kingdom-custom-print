@@ -48,6 +48,7 @@ try {
   assert.equal((await settings.PUT(settingsRequest("wrong", { STRIPE_SECRET_KEY: secret }))).status, 403);
   assert.equal(saved, null);
   assert.equal((await settings.PUT(settingsRequest("correct", { STRIPE_SECRET_KEY: "wrong-key" }))).status, 422);
+  assert.equal((await settings.PUT(settingsRequest("correct", { STRIPE_SECRET_KEY: "sk_test_example_secret" }))).status, 422);
   const savedResponse = await settings.PUT(settingsRequest("correct", { STRIPE_SECRET_KEY: secret }));
   assert.equal(savedResponse.status, 200);
   assert.equal(saved.STRIPE_SECRET_KEY, secret);
