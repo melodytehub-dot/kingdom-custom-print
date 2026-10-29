@@ -6,6 +6,9 @@ export interface SiteSettings {
   heroHeadlineTop: string;
   heroHeadlineBottom: string;
   heroDescription: string;
+  heroImage1: string;
+  heroImage2: string;
+  heroImage3: string;
   announcement: string;
   shippingFlat: number;
   freeShippingThreshold: number;

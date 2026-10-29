@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
 import { requireAdmin } from "../_guard";
 import { getSettings, saveSettings, type SiteSettings } from "@/lib/catalog";
+import { HERO_IMAGES } from "@/lib/hero-slides";
 
 export const dynamic = "force-dynamic";
 
@@ -23,6 +24,7 @@ export async function PUT(req: Request) {
   }
 
   const current = await getSettings();
+  const image = (value: unknown, fallback: string) => typeof value === "string" && HERO_IMAGES.some((item) => item.src === value) ? value : fallback;
   const str = (v: unknown, max = 500) => String(v ?? "").slice(0, max);
   const numField = (v: unknown, fallback: number, max = 100000) => {
     const n = Number(v);
@@ -35,6 +37,9 @@ export async function PUT(req: Request) {
     heroHeadlineTop: str(body.heroHeadlineTop ?? current.heroHeadlineTop, 100),
     heroHeadlineBottom: str(body.heroHeadlineBottom ?? current.heroHeadlineBottom, 100),
     heroDescription: str(body.heroDescription ?? current.heroDescription, 350),
+    heroImage1: image(body.heroImage1, current.heroImage1),
+    heroImage2: image(body.heroImage2, current.heroImage2),
+    heroImage3: image(body.heroImage3, current.heroImage3),
     announcement: str(body.announcement ?? current.announcement, 160),
     shippingFlat: numField(body.shippingFlat, current.shippingFlat, 999),
     freeShippingThreshold: numField(

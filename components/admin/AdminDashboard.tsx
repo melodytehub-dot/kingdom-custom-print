@@ -7,6 +7,7 @@ import Garment from "@/components/Garment";
 import ArrowRight from "@/components/icons/ArrowRight";
 import PaymentSettings from "./PaymentSettings";
 import AdminRefund from "./AdminRefund";
+import { HERO_IMAGES } from "@/lib/hero-slides";
 import { formatUSD } from "@/lib/pricing";
 import { mockupsForProduct } from "@/lib/mockups";
 import {
@@ -1509,6 +1510,10 @@ function SettingsPanel({
           ] as const).map(([key, label]) => <div className="field" key={key}>
             <label className="label" htmlFor={`s-${key}`}>{label}</label>
             <input id={`s-${key}`} className="input" value={form[key]} onChange={(e) => setForm({ ...form, [key]: e.target.value })} />
+          </div>)}
+          {(["heroImage1", "heroImage2", "heroImage3"] as const).map((key, index) => <div className="field" key={key}>
+            <label className="label" htmlFor={`s-${key}`}>Slideshow image {index + 1}</label>
+            <select id={`s-${key}`} className="select" value={form[key]} onChange={(e) => setForm({ ...form, [key]: e.target.value })}>{HERO_IMAGES.map((image) => <option key={image.src} value={image.src}>{image.name}</option>)}</select>
           </div>)}
         </fieldset>
         <div className="field">

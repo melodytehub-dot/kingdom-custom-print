@@ -7,6 +7,7 @@ import Truck from "@/components/icons/Truck";
 import Shield from "@/components/icons/Shield";
 import Store from "@/components/icons/Store";
 import { getProducts, getSettings, DEFAULT_SETTINGS } from "@/lib/catalog";
+import { heroImage } from "@/lib/hero-slides";
 
 export const revalidate = 60;
 
@@ -69,7 +70,7 @@ export default async function HomePage() {
             </div>
 
             <div className="mm-hero-media">
-              <HeroImageSlider />
+              <HeroImageSlider slides={[heroImage(settings.heroImage1), heroImage(settings.heroImage2), heroImage(settings.heroImage3)]} />
             </div>
           </div>
         </div>

@@ -363,6 +363,9 @@ export interface SiteSettings {
   heroHeadlineTop: string;
   heroHeadlineBottom: string;
   heroDescription: string;
+  heroImage1: string;
+  heroImage2: string;
+  heroImage3: string;
   announcement: string;
   shippingFlat: number;
   freeShippingThreshold: number;
@@ -377,6 +380,9 @@ export const DEFAULT_SETTINGS: SiteSettings = {
   heroHeadlineTop: "YOUR IDEAS.",
   heroHeadlineBottom: "MADE TO WEAR.",
   heroDescription: "Custom apparel for your everyday, your brand, or your team. Design it online. Make it yours.",
+  heroImage1: "/img/shop-studio.png",
+  heroImage2: "/img/shop-printing.png",
+  heroImage3: "/img/kingdom-team.webp",
   announcement: "Free US shipping on orders over $75",
   shippingFlat: 6.95,
   freeShippingThreshold: 75,
@@ -395,6 +401,9 @@ export async function getSettings(): Promise<SiteSettings> {
     heroHeadlineTop: String(map.get("hero_headline_top") ?? DEFAULT_SETTINGS.heroHeadlineTop),
     heroHeadlineBottom: String(map.get("hero_headline_bottom") ?? DEFAULT_SETTINGS.heroHeadlineBottom),
     heroDescription: String(map.get("hero_description") ?? DEFAULT_SETTINGS.heroDescription),
+    heroImage1: String(map.get("hero_image_1") ?? DEFAULT_SETTINGS.heroImage1),
+    heroImage2: String(map.get("hero_image_2") ?? DEFAULT_SETTINGS.heroImage2),
+    heroImage3: String(map.get("hero_image_3") ?? DEFAULT_SETTINGS.heroImage3),
     announcement: String(map.get("announcement") ?? DEFAULT_SETTINGS.announcement),
     shippingFlat: num(map.get("shipping_flat") ?? DEFAULT_SETTINGS.shippingFlat),
     freeShippingThreshold: num(
@@ -414,6 +423,9 @@ export async function saveSettings(settings: SiteSettings): Promise<void> {
       ["hero_headline_top", settings.heroHeadlineTop],
       ["hero_headline_bottom", settings.heroHeadlineBottom],
       ["hero_description", settings.heroDescription],
+      ["hero_image_1", settings.heroImage1],
+      ["hero_image_2", settings.heroImage2],
+      ["hero_image_3", settings.heroImage3],
       ["announcement", settings.announcement],
       ["shipping_flat", settings.shippingFlat],
       ["free_shipping_threshold", settings.freeShippingThreshold],
