@@ -25,13 +25,14 @@ import type {
   SiteSettings,
 } from "@/lib/catalog-types";
 
-type Tab = "overview" | "orders" | "products" | "customers" | "settings";
+type Tab = "overview" | "orders" | "products" | "customers" | "payment" | "settings";
 
 const TABS: { id: Tab; label: string }[] = [
   { id: "overview", label: "Overview" },
   { id: "orders", label: "Orders" },
   { id: "products", label: "Products" },
   { id: "customers", label: "Customers" },
+  { id: "payment", label: "Payment" },
   { id: "settings", label: "Settings" },
 ];
 
@@ -124,6 +125,7 @@ export default function AdminDashboard({
       ) : null}
       {tab === "products" ? <ProductsPanel data={data} /> : null}
       {tab === "customers" ? <Customers data={data} /> : null}
+      {tab === "payment" ? <PaymentSettings /> : null}
       {tab === "settings" ? <SettingsPanel settings={data.settings} categories={data.categories} /> : null}
     </div>
   );
@@ -1624,8 +1626,6 @@ function SettingsPanel({
           {saving ? "Saving…" : "Save settings"}
         </button>
       </form>
-
-      <PaymentSettings />
 
       <div className="admin-subsection">
         <div className="admin-block-head">

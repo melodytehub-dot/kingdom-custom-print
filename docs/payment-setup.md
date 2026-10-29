@@ -1,6 +1,6 @@
 # Payment setup for Kingdom Custom Print
 
-Only the business owner or an authorized administrator should enter payment credentials. Never send secret keys, signing secrets, passwords, or card numbers by email or chat. Use the store's authenticated **Admin → Settings → Payment credentials** form. Blank fields leave previously saved values unchanged.
+Only the business owner or an authorized administrator should enter payment credentials. Never send secret keys, signing secrets, passwords, or card numbers by email or chat. Use the store's authenticated **Admin → Payment** form. Blank fields leave previously saved values unchanged.
 
 ## Stripe
 
