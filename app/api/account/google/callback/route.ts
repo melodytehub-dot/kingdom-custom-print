@@ -30,6 +30,10 @@ export async function GET(request: NextRequest) {
   const verifier = request.cookies.get(GOOGLE_VERIFIER_COOKIE)?.value;
   const nonce = request.cookies.get(GOOGLE_NONCE_COOKIE)?.value;
   if (!client || !code || !verifier || !nonce || !sameSecret(request.cookies.get(GOOGLE_STATE_COOKIE)?.value, query.get("state"))) {
+    console.warn("Google sign-in validation failed", {
+      clientConfigured: Boolean(client), codePresent: Boolean(code), verifierPresent: Boolean(verifier),
+      noncePresent: Boolean(nonce), stateMatches: sameSecret(request.cookies.get(GOOGLE_STATE_COOKIE)?.value, query.get("state")),
+    });
     return finish(request, "invalid");
   }
 
@@ -39,6 +43,10 @@ export async function GET(request: NextRequest) {
     const ticket = await client.verifyIdToken({ idToken: tokens.id_token, audience: process.env.GOOGLE_CLIENT_ID });
     const profile = ticket.getPayload();
     if (!profile?.sub || !profile.email_verified || !profile.email || !sameSecret(nonce, profile.nonce ?? null)) {
+      console.warn("Google sign-in profile validation failed", {
+        subjectPresent: Boolean(profile?.sub), emailVerified: Boolean(profile?.email_verified),
+        emailPresent: Boolean(profile?.email), nonceMatches: sameSecret(nonce, profile?.nonce ?? null),
+      });
       return finish(request, "invalid");
     }
 
