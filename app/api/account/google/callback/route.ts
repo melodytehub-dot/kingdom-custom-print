@@ -1,10 +1,12 @@
 import { randomBytes, timingSafeEqual } from "node:crypto";
+import { createRemoteJWKSet, jwtVerify } from "jose";
 import { NextRequest, NextResponse } from "next/server";
 import { sql } from "@/lib/db";
 import { CUSTOMER_COOKIE, createCustomerSession, customerCookieOptions, normalizedEmail } from "@/lib/customer-auth";
 import { googleClient, googleRedirectUri, GOOGLE_NONCE_COOKIE, GOOGLE_STATE_COOKIE, GOOGLE_VERIFIER_COOKIE } from "@/lib/google-auth";
 
 export const runtime = "nodejs";
+const googleKeys = createRemoteJWKSet(new URL("https://www.googleapis.com/oauth2/v3/certs"));
 
 function sameSecret(a: string | undefined, b: string | null): boolean {
   if (!a || !b || a.length !== b.length) return false;
@@ -59,12 +61,16 @@ export async function GET(request: NextRequest) {
     const tokens = await tokenResponse.json() as { id_token?: string };
     if (!tokens.id_token) return finish(request, "invalid-token");
     stage = "verification";
-    const ticket = await client.verifyIdToken({ idToken: tokens.id_token, audience: process.env.GOOGLE_CLIENT_ID });
-    const profile = ticket.getPayload();
-    if (!profile?.sub || !profile.email_verified || !profile.email || !sameSecret(nonce, profile.nonce ?? null)) {
+    const { payload: profile } = await jwtVerify(tokens.id_token, googleKeys, {
+      issuer: ["https://accounts.google.com", "accounts.google.com"],
+      audience: process.env.GOOGLE_CLIENT_ID!,
+      algorithms: ["RS256"],
+      requiredClaims: ["exp", "iat", "sub"],
+    });
+    if (!profile.sub || profile.email_verified !== true || typeof profile.email !== "string" || typeof profile.nonce !== "string" || !sameSecret(nonce, profile.nonce)) {
       console.warn("Google sign-in profile validation failed", {
         subjectPresent: Boolean(profile?.sub), emailVerified: Boolean(profile?.email_verified),
-        emailPresent: Boolean(profile?.email), nonceMatches: sameSecret(nonce, profile?.nonce ?? null),
+        emailPresent: Boolean(profile?.email), nonceMatches: sameSecret(nonce, typeof profile.nonce === "string" ? profile.nonce : null),
       });
       return finish(request, "invalid-profile");
     }
