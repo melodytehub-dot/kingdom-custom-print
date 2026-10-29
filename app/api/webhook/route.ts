@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import type Stripe from "stripe";
 import { markOrderPaid } from "@/lib/orders";
 import { stripeClient } from "@/lib/stripe";
+import { sendPaidOrderReceipt } from "@/lib/order-email";
 
 export const dynamic = "force-dynamic";
 
@@ -37,13 +38,22 @@ export async function POST(req: Request) {
     case "checkout.session.async_payment_succeeded": {
       const session = event.data.object;
       if (session.payment_status !== "paid") break;
-      await markOrderPaid(
+      const order = await markOrderPaid(
         session.id,
         typeof session.payment_intent === "string"
           ? session.payment_intent
           : (session.payment_intent?.id ?? null),
         event.id
       );
+      if (order) {
+        try {
+          await sendPaidOrderReceipt(order.reference);
+        } catch {
+          // Stripe retries the event, allowing delivery to recover without
+          // rolling back the already confirmed payment.
+          return NextResponse.json({ error: "Order receipt delivery failed; retry the event." }, { status: 503 });
+        }
+      }
       break;
     }
     case "checkout.session.expired": {

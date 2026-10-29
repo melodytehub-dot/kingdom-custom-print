@@ -7,9 +7,9 @@ const BROWSER = process.env.QA_BROWSER ?? "chrome";
 
 const cliparts = JSON.parse(readFileSync("public/lumise/cliparts.json", "utf8"));
 const templates = JSON.parse(readFileSync("public/lumise/templates.json", "utf8"));
-assert.equal(cliparts.items.length, 3322);
-assert.equal(templates.items.length, 311);
-console.log("PASS Lumise manifests contain 3,322 cliparts and 311 templates");
+assert.equal(cliparts.items.length, 3449);
+assert.equal(templates.items.length, 347);
+console.log("PASS Lumise manifests contain 3,449 cliparts and 347 templates");
 
 const browser = await chromium.launch({ channel: BROWSER, headless: true });
 const page = await browser.newPage({ viewport: { width: 390, height: 844 } });

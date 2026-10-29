@@ -158,6 +158,14 @@ CREATE INDEX IF NOT EXISTS orders_account_idx ON orders (account_id, created_at 
 CREATE INDEX IF NOT EXISTS orders_created_idx ON orders (created_at DESC);
 CREATE INDEX IF NOT EXISTS orders_status_idx ON orders (status);
 
+-- Durable record prevents repeated Stripe webhook deliveries from sending
+-- additional receipts after Resend's idempotency window has expired.
+CREATE TABLE IF NOT EXISTS order_email_receipts (
+  reference text PRIMARY KEY REFERENCES orders(reference) ON DELETE CASCADE,
+  provider_id text NOT NULL,
+  sent_at timestamptz NOT NULL DEFAULT now()
+);
+
 -- Short-lived proof that a guest verified an order with its checkout email.
 -- Only a hash is stored; the raw token lives in an httpOnly browser cookie.
 CREATE TABLE IF NOT EXISTS order_access_sessions (

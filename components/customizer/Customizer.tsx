@@ -103,7 +103,7 @@ import {
   hostedCutoutStatus,
   photoroomAction,
 } from "@/lib/cutoutActions";
-import { hostedCutoutDataUrl, hostedCutoutReady } from "@/lib/hostedCutout";
+import { hostedCutoutDataUrl, hostedCutoutReady, loadHostedCutoutConfig } from "@/lib/hostedCutout";
 import { photoroomAltReady, photoroomCutoutDataUrl } from "@/lib/photoroomCutout";
 import {
   CUTOUT_MAX_EDGE,
@@ -807,6 +807,7 @@ export default function Customizer({
       setFxStatus("Removing background…");
       keepQuick(await quickCut());
     } else {
+      await loadHostedCutoutConfig();
       if (hostedCutoutReady()) {
         try {
           dataUrl = await runHostedCutout(orig);

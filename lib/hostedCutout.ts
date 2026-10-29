@@ -28,6 +28,23 @@ const RETRY_MS = 4_000;
 /** A single request that never answers is treated as unreachable. Cold
  * renders answer in seconds (measured ~6 s); a 423 restarts the clock. */
 const ATTEMPT_TIMEOUT_MS = 45_000;
+let runtimeImgixSource = "";
+let runtimeConfig: Promise<void> | undefined;
+
+/** Resolve the public source at runtime so Cloudflare builds do not need secrets. */
+export function loadHostedCutoutConfig(): Promise<void> {
+  if (hostedCutoutDomain()) return Promise.resolve();
+  runtimeConfig ??= fetch("/api/public-config", { cache: "no-store" })
+    .then(async (response) => {
+      if (!response.ok) throw new Error("Configuration unavailable");
+      const value = (await response.json()) as { imgixSource?: unknown };
+      if (typeof value.imgixSource === "string" && /^[a-z0-9-]+\.imgix\.net$/i.test(value.imgixSource)) {
+        runtimeImgixSource = value.imgixSource;
+      }
+    })
+    .catch(() => { runtimeConfig = undefined; });
+  return runtimeConfig;
+}
 
 export type HostedCutoutPhase =
   /** Shrinking and sending the photo. */
@@ -39,7 +56,7 @@ export type HostedCutoutPhase =
 
 /** The configured imgix source host, or "" when hosted removal is off. */
 export function hostedCutoutDomain(): string {
-  return (process.env.NEXT_PUBLIC_IMGIX_SOURCE ?? "").trim();
+  return (process.env.NEXT_PUBLIC_IMGIX_SOURCE ?? "").trim() || runtimeImgixSource;
 }
 
 /** True when a hosted remover is configured for this build. */

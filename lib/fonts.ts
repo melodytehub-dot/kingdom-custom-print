@@ -6,6 +6,7 @@ export interface FontOption {
   fallback: string;
   /** Google Fonts family loaded only when a customer selects it. */
   googleFamily?: string;
+  googleWeight?: number;
   /** Scripts the face can render; web-safe stacks cover Greek and Hebrew. */
   scripts?: ("latin" | "greek" | "hebrew")[];
 }
@@ -60,12 +61,16 @@ const GOOGLE_FONT_FAMILIES = [
 
 const googleFonts: FontOption[] = GOOGLE_FONT_FAMILIES.map((family) => {
   const value = family.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+  // The old template names Vinhan, which is unavailable from Google Fonts.
+  // Vina Sans is an available approximation until the original font is supplied.
+  const resolvedFamily = family === "Vinhan" ? "Vina Sans" : family;
   return {
     value: `google-${value}`,
     label: family,
     cssVar: "",
-    fallback: `"${family}", sans-serif`,
-    googleFamily: family,
+    fallback: `"${resolvedFamily}", sans-serif`,
+    googleFamily: resolvedFamily,
+    ...(family === "Coda Caption" ? { googleWeight: 800 } : {}),
   };
 });
 
@@ -115,9 +120,10 @@ export function ensureFontLoaded(value: string): Promise<void> {
   const load = new Promise<void>((resolve, reject) => {
     const link = document.createElement("link");
     link.rel = "stylesheet";
-    link.href = `https://fonts.googleapis.com/css2?family=${encodeURIComponent(googleFamily)}&display=swap`;
+    const familyQuery = `${encodeURIComponent(googleFamily)}${font.googleWeight ? `:wght@${font.googleWeight}` : ""}`;
+    link.href = `https://fonts.googleapis.com/css2?family=${familyQuery}&display=swap`;
     link.onload = () => {
-      void document.fonts.load(`400 16px "${googleFamily}"`).then(() => resolve(), reject);
+      void document.fonts.load(`${font.googleWeight ?? 400} 16px "${googleFamily}"`).then(() => resolve(), reject);
     };
     link.onerror = () => reject(new Error(`Could not load ${font.label}`));
     document.head.append(link);

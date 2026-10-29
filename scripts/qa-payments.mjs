@@ -70,13 +70,16 @@ const previousSecret = process.env.STRIPE_WEBHOOK_SECRET;
 process.env.STRIPE_WEBHOOK_SECRET = secret;
 let paidCalls = 0;
 let refundedCalls = 0;
+let receiptCalls = 0;
+let receiptFails = false;
 const webhook = load("app/api/webhook/route.ts", {
   "next/server": { NextResponse },
   "@/lib/orders": {
-    markOrderPaid: async () => { paidCalls++; },
+    markOrderPaid: async () => { paidCalls++; return { reference: "KCP-TEST01" }; },
     markOrderRefunded: async () => { refundedCalls++; },
   },
   "@/lib/stripe": { stripeClient: () => stripe },
+  "@/lib/order-email": { sendPaidOrderReceipt: async () => { receiptCalls++; if (receiptFails) throw new Error("mail unavailable"); } },
 });
 async function event(status, type = "checkout.session.completed", valid = true, object) {
   const body = JSON.stringify({ id: "evt_local", type, data: { object: object ?? { id: "cs_test_local", payment_status: status, payment_intent: "pi_local" } } });
@@ -90,8 +93,14 @@ try {
   assert.equal(paidCalls, 0);
   assert.equal((await event("paid")).status, 200);
   assert.equal(paidCalls, 1);
+  assert.equal(receiptCalls, 1);
   assert.equal((await event("paid", "checkout.session.async_payment_succeeded")).status, 200);
   assert.equal(paidCalls, 2);
+  receiptFails = true;
+  assert.equal((await event("paid")).status, 503);
+  receiptFails = false;
+  assert.equal((await event("paid")).status, 200);
+  console.log("PASS a failed receipt makes Stripe retry without ignoring the paid order");
   assert.equal((await event("paid", "charge.refunded", true, { id: "ch_partial", amount: 5000, amount_refunded: 1000, payment_intent: "pi_local" })).status, 200);
   assert.equal(refundedCalls, 0);
   assert.equal((await event("paid", "charge.refunded", true, { id: "ch_full", amount: 5000, amount_refunded: 5000, payment_intent: "pi_local" })).status, 200);

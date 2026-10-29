@@ -55,11 +55,12 @@ function writeElementAsset(templateId, index, source) {
   return `/lumise/template-elements/${file}`;
 }
 
-function getTemplateSource(previewSrc) {
-  const rel = String(previewSrc ?? "")
+function getTemplateSource(template) {
+  const previewSrc = template.previewSrc;
+  const rel = template.sourcePath ?? String(previewSrc ?? "")
     .replace(/^\/lumise\//, "")
     .replace(/-thumbn(?:-\d+)?\.png$/i, ".lumi");
-  if (rel === previewSrc || rel.split(/[\\/]/).includes("..")) return null;
+  if ((!template.sourcePath && rel === previewSrc) || rel.split(/[\\/]/).includes("..")) return null;
   const path = resolve(tempRoot, rel);
   if (!path.startsWith(`${tempRoot}${sep}`) || !existsSync(path)) return null;
   return path;
@@ -153,7 +154,7 @@ try {
   let artCount = 0;
 
   for (const template of manifest.items) {
-    const sourcePath = getTemplateSource(template.previewSrc);
+    const sourcePath = getTemplateSource(template);
     if (!sourcePath) {
       missing.push(`${template.id}: source file missing`);
       continue;
