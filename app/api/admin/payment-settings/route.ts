@@ -26,14 +26,12 @@ export async function PUT(req: Request) {
   for (const name of PAYMENT_FIELDS) {
     const v = (body.fields as Record<string, unknown>)[name];
     if (v === undefined || v === "") continue;
-    if (typeof v !== "string" || v.trim().length < (name === "PAYPAL_ENVIRONMENT" ? 4 : 8) || v.trim().length > 512 || /\s/.test(v.trim())) return NextResponse.json({ error: `Check the ${name.replaceAll("_", " ")} value.` }, { status: 422 });
+    if (typeof v !== "string" || v.trim().length < 8 || v.trim().length > 512 || /\s/.test(v.trim())) return NextResponse.json({ error: `Check the ${name.replaceAll("_", " ")} value.` }, { status: 422 });
     values[name] = v.trim();
   }
   if (!Object.keys(values).length) return NextResponse.json({ error: "Enter at least one credential." }, { status: 422 });
-  if (values.STRIPE_SECRET_KEY && !/^(sk|rk)_(live|test)_/.test(values.STRIPE_SECRET_KEY)) return NextResponse.json({ error: "Enter a Stripe secret or restricted key." }, { status: 422 });
+  if (values.STRIPE_SECRET_KEY && !/^(sk|rk)_live_/.test(values.STRIPE_SECRET_KEY)) return NextResponse.json({ error: "Enter a live Stripe secret or restricted key." }, { status: 422 });
   if (values.STRIPE_WEBHOOK_SECRET && !values.STRIPE_WEBHOOK_SECRET.startsWith("whsec_")) return NextResponse.json({ error: "Enter a Stripe webhook signing secret." }, { status: 422 });
-  if (values.PAYPAL_ENVIRONMENT && !["live", "sandbox"].includes(values.PAYPAL_ENVIRONMENT)) return NextResponse.json({ error: "Choose a valid PayPal environment." }, { status: 422 });
-  if (values.PAYPAL_ENVIRONMENT && !(values.PAYPAL_CLIENT_ID && values.PAYPAL_CLIENT_SECRET && values.PAYPAL_WEBHOOK_ID)) return NextResponse.json({ error: "Changing the PayPal environment requires all three matching credentials." }, { status: 422 });
   await savePaymentCredentials(values);
   return NextResponse.json({ ok: true, fields: await paymentCredentialStatus() }, { headers: { "Cache-Control": "no-store" } });
 }

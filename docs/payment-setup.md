@@ -14,15 +14,14 @@ Only the business owner or an authorized administrator should enter payment cred
 ## PayPal
 
 1. Sign in with the business account at https://developer.paypal.com/dashboard/ and open **Apps & Credentials**.
-2. Choose **Sandbox** for initial integration testing. Create or select a REST app and find its client ID and client secret.
-3. Add a webhook pointing to `https://kingdomcustomprint.com/api/paypal/webhook`, subscribing to `CHECKOUT.ORDER.APPROVED`, `PAYMENT.CAPTURE.COMPLETED`, and `PAYMENT.CAPTURE.REFUNDED`. Copy its webhook ID.
-4. Once the developer confirms the sandbox test is ready, enter all three matching values and choose **Sandbox** in the store's payment settings. PayPal checkout stays disabled until the developer explicitly enables it for testing.
-5. For production, switch the developer dashboard to **Live**, create or select a live REST app, and create a separate live webhook with the same endpoint and event subscriptions. Save its live client ID, live client secret, and live webhook ID together, selecting **Live**.
+2. Select **Live**, create or select a live REST app, and find its client ID and client secret.
+3. Add a live webhook pointing to `https://kingdomcustomprint.com/api/paypal/webhook`, subscribing to `CHECKOUT.ORDER.APPROVED`, `PAYMENT.CAPTURE.COMPLETED`, and `PAYMENT.CAPTURE.REFUNDED`. Copy its webhook ID.
+4. Enter the three matching live values in the store's **Payment** tab. Saving the credentials alone does not enable checkout.
 
-The mode and all three PayPal values must match the same app and environment. Saving PayPal credentials alone does not enable checkout.
+All three PayPal values must belong to the same live app.
 
 ## Verification
 
-First use Stripe test mode and PayPal sandbox on an isolated test environment. Once each integration, signed webhook, order record and refund are verified, the client can perform the requested two $1 live tests from a separate buyer account or card and approve each payment herself. Confirm the store order, provider transaction and webhook, then use the admin refund control if desired. Live payment and refund fees and settlement timing depend on the providers and merchant account.
+After credentials and signed webhook setup are checked, the client can perform the requested two $1 live tests from a separate buyer account or card and approve each payment herself. Confirm the store order, provider transaction and webhook, then use the admin refund control if desired. These are real charges; live payment and refund fees and settlement timing depend on the providers and merchant account.
 
 Official guidance: https://docs.stripe.com/keys and https://developer.paypal.com/api/get-started/.

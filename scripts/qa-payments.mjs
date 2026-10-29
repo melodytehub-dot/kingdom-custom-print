@@ -28,7 +28,7 @@ const checkout = load("app/api/checkout/route.ts", {
   "next/server": { NextResponse },
   "node:crypto": { randomUUID: () => "11111111-1111-4111-8111-111111111111" },
   "@/lib/orders": { createOrder: async input => { writes++; orderInput = input; const subtotal = input.items.reduce((sum, item) => sum + item.total, 0); return { reference: "KCP-TEST01", subtotal, shipping: 6.95, total: subtotal + 6.95 }; }, attachStripeSession: async () => {}, attachPayPalOrder: async () => {}, cancelOrder: async () => true },
-  "@/lib/paypal": { paypalConfigured: async () => paypalEnabled, paypalRequest: async (_path, options) => { paypalInput = JSON.parse(options.body); return { id: "PAYPALID", links: [{ rel: "payer-action", href: "https://www.sandbox.paypal.com/checkoutnow" }] }; } },
+  "@/lib/paypal": { paypalConfigured: async () => paypalEnabled, paypalRequest: async (_path, options) => { paypalInput = JSON.parse(options.body); return { id: "PAYPALID", links: [{ rel: "payer-action", href: "https://www.paypal.com/checkoutnow" }] }; } },
   "@/lib/order-access": { createOrderAccessSession: async () => "test_access_token", ORDER_ACCESS_COOKIE: "kcp_order_access", orderAccessCookieOptions: () => ({ httpOnly: true, sameSite: "lax", path: "/" }) },
   "@/lib/stripe": { paymentsConfigured: () => configured, siteUrl: () => "https://kingdom.example", stripeClient: () => ({ checkout: { sessions: { create: async input => { sessionInput = input; return { id: "cs_test_local", url: "https://checkout.stripe.com/test" }; }, expire: async () => ({}) } } }) },
   "@/lib/catalog": { getProductById: async () => product },

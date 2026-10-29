@@ -29,7 +29,7 @@ export default function PaymentSettings() {
 
   async function save(event: React.FormEvent) {
     event.preventDefault();
-    if ((values.PAYPAL_ENVIRONMENT === "live" || /^(sk|rk)_live_/.test(values.STRIPE_SECRET_KEY ?? "")) && !window.confirm("These are live payment credentials and can be used for real customer charges once checkout is enabled. Continue?")) return;
+    if (Object.values(values).some(Boolean) && !window.confirm("These are live payment credentials and can be used for real customer charges once checkout is enabled. Continue?")) return;
     setSaving(true); setNotice("");
     try {
       const response = await fetch("/api/admin/payment-settings", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ password, fields: values }) });
@@ -53,7 +53,6 @@ export default function PaymentSettings() {
             <label className="label" htmlFor={`payment-${key}`}>{label} {configured[key] ? "(saved)" : "(not saved)"}</label>
             <input id={`payment-${key}`} className="input" type="password" autoComplete="new-password" value={values[key] ?? ""} onChange={(event) => setValues({ ...values, [key]: event.target.value })} />
           </div>)}
-          {provider === "PAYPAL" ? <div className="field"><label className="label" htmlFor="paypal-environment">PayPal environment</label><select id="paypal-environment" className="select" value={values.PAYPAL_ENVIRONMENT ?? ""} onChange={(event) => setValues({ ...values, PAYPAL_ENVIRONMENT: event.target.value })}><option value="">Keep current setting</option><option value="sandbox">Sandbox (test)</option><option value="live">Live</option></select><span className="hint">Changing the environment requires the matching client ID, secret, and webhook ID.</span></div> : null}
         </fieldset>)}
         <div className="field"><label className="label" htmlFor="payment-admin-password">Confirm admin password</label><input id="payment-admin-password" className="input" type="password" required autoComplete="current-password" value={password} onChange={(event) => setPassword(event.target.value)} /></div>
         <button className="btn" type="submit" disabled={saving}>{saving ? "Saving…" : "Save payment credentials"}</button>

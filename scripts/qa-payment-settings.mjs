@@ -27,7 +27,7 @@ try {
   };
   sql.begin = (fn) => fn(sql);
   const vault = await load("lib/payment-credentials.ts", { "./db": { sql } });
-  const secret = "sk_test_example_secret";
+  const secret = "sk_live_example_secret";
   await vault.savePaymentCredentials({ STRIPE_SECRET_KEY: secret });
   assert.notEqual(db.get("STRIPE_SECRET_KEY"), secret);
   assert.equal(await vault.getPaymentCredential("STRIPE_SECRET_KEY"), secret);

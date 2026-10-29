@@ -319,7 +319,7 @@ export async function POST(req: Request) {
         body: JSON.stringify({ intent: "CAPTURE", purchase_units: [{ custom_id: order.reference, amount: { currency_code: "USD", value: order.total.toFixed(2) } }], payment_source: { paypal: { experience_context: { return_url: `${base}/api/paypal/return`, cancel_url: `${base}/cart?cancelled=1`, user_action: "PAY_NOW", shipping_preference: "NO_SHIPPING" } } } }),
       });
       const approval = result.links?.find((link) => link.rel === "payer-action" || link.rel === "approve")?.href;
-      if (!result.id || !approval || !/^https:\/\/(www\.)?(sandbox\.)?paypal\.com\//i.test(approval)) throw new Error("Invalid PayPal approval response.");
+      if (!result.id || !approval || !/^https:\/\/(www\.)?paypal\.com\//i.test(approval)) throw new Error("Invalid PayPal approval response.");
       await attachPayPalOrder(order.reference, result.id);
       const accessToken = await createOrderAccessSession(order.reference);
       const response = NextResponse.json({ url: approval, reference: order.reference });
