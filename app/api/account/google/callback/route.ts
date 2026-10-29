@@ -34,12 +34,12 @@ export async function GET(request: NextRequest) {
       clientConfigured: Boolean(client), codePresent: Boolean(code), verifierPresent: Boolean(verifier),
       noncePresent: Boolean(nonce), stateMatches: sameSecret(request.cookies.get(GOOGLE_STATE_COOKIE)?.value, query.get("state")),
     });
-    return finish(request, "invalid");
+    return finish(request, "invalid-state");
   }
 
   try {
     const { tokens } = await client.getToken({ code, codeVerifier: verifier });
-    if (!tokens.id_token) return finish(request, "invalid");
+    if (!tokens.id_token) return finish(request, "invalid-token");
     const ticket = await client.verifyIdToken({ idToken: tokens.id_token, audience: process.env.GOOGLE_CLIENT_ID });
     const profile = ticket.getPayload();
     if (!profile?.sub || !profile.email_verified || !profile.email || !sameSecret(nonce, profile.nonce ?? null)) {
@@ -47,11 +47,11 @@ export async function GET(request: NextRequest) {
         subjectPresent: Boolean(profile?.sub), emailVerified: Boolean(profile?.email_verified),
         emailPresent: Boolean(profile?.email), nonceMatches: sameSecret(nonce, profile?.nonce ?? null),
       });
-      return finish(request, "invalid");
+      return finish(request, "invalid-profile");
     }
 
     const email = normalizedEmail(profile.email);
-    if (email.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) return finish(request, "invalid");
+    if (email.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) return finish(request, "invalid-email");
     const name = String(profile.name || email.split("@")[0]).slice(0, 100);
     const authoritative = email.endsWith("@gmail.com") || Boolean(profile.hd);
 
@@ -73,7 +73,7 @@ export async function GET(request: NextRequest) {
         accountId = created?.id;
       }
     }
-    if (!accountId) return finish(request, "invalid");
+    if (!accountId) return finish(request, "invalid-account");
     const token = await createCustomerSession(accountId);
     return finish(request, "ok", token);
   } catch (error) {
