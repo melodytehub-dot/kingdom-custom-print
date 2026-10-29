@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { randomUUID } from "node:crypto";
-import { createOrder, attachStripeSession, cancelOrder } from "@/lib/orders";
+import { createOrder, attachStripeSession, attachPayPalOrder, cancelOrder } from "@/lib/orders";
+import { paypalConfigured, paypalRequest } from "@/lib/paypal";
 import {
   createOrderAccessSession,
   ORDER_ACCESS_COOKIE,
@@ -19,6 +20,7 @@ export const dynamic = "force-dynamic";
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 
 interface Body {
+  paymentMethod?: string;
   checkoutAttemptId?: string;
   email?: string;
   name?: string;
@@ -231,20 +233,17 @@ function clampNum(v: unknown, min: number, max: number, fallback: number): numbe
 
 export async function POST(req: Request) {
   if (!sameOrigin(req)) return NextResponse.json({ error: "Invalid request origin." }, { status: 403 });
-  if (!paymentsConfigured()) {
+  let body: Body;
+  try { body = (await req.json()) as Body; } catch { return NextResponse.json({ error: "Invalid request." }, { status: 400 }); }
+  const paypal = body.paymentMethod === "paypal";
+  if (!(paypal ? await paypalConfigured() : await paymentsConfigured())) {
     return NextResponse.json(
-      { error: "Card checkout is temporarily unavailable. Your design is saved in your cart; please try again later." },
+      { error: "That payment method is temporarily unavailable. Your design is saved in your cart; please try again later." },
       { status: 503 }
     );
   }
-  const stripe = stripeClient();
-  if (!stripe) return NextResponse.json({ error: "Card checkout is temporarily unavailable." }, { status: 503 });
-  let body: Body;
-  try {
-    body = (await req.json()) as Body;
-  } catch {
-    return NextResponse.json({ error: "Invalid request." }, { status: 400 });
-  }
+  const stripe = paypal ? null : await stripeClient();
+  if (!paypal && !stripe) return NextResponse.json({ error: "Card checkout is temporarily unavailable." }, { status: 503 });
 
   const email = String(body.email ?? "").trim().toLowerCase();
   const checkoutAttemptId = /^[0-9a-f]{8}-[0-9a-f-]{27}$/i.test(String(body.checkoutAttemptId ?? ""))
@@ -314,6 +313,20 @@ export async function POST(req: Request) {
     createdOrderWasNew = !order.reused;
 
     const base = siteUrl();
+    if (paypal) {
+      const result = await paypalRequest<{ id?: string; links?: { rel: string; href: string }[] }>("/v2/checkout/orders", {
+        method: "POST", requestId: `c-${checkoutAttemptId.replaceAll("-", "")}`,
+        body: JSON.stringify({ intent: "CAPTURE", purchase_units: [{ custom_id: order.reference, amount: { currency_code: "USD", value: order.total.toFixed(2) } }], payment_source: { paypal: { experience_context: { return_url: `${base}/api/paypal/return`, cancel_url: `${base}/cart?cancelled=1`, user_action: "PAY_NOW", shipping_preference: "NO_SHIPPING" } } } }),
+      });
+      const approval = result.links?.find((link) => link.rel === "payer-action" || link.rel === "approve")?.href;
+      if (!result.id || !approval || !/^https:\/\/(www\.)?(sandbox\.)?paypal\.com\//i.test(approval)) throw new Error("Invalid PayPal approval response.");
+      await attachPayPalOrder(order.reference, result.id);
+      const accessToken = await createOrderAccessSession(order.reference);
+      const response = NextResponse.json({ url: approval, reference: order.reference });
+      if (accessToken) response.cookies.set(ORDER_ACCESS_COOKIE, accessToken, orderAccessCookieOptions());
+      return response;
+    }
+    if (!stripe) throw new Error("Stripe is unavailable.");
     const session = await stripe.checkout.sessions.create({
       mode: "payment",
       payment_method_types: ["card"],
@@ -366,7 +379,7 @@ export async function POST(req: Request) {
     return response;
   } catch (err) {
     console.error("checkout error:", err);
-    if (stripeSessionId) {
+    if (stripeSessionId && stripe) {
       try {
         await stripe.checkout.sessions.expire(stripeSessionId);
       } catch (expireError) {

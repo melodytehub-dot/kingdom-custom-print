@@ -5,6 +5,8 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import Garment from "@/components/Garment";
 import ArrowRight from "@/components/icons/ArrowRight";
+import PaymentSettings from "./PaymentSettings";
+import AdminRefund from "./AdminRefund";
 import { formatUSD } from "@/lib/pricing";
 import { mockupsForProduct } from "@/lib/mockups";
 import {
@@ -550,6 +552,8 @@ function OrderDetailPanel({
                 ? "Only the next valid fulfillment step is available."
                 : "This order has no further manual status changes."}
           </p>
+
+          {detail.refundProvider ? <AdminRefund reference={detail.reference} total={detail.total} provider={detail.refundProvider} /> : null}
 
           <h4 className="panel-heading">Status history</h4>
           {detail.statusHistory.length ? (
@@ -1496,6 +1500,17 @@ function SettingsPanel({
       ) : null}
 
       <form className="settings-form" onSubmit={save}>
+        <fieldset className="fieldset">
+          <legend className="label">Homepage introduction</legend>
+          <p className="hint">Edit the text shown over the homepage slideshow.</p>
+          {([
+            ["heroLabel", "Small heading"], ["heroHeadlineTop", "Headline, first line"],
+            ["heroHeadlineBottom", "Headline, second line"], ["heroDescription", "Description"],
+          ] as const).map(([key, label]) => <div className="field" key={key}>
+            <label className="label" htmlFor={`s-${key}`}>{label}</label>
+            <input id={`s-${key}`} className="input" value={form[key]} onChange={(e) => setForm({ ...form, [key]: e.target.value })} />
+          </div>)}
+        </fieldset>
         <div className="field">
           <label className="label" htmlFor="s-announcement">
             Announcement bar
@@ -1604,6 +1619,8 @@ function SettingsPanel({
           {saving ? "Saving…" : "Save settings"}
         </button>
       </form>
+
+      <PaymentSettings />
 
       <div className="admin-subsection">
         <div className="admin-block-head">

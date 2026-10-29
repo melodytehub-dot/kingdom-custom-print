@@ -359,6 +359,10 @@ export async function deleteProduct(id: number): Promise<boolean> {
    ------------------------------------------------------------------------- */
 
 export interface SiteSettings {
+  heroLabel: string;
+  heroHeadlineTop: string;
+  heroHeadlineBottom: string;
+  heroDescription: string;
   announcement: string;
   shippingFlat: number;
   freeShippingThreshold: number;
@@ -369,6 +373,10 @@ export interface SiteSettings {
 }
 
 export const DEFAULT_SETTINGS: SiteSettings = {
+  heroLabel: "PRINT ON DEMAND STUDIO",
+  heroHeadlineTop: "YOUR IDEAS.",
+  heroHeadlineBottom: "MADE TO WEAR.",
+  heroDescription: "Custom apparel for your everyday, your brand, or your team. Design it online. Make it yours.",
   announcement: "Free US shipping on orders over $75",
   shippingFlat: 6.95,
   freeShippingThreshold: 75,
@@ -383,6 +391,10 @@ export async function getSettings(): Promise<SiteSettings> {
     SELECT key, value FROM site_settings`;
   const map = new Map(rows.map((r) => [r.key, r.value]));
   return {
+    heroLabel: String(map.get("hero_label") ?? DEFAULT_SETTINGS.heroLabel),
+    heroHeadlineTop: String(map.get("hero_headline_top") ?? DEFAULT_SETTINGS.heroHeadlineTop),
+    heroHeadlineBottom: String(map.get("hero_headline_bottom") ?? DEFAULT_SETTINGS.heroHeadlineBottom),
+    heroDescription: String(map.get("hero_description") ?? DEFAULT_SETTINGS.heroDescription),
     announcement: String(map.get("announcement") ?? DEFAULT_SETTINGS.announcement),
     shippingFlat: num(map.get("shipping_flat") ?? DEFAULT_SETTINGS.shippingFlat),
     freeShippingThreshold: num(
@@ -398,6 +410,10 @@ export async function getSettings(): Promise<SiteSettings> {
 export async function saveSettings(settings: SiteSettings): Promise<void> {
   await sql.begin(async (tx) => {
     const entries: [string, unknown][] = [
+      ["hero_label", settings.heroLabel],
+      ["hero_headline_top", settings.heroHeadlineTop],
+      ["hero_headline_bottom", settings.heroHeadlineBottom],
+      ["hero_description", settings.heroDescription],
       ["announcement", settings.announcement],
       ["shipping_flat", settings.shippingFlat],
       ["free_shipping_threshold", settings.freeShippingThreshold],

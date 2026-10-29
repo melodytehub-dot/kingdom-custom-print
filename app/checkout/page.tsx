@@ -3,6 +3,7 @@ import { paymentsConfigured } from "@/lib/stripe";
 import CheckoutForm from "@/components/CheckoutForm";
 import { getSettings } from "@/lib/catalog";
 import { customerFromCookies } from "@/lib/customer-auth";
+import { paypalConfigured } from "@/lib/paypal";
 
 export const dynamic = "force-dynamic";
 
@@ -17,7 +18,7 @@ export default async function CheckoutPage() {
   return (
     <>
 
-      <CheckoutForm settings={settings} paymentsReady={paymentsConfigured()} account={account ? { email: account.email, name: account.name } : null} />
+      <CheckoutForm settings={settings} paymentsReady={await paymentsConfigured()} paypalReady={await paypalConfigured()} account={account ? { email: account.email, name: account.name } : null} />
     </>
   );
 }

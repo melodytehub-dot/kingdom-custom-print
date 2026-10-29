@@ -82,6 +82,13 @@ CREATE TABLE IF NOT EXISTS product_images (
   sort_order int NOT NULL DEFAULT 0
 );
 
+-- Payment credentials are encrypted before storage with a separate Worker secret.
+CREATE TABLE IF NOT EXISTS payment_credentials (
+  name text PRIMARY KEY,
+  ciphertext text NOT NULL,
+  updated_at timestamptz NOT NULL DEFAULT now()
+);
+
 CREATE TABLE IF NOT EXISTS customers (
   id         serial PRIMARY KEY,
   email      text NOT NULL UNIQUE,
@@ -147,6 +154,10 @@ CREATE TABLE IF NOT EXISTS orders (
 );
 
 ALTER TABLE orders ADD COLUMN IF NOT EXISTS account_id int REFERENCES customer_accounts(id) ON DELETE SET NULL;
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS paypal_order_id text;
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS paypal_capture_id text;
+CREATE UNIQUE INDEX IF NOT EXISTS orders_paypal_order_idx ON orders (paypal_order_id) WHERE paypal_order_id IS NOT NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS orders_paypal_capture_idx ON orders (paypal_capture_id) WHERE paypal_capture_id IS NOT NULL;
 ALTER TABLE orders DROP CONSTRAINT IF EXISTS orders_status_check;
 ALTER TABLE orders ADD CONSTRAINT orders_status_check
   CHECK (status IN ('pending','paid','in_proof','in_production','shipped','refunded','cancelled'));

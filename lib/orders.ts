@@ -161,9 +161,42 @@ export async function attachStripeSession(
   orderReference: string,
   sessionId: string
 ): Promise<void> {
-  await sql`
+  const result = await sql`
     UPDATE orders SET stripe_session_id = ${sessionId}
-    WHERE reference = ${orderReference}`;
+    WHERE reference = ${orderReference} AND status = 'pending' AND paypal_order_id IS NULL AND (stripe_session_id IS NULL OR stripe_session_id = ${sessionId})`;
+  if (!result.count) throw new Error("Stripe session could not be linked.");
+}
+
+export async function attachPayPalOrder(reference: string, paypalOrderId: string): Promise<void> {
+  const rows = await sql`UPDATE orders SET paypal_order_id = ${paypalOrderId} WHERE reference = ${reference} AND status = 'pending' AND stripe_session_id IS NULL AND (paypal_order_id IS NULL OR paypal_order_id = ${paypalOrderId})`;
+  if (!rows.count) throw new Error("PayPal order could not be linked.");
+}
+
+export async function paypalOrderForCapture(paypalOrderId: string): Promise<{ reference: string; total: number; status: OrderStatus } | null> {
+  const [row] = await sql<{ reference: string; total: number; status: OrderStatus }[]>`SELECT reference, total, status FROM orders WHERE paypal_order_id = ${paypalOrderId} LIMIT 1`;
+  return row ? { ...row, total: num(row.total) } : null;
+}
+
+export async function recordPayPalCapture(paypalOrderId: string, captureId: string, amount: string, currency: string, eventId?: string): Promise<{ reference: string } | null> {
+  if (currency !== "USD" || !/^\d+\.\d{2}$/.test(amount)) return null;
+  return sql.begin(async (tx) => {
+    const [row] = await tx<{ id: number; reference: string; total: number; status: OrderStatus; paid_at: Date | null; paypal_capture_id: string | null }[]>`SELECT id, reference, total, status, paid_at, paypal_capture_id FROM orders WHERE paypal_order_id = ${paypalOrderId} LIMIT 1 FOR UPDATE`;
+    if (!row || Math.round(num(row.total) * 100) !== Math.round(Number(amount) * 100)) return null;
+    if (row.paid_at) return row.paypal_capture_id === captureId ? { reference: row.reference } : null;
+    if (row.status !== "pending") return null;
+    await tx`UPDATE orders SET status = 'paid', paid_at = now(), paypal_capture_id = ${captureId}, updated_at = now() WHERE id = ${row.id}`;
+    await tx`INSERT INTO order_status_events (order_id, from_status, to_status, actor, note, external_event_id) VALUES (${row.id}, 'pending', 'paid', 'system', 'Payment confirmed by PayPal.', ${eventId ?? null}) ON CONFLICT (external_event_id) WHERE external_event_id IS NOT NULL DO NOTHING`;
+    return { reference: row.reference };
+  });
+}
+
+export async function markPayPalRefunded(captureId: string, eventId?: string): Promise<void> {
+  await sql.begin(async (tx) => {
+    const [row] = await tx<{ id: number; status: OrderStatus }[]>`SELECT id, status FROM orders WHERE paypal_capture_id = ${captureId} AND paid_at IS NOT NULL LIMIT 1 FOR UPDATE`;
+    if (!row || row.status === "refunded") return;
+    await tx`UPDATE orders SET status = 'refunded', updated_at = now() WHERE id = ${row.id}`;
+    await tx`INSERT INTO order_status_events (order_id, from_status, to_status, actor, note, external_event_id) VALUES (${row.id}, ${row.status}, 'refunded', 'system', 'Full refund confirmed by PayPal.', ${eventId ?? null}) ON CONFLICT (external_event_id) WHERE external_event_id IS NOT NULL DO NOTHING`;
+  });
 }
 
 /**
@@ -399,9 +432,11 @@ export async function getAdminOrder(reference: string): Promise<AdminOrderDetail
       country: string;
       notes: string;
       paid_at: Date | null;
+      stripe_payment_intent: string | null;
+      paypal_capture_id: string | null;
     }[]
   >`
-    SELECT phone, address_line1, address_line2, city, region, postal, country, notes, paid_at
+    SELECT phone, address_line1, address_line2, city, region, postal, country, notes, paid_at, stripe_payment_intent, paypal_capture_id
     FROM orders WHERE reference = ${reference} LIMIT 1`;
 
   const r = rows[0];
@@ -427,6 +462,7 @@ export async function getAdminOrder(reference: string): Promise<AdminOrderDetail
     country: r.country,
     notes: r.notes,
     paidAt: r.paid_at ? r.paid_at.toISOString() : null,
+    refundProvider: r.paid_at && base.status !== "refunded" ? (r.stripe_payment_intent ? "stripe" : r.paypal_capture_id ? "paypal" : null) : null,
     statusHistory: history.map((event) => ({
       fromStatus: event.from_status,
       toStatus: event.to_status,

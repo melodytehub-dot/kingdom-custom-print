@@ -82,7 +82,8 @@ export async function endCustomerSession(request: Request): Promise<void> {
 }
 
 export async function authAttemptAllowed(request: Request, email: string): Promise<boolean> {
-  const ip = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "local";
+  const ip = request.headers.get("cf-connecting-ip")?.trim()
+    || request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "local";
   const key = createHash("sha256").update(`${ip}:${email}`).digest("hex");
   const [row] = await sql<{ attempts: number }[]>`
     INSERT INTO customer_auth_attempts (key, attempts, reset_at)

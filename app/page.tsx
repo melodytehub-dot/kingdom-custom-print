@@ -6,7 +6,7 @@ import ArrowRight from "@/components/icons/ArrowRight";
 import Truck from "@/components/icons/Truck";
 import Shield from "@/components/icons/Shield";
 import Store from "@/components/icons/Store";
-import { getProducts } from "@/lib/catalog";
+import { getProducts, getSettings, DEFAULT_SETTINGS } from "@/lib/catalog";
 
 export const revalidate = 60;
 
@@ -36,7 +36,7 @@ const COLLECTIONS = [
 ];
 
 export default async function HomePage() {
-  const products = await getProducts().catch(() => []);
+  const [products, settings] = await Promise.all([getProducts().catch(() => []), getSettings().catch(() => DEFAULT_SETTINGS)]);
 
   return (
     <div className="mm-home-wrapper">
@@ -48,14 +48,14 @@ export default async function HomePage() {
           <div className="mm-hero-grid">
             <div className="mm-hero-content">
               <div className="mm-hero-copy">
-                <span className="mm-hero-tag">PRINT ON DEMAND STUDIO</span>
+                <span className="mm-hero-tag">{settings.heroLabel}</span>
                 <h1 className="mm-hero-title">
-                  YOUR IDEAS.
+                  {settings.heroHeadlineTop}
                   <br />
-                  MADE TO WEAR.
+                  {settings.heroHeadlineBottom}
                 </h1>
                 <p className="mm-hero-desc">
-                  Custom apparel for your everyday, your brand, or your team. Design it online. Make it yours.
+                  {settings.heroDescription}
                 </p>
               </div>
               <div className="mm-hero-actions">

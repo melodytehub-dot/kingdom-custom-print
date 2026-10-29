@@ -40,7 +40,7 @@ function validate(fields: Fields): Errors {
   return e;
 }
 
-export default function CheckoutForm({ settings, paymentsReady, account }: { settings: SiteSettings; paymentsReady: boolean; account: { email: string; name: string } | null }) {
+export default function CheckoutForm({ settings, paymentsReady, paypalReady, account }: { settings: SiteSettings; paymentsReady: boolean; paypalReady: boolean; account: { email: string; name: string } | null }) {
   const { items, hydrated, subtotal } = useCart();
 
   const [fields, setFields] = useState<Fields>({
@@ -55,6 +55,8 @@ export default function CheckoutForm({ settings, paymentsReady, account }: { set
     country: "US",
     notes: "",
   });
+  const [paymentMethod, setPaymentMethod] = useState<"stripe" | "paypal">(paymentsReady ? "stripe" : "paypal");
+  const selectedReady = paymentMethod === "stripe" ? paymentsReady : paypalReady;
   const [errors, setErrors] = useState<Errors>({});
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
@@ -84,8 +86,8 @@ export default function CheckoutForm({ settings, paymentsReady, account }: { set
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     setFormError(null);
-    if (!paymentsReady) {
-      setFormError("Card checkout is temporarily unavailable. Your cart is saved.");
+    if (!selectedReady) {
+      setFormError("That payment method is temporarily unavailable. Your cart is saved.");
       return;
     }
 
@@ -102,7 +104,7 @@ export default function CheckoutForm({ settings, paymentsReady, account }: { set
       const res = await fetch("/api/checkout", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...fields, items, checkoutAttemptId: checkoutAttempt.current }),
+        body: JSON.stringify({ ...fields, items, checkoutAttemptId: checkoutAttempt.current, paymentMethod }),
       });
       const data = (await res.json()) as {
         url?: string;
@@ -160,7 +162,7 @@ export default function CheckoutForm({ settings, paymentsReady, account }: { set
     <form className="wrap section-tight checkout" onSubmit={onSubmit} noValidate>
       <div className="checkout-main">
         <h1 className="h2">Checkout</h1>
-        {!paymentsReady ? <p className="banner-note" role="status">Card checkout is temporarily unavailable. Your design stays saved in your cart. Please check back soon.</p> : null}
+        {!paymentsReady && !paypalReady ? <p className="banner-note" role="status">Online checkout is temporarily unavailable. Your design stays saved in your cart. Please check back soon.</p> : null}
 
         {formError ? (
           <p className="banner-note is-error" role="alert">
@@ -342,8 +344,12 @@ export default function CheckoutForm({ settings, paymentsReady, account }: { set
             </div>
           </dl>
 
-          <button type="submit" className="btn btn-lg btn-block" disabled={submitting || !paymentsReady}>
-            {submitting ? "Starting checkout…" : !paymentsReady ? "Card checkout unavailable" : "Continue to payment"}
+          <fieldset className="fieldset"><legend className="label">Payment method</legend>
+            {paymentsReady ? <label><input type="radio" name="paymentMethod" checked={paymentMethod === "stripe"} onChange={() => { setPaymentMethod("stripe"); checkoutAttempt.current = crypto.randomUUID(); }} /> Credit or debit card</label> : null}
+            {paypalReady ? <label><input type="radio" name="paymentMethod" checked={paymentMethod === "paypal"} onChange={() => { setPaymentMethod("paypal"); checkoutAttempt.current = crypto.randomUUID(); }} /> PayPal</label> : null}
+          </fieldset>
+          <button type="submit" className="btn btn-lg btn-block" disabled={submitting || !selectedReady}>
+            {submitting ? "Starting checkout…" : !selectedReady ? "Checkout unavailable" : "Continue to payment"}
             {!submitting ? <ArrowRight /> : null}
           </button>
 

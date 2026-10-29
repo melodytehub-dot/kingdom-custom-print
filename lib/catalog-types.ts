@@ -2,6 +2,10 @@ import type { OrderStatus, ProductKind, RosterEntry } from "./types";
 import type { Product } from "./types";
 
 export interface SiteSettings {
+  heroLabel: string;
+  heroHeadlineTop: string;
+  heroHeadlineBottom: string;
+  heroDescription: string;
   announcement: string;
   shippingFlat: number;
   freeShippingThreshold: number;
@@ -74,6 +78,7 @@ export interface AdminOrderDetail {
   total: number;
   createdAt: string;
   paidAt: string | null;
+  refundProvider: "stripe" | "paypal" | null;
   statusHistory: {
     fromStatus: OrderStatus | null;
     toStatus: OrderStatus;

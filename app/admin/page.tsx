@@ -80,7 +80,7 @@ export default async function AdminPage({
         })),
           customers,
           settings,
-          paymentsLive: paymentsConfigured(),
+          paymentsLive: await paymentsConfigured(),
         }}
       />
     </div>

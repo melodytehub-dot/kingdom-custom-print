@@ -3,12 +3,13 @@ import type Stripe from "stripe";
 import { markOrderPaid } from "@/lib/orders";
 import { stripeClient } from "@/lib/stripe";
 import { sendPaidOrderReceipt } from "@/lib/order-email";
+import { getPaymentCredential } from "@/lib/payment-credentials";
 
 export const dynamic = "force-dynamic";
 
 export async function POST(req: Request) {
-  const stripe = stripeClient();
-  const secret = process.env.STRIPE_WEBHOOK_SECRET;
+  const stripe = await stripeClient();
+  const secret = await getPaymentCredential("STRIPE_WEBHOOK_SECRET");
 
   if (!stripe || !secret) {
     return NextResponse.json(
@@ -27,7 +28,7 @@ export async function POST(req: Request) {
   let event: Stripe.Event;
   try {
     // Signature verification must run against the raw body.
-    event = stripe.webhooks.constructEvent(payload, signature, secret);
+    event = await stripe.webhooks.constructEventAsync(payload, signature, secret);
   } catch (err) {
     const message = err instanceof Error ? err.message : "Invalid signature";
     return NextResponse.json({ error: `Webhook error: ${message}` }, { status: 400 });

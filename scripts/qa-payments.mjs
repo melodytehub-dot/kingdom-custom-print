@@ -21,11 +21,14 @@ let configured = false;
 let account = null;
 let orderInput;
 let sessionInput;
+let paypalInput;
+let paypalEnabled = false;
 let writes = 0;
 const checkout = load("app/api/checkout/route.ts", {
   "next/server": { NextResponse },
   "node:crypto": { randomUUID: () => "11111111-1111-4111-8111-111111111111" },
-  "@/lib/orders": { createOrder: async input => { writes++; orderInput = input; const subtotal = input.items.reduce((sum, item) => sum + item.total, 0); return { reference: "KCP-TEST01", subtotal, shipping: 6.95, total: subtotal + 6.95 }; }, attachStripeSession: async () => {}, cancelOrder: async () => true },
+  "@/lib/orders": { createOrder: async input => { writes++; orderInput = input; const subtotal = input.items.reduce((sum, item) => sum + item.total, 0); return { reference: "KCP-TEST01", subtotal, shipping: 6.95, total: subtotal + 6.95 }; }, attachStripeSession: async () => {}, attachPayPalOrder: async () => {}, cancelOrder: async () => true },
+  "@/lib/paypal": { paypalConfigured: async () => paypalEnabled, paypalRequest: async (_path, options) => { paypalInput = JSON.parse(options.body); return { id: "PAYPALID", links: [{ rel: "payer-action", href: "https://www.sandbox.paypal.com/checkoutnow" }] }; } },
   "@/lib/order-access": { createOrderAccessSession: async () => "test_access_token", ORDER_ACCESS_COOKIE: "kcp_order_access", orderAccessCookieOptions: () => ({ httpOnly: true, sameSite: "lax", path: "/" }) },
   "@/lib/stripe": { paymentsConfigured: () => configured, siteUrl: () => "https://kingdom.example", stripeClient: () => ({ checkout: { sessions: { create: async input => { sessionInput = input; return { id: "cs_test_local", url: "https://checkout.stripe.com/test" }; }, expire: async () => ({}) } } }) },
   "@/lib/catalog": { getProductById: async () => product },
@@ -64,6 +67,12 @@ response = await checkout.POST(request(payload));
 assert.equal(response.status, 200);
 assert.equal(orderInput.accountId, 7);
 console.log("PASS signed-in orders stay linked to the account email and ID");
+paypalEnabled = true;
+response = await checkout.POST(request({ ...payload, paymentMethod: "paypal" }));
+assert.equal(response.status, 200);
+assert.equal(paypalInput.purchase_units[0].amount.value, "39.95");
+assert.equal(paypalInput.purchase_units[0].amount.currency_code, "USD");
+console.log("PASS PayPal checkout uses the server-calculated total");
 const stripe = new Stripe("sk_test_local_fixture");
 const secret = "whsec_local_fixture";
 const previousSecret = process.env.STRIPE_WEBHOOK_SECRET;
@@ -79,6 +88,7 @@ const webhook = load("app/api/webhook/route.ts", {
     markOrderRefunded: async () => { refundedCalls++; },
   },
   "@/lib/stripe": { stripeClient: () => stripe },
+  "@/lib/payment-credentials": { getPaymentCredential: async () => secret },
   "@/lib/order-email": { sendPaidOrderReceipt: async () => { receiptCalls++; if (receiptFails) throw new Error("mail unavailable"); } },
 });
 async function event(status, type = "checkout.session.completed", valid = true, object) {

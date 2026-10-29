@@ -31,6 +31,10 @@ export async function PUT(req: Request) {
   };
 
   await saveSettings({
+    heroLabel: str(body.heroLabel ?? current.heroLabel, 80),
+    heroHeadlineTop: str(body.heroHeadlineTop ?? current.heroHeadlineTop, 100),
+    heroHeadlineBottom: str(body.heroHeadlineBottom ?? current.heroHeadlineBottom, 100),
+    heroDescription: str(body.heroDescription ?? current.heroDescription, 350),
     announcement: str(body.announcement ?? current.announcement, 160),
     shippingFlat: numField(body.shippingFlat, current.shippingFlat, 999),
     freeShippingThreshold: numField(
