@@ -6,7 +6,6 @@ import {
   useMemo,
   useRef,
   useState,
-  type PointerEvent as ReactPointerEvent,
 } from "react";
 import Link from "next/link";
 import Image from "next/image";
@@ -14,7 +13,7 @@ import { useRouter } from "next/navigation";
 import DesignCanvas, { printAreaView } from "./DesignCanvas";
 import { GarmentPreview } from "./GarmentPreview";
 import { measureTextLayer } from "./textGeometry";
-import { clampStageOffset, fitStage } from "./stageGeometry";
+import { fitStage } from "./stageGeometry";
 import {
   ArtPanel,
   AddTextPanel,
@@ -274,8 +273,6 @@ export default function Customizer({
   const [focusToken, setFocusToken] = useState(0);
   const [flipping, setFlipping] = useState(false);
   const [zoom, setZoom] = useState(1);
-  const [stagePan, setStagePan] = useState({ x: 0, y: 0 });
-  const [panning, setPanning] = useState(false);
   const [previews, setPreviews] = useState<{ front: string | null; back: string | null }>({
     front: null,
     back: null,
@@ -284,13 +281,6 @@ export default function Customizer({
   const fileInput = useRef<HTMLInputElement>(null);
   const stageRef = useRef<HTMLElement>(null);
   const panelRef = useRef<HTMLElement>(null);
-  const stagePanRef = useRef<{
-    pointerId: number;
-    startX: number;
-    startY: number;
-    originX: number;
-    originY: number;
-  } | null>(null);
   const openFilePicker = useCallback(() => {
     fileInput.current?.click();
   }, []);
@@ -604,14 +594,12 @@ export default function Customizer({
     setFlipping(true);
     window.setTimeout(() => setFlipping(false), 320);
     setSide((s) => (s === "front" ? "back" : "front"));
-    setStagePan({ x: 0, y: 0 });
     setSelectedIds([]);
     setPanel((p) => (SPLIT_PANELS.includes(p) ? "none" : p));
   };
 
   const adjustZoom = (delta: number) => {
     setZoom((current) => Math.min(1.6, Math.max(1, Math.round((current + delta) * 10) / 10)));
-    setStagePan({ x: 0, y: 0 });
   };
 
   const shareDesign = async () => {
@@ -1197,7 +1185,6 @@ export default function Customizer({
     setRoster(rows);
     syncLinesFromRoster(rows);
     setSide(nn.side);
-    setStagePan({ x: 0, y: 0 });
     setSelectedIds([]);
     setPanel("none");
     setNotice({
@@ -1221,7 +1208,6 @@ export default function Customizer({
     setSelectedIds([]);
     setPanel("none");
     setZoom(1);
-    setStagePan({ x: 0, y: 0 });
     setNotice({ tone: "ok", text: "Started a fresh design." });
   };
 
@@ -1488,46 +1474,6 @@ export default function Customizer({
     () => fitStage(stageBox.w, stageBox.h, zoom, { visibleH: visibleStageH, focusY }),
     [stageBox, zoom, visibleStageH, focusY]
   );
-
-  const updateStagePan = useCallback((x: number, y: number) => {
-    setStagePan(clampStageOffset({ x, y }, { width: stageBox.w, height: stageBox.h }, fit));
-  }, [fit, stageBox.h, stageBox.w]);
-
-  const startStagePan = (event: ReactPointerEvent<HTMLElement>) => {
-    if (step !== "design" || event.defaultPrevented) return;
-    if (event.pointerType === "mouse" && event.button !== 0) return;
-    const target = event.target;
-    if (target instanceof Element && target.closest(".rot-mobile-canvas-controls, .rot-share, .rot-quickadd, .rot-selbar")) return;
-    event.preventDefault();
-    stagePanRef.current = {
-      pointerId: event.pointerId,
-      startX: event.clientX,
-      startY: event.clientY,
-      originX: stagePan.x,
-      originY: stagePan.y,
-    };
-    event.currentTarget.setPointerCapture(event.pointerId);
-    setPanning(true);
-  };
-
-  const moveStagePan = (event: ReactPointerEvent<HTMLElement>) => {
-    const gesture = stagePanRef.current;
-    if (!gesture || gesture.pointerId !== event.pointerId) return;
-    event.preventDefault();
-    updateStagePan(
-      gesture.originX + event.clientX - gesture.startX,
-      gesture.originY + event.clientY - gesture.startY
-    );
-  };
-
-  const endStagePan = (event: ReactPointerEvent<HTMLElement>) => {
-    if (stagePanRef.current?.pointerId !== event.pointerId) return;
-    stagePanRef.current = null;
-    setPanning(false);
-    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
-      event.currentTarget.releasePointerCapture(event.pointerId);
-    }
-  };
 
   /* ---- what the rail highlights ---- */
   const railActive =
@@ -1990,7 +1936,6 @@ export default function Customizer({
                       className={`rot-side-thumb${side === view ? " is-active" : ""}`}
                       onClick={() => {
                         setSide(view);
-                        setStagePan({ x: 0, y: 0 });
                         setSelectedIds([]);
                         setPanel((p) => (SPLIT_PANELS.includes(p) ? "none" : p));
                       }}
@@ -2028,13 +1973,9 @@ export default function Customizer({
             </div>
 
           <section
-            className={`rot-stage${panning ? " is-panning" : ""}`}
+            className="rot-stage"
             ref={stageRef}
             aria-label="Design preview"
-            onPointerDown={startStagePan}
-            onPointerMove={moveStagePan}
-            onPointerUp={endStagePan}
-            onPointerCancel={endStagePan}
           >
             <div className="rot-mobile-canvas-controls" aria-label="Canvas controls">
               <div className="rot-mobile-history" role="group" aria-label="History">
@@ -2081,7 +2022,7 @@ export default function Customizer({
                   width: fit.size,
                   height: fit.size,
                   left: fit.left,
-                  transform: `translate3d(${stagePan.x}px, ${fit.ty + stagePan.y}px, 0)`,
+                  transform: `translate3d(0, ${fit.ty}px, 0)`,
                 }}
               >
                 <DesignCanvas

@@ -355,9 +355,8 @@ export default function DesignCanvas({
     const rect = svgRef.current?.getBoundingClientRect();
     if (!point || !rect) return;
 
-    // Blank space inside the printable area draws a selection marquee. Blank
-    // garment space outside it bubbles to the stage and pans the whole shirt,
-    // so Select and Hand behavior remain available without a mode switch.
+    // Blank space inside the printable area draws a selection marquee.
+    // Dragging outside the printable area leaves the garment in place.
     if (point.x < pa.x || point.x > pa.x + pa.w || point.y < pa.y || point.y > pa.y + pa.h) return;
 
     event.preventDefault();

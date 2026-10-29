@@ -1,4 +1,4 @@
-/** Browser regression for automatic canvas selection/panning and mobile controls. */
+/** Browser regression for stationary products, canvas selection, and mobile controls. */
 import { chromium } from "playwright";
 
 const BASE = process.env.QA_BASE ?? "http://localhost:3000";
@@ -62,11 +62,9 @@ try {
   const artworkDx = beforeArtwork && afterArtwork ? afterArtwork.x - beforeArtwork.x : 0;
   const artworkDy = beforeArtwork && afterArtwork ? afterArtwork.y - beforeArtwork.y : 0;
   check(
-    "Dragging blank garment space automatically pans garment and artwork together",
-    Math.abs(garmentDx) > 20
-      && Math.abs(garmentDy) > 15
-      && Math.abs(garmentDx - artworkDx) < 2
-      && Math.abs(garmentDy - artworkDy) < 2,
+    "Dragging blank garment space keeps the garment and artwork stationary",
+    Math.abs(garmentDx) < 1 && Math.abs(garmentDy) < 1
+      && Math.abs(artworkDx) < 1 && Math.abs(artworkDy) < 1,
     `garment ${Math.round(garmentDx)},${Math.round(garmentDy)}; artwork ${Math.round(artworkDx)},${Math.round(artworkDy)}`,
   );
 
@@ -232,6 +230,25 @@ try {
   const mobileStage = await stage.boundingBox();
   if (mobileStage) await page.mouse.click(mobileStage.x + mobileStage.width / 2, mobileStage.y + 80);
   check("Tapping the mobile design surface hides the open panel", await textPanel.isHidden());
+  await page.waitForTimeout(350);
+  const mobileGarmentBefore = await garment.boundingBox();
+  const mobileSvg = await page.locator(".rot-canvas-svg").boundingBox();
+  if (mobileSvg) {
+    const session = await page.context().newCDPSession(page);
+    await session.send("Emulation.setTouchEmulationEnabled", { enabled: true, maxTouchPoints: 1 });
+    const point = (x, y) => ({ x, y, id: 1, radiusX: 2, radiusY: 2, force: 1 });
+    const x = mobileSvg.x + mobileSvg.width / 2;
+    const y = mobileSvg.y + mobileSvg.height * 0.1;
+    await session.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: [point(x, y)] });
+    await session.send("Input.dispatchTouchEvent", { type: "touchMove", touchPoints: [point(x + 40, y + 30)] });
+    await session.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
+    await session.detach();
+  }
+  const mobileGarmentAfter = await garment.boundingBox();
+  check("Dragging blank garment space on mobile keeps the product stationary",
+    Boolean(mobileSvg && mobileGarmentBefore && mobileGarmentAfter)
+      && Math.abs(mobileGarmentAfter.x - mobileGarmentBefore.x) < 1
+      && Math.abs(mobileGarmentAfter.y - mobileGarmentBefore.y) < 1);
   check("One-finger drag shows a mobile selection marquee", await dragMarquee("touch"));
   check(
     "One-finger marquee selects both design layers on mobile",

@@ -294,17 +294,6 @@
   display: none;
 }
 
-.rot-stage.is-mode-pan,
-.rot-stage.is-mode-pan .rot-canvas-svg {
-  cursor: grab;
-  touch-action: none;
-}
-
-.rot-stage.is-panning,
-.rot-stage.is-panning .rot-canvas-svg {
-  cursor: grabbing;
-}
-
 .rot-shirt {
   position: absolute;
   top: 0;
