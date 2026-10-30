@@ -16,7 +16,7 @@ const paypalRequest = async (path, options = {}) => {
 const source = await readFile("app/api/admin/paypal-test/route.ts", "utf8");
 const code = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
 const exports = {};
-const deps = { "next/server": { NextResponse }, "../_guard": { requireAdmin: async () => allowed ? null : NextResponse.json({}, { status: 401 }) }, "@/lib/paypal": { paypalRequest }, "@/lib/stripe": { siteUrl: () => "https://kingdomcustomprint.com" } };
+const deps = { "next/server": { NextResponse }, "../_guard": { requireAdmin: async () => allowed ? null : NextResponse.json({}, { status: 401 }) }, "@/lib/paypal": { paypalRequest, PayPalRequestError: class PayPalRequestError extends Error {} }, "@/lib/stripe": { siteUrl: () => "https://kingdomcustomprint.com" } };
 vm.runInNewContext(code, { exports, require: name => deps[name] ?? require(name), console });
 const request = (body, cookie = "") => new Request("https://kingdomcustomprint.com/api/admin/paypal-test", { method: "POST", headers: { "Content-Type": "application/json", cookie }, body: JSON.stringify(body) });
 assert.equal((await exports.POST(request({ action: "start" }))).status, 401);

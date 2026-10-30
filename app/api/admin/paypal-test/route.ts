@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { randomUUID } from "node:crypto";
 import { requireAdmin } from "../_guard";
-import { paypalRequest } from "@/lib/paypal";
+import { paypalRequest, PayPalRequestError } from "@/lib/paypal";
 import { siteUrl } from "@/lib/stripe";
 
 export const dynamic = "force-dynamic";
@@ -67,7 +67,8 @@ export async function POST(req: Request) {
     }
     if (body.action !== "capture" && body.action !== "status") return NextResponse.json({ error: "Invalid action." }, { status: 400 });
     return NextResponse.json({ orderStatus: order.status, captureStatus: capture?.status ?? null });
-  } catch {
-    return NextResponse.json({ error: "PayPal could not complete this step. Check the PayPal dashboard before retrying to avoid duplicate transactions." }, { status: 502 });
+  } catch (error) {
+    const code = error instanceof PayPalRequestError && error.issue ? ` PayPal code: ${error.issue}.` : "";
+    return NextResponse.json({ error: `PayPal could not complete this step.${code} Check the PayPal dashboard before retrying to avoid duplicate transactions.` }, { status: 502 });
   }
 }
