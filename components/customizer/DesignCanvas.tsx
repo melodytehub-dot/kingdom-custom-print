@@ -1216,7 +1216,6 @@ function ControlButton({
   y,
   label,
   onActivate,
-  shape = "circle",
   scale = 1,
   children,
 }: {
@@ -1224,7 +1223,6 @@ function ControlButton({
   y: number;
   label: string;
   onActivate: (e: ReactPointerEvent) => void;
-  shape?: "circle" | "pill";
   scale?: number;
   children: React.ReactNode;
 }) {
@@ -1236,11 +1234,7 @@ function ControlButton({
       role="button"
       aria-label={label}
     >
-      {shape === "circle" ? (
-        <circle r={34} fill="#fff" stroke="#cfd3d9" strokeWidth={2} />
-      ) : (
-        <rect x={-24} y={-30} width={48} height={60} rx={4} fill="#fff" stroke="#cfd3d9" strokeWidth={2} />
-      )}
+      <circle r={34} fill="#fff" stroke="#cfd3d9" strokeWidth={2} />
       {children}
     </g>
   );
@@ -1262,6 +1256,7 @@ function Icon({ children, transform }: { children: React.ReactNode; transform?: 
       strokeLinecap="round"
       strokeLinejoin="round"
       transform={transform}
+      style={{ pointerEvents: "none" }}
     >
       {children}
     </svg>
