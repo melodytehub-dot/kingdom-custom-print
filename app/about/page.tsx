@@ -1,6 +1,5 @@
 import Link from "next/link";
 import type { Metadata } from "next";
-import { getSettings } from "@/lib/catalog";
 
 export const metadata: Metadata = {
   title: "How custom printing works",
@@ -55,9 +54,7 @@ const FAQ_LINKS = [
   },
 ];
 
-export default async function AboutPage() {
-  const settings = await getSettings();
-
+export default function AboutPage() {
   return (
     <>
       <div className="wrap page-head">
