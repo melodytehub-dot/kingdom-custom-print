@@ -23,7 +23,7 @@ export default async function AccountPage({ searchParams }: { searchParams: Prom
   return (
     <section className="account-page minimog-container">
       <header className="account-heading">
-        <div><span className="mm-hero-tag">KINGDOM CUSTOM PRINT</span><h1>{account ? "Your account" : "Welcome back"}</h1></div>
+        <div><h1>{account ? "Your account" : "Welcome back"}</h1></div>
         {account ? <AccountSignOut /> : null}
       </header>
       {params.verification ? <p role="status">{params.verification === "success" ? "Email confirmed. You can sign in now." : params.verification === "invalid" ? "This confirmation link is invalid or expired. Sign in to receive a new link." : "We could not confirm your email. Please try again."}</p> : null}
@@ -36,7 +36,7 @@ export default async function AccountPage({ searchParams }: { searchParams: Prom
             {orders.length ? <ul>{orders.map((order) => <li key={order.reference}>
               <Link href={`/order/${order.reference}`}>
                 <span><strong>{order.reference}</strong><small>{new Intl.DateTimeFormat("en-US", { dateStyle: "medium" }).format(new Date(order.created_at))}</small></span>
-                <span><strong>{formatUSD(num(order.total))}</strong><small>{order.status.replaceAll("_", " ")}</small></span>
+                <span><strong>{formatUSD(num(order.total))}</strong></span>
               </Link>
             </li>)}</ul> : <div className="account-empty"><p>Orders you place while signed in will appear here.</p><Link href="/shop">Shop products</Link></div>}
           </section>

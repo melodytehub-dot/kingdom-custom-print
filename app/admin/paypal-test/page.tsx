@@ -27,7 +27,7 @@ export default function PayPalTestPage() {
     <h1>PayPal $1 live payment test</h1>
     <p>This is a real $1 USD charge to test PayPal. No product will be shipped. You can request a refund after the payment is captured.</p>
     <p>PayPal may offer a debit or credit card option without an account; availability depends on PayPal and the payer.</p>
-    <p>This is an isolated provider test. It does not verify the store’s normal checkout, order tracking, webhook delivery, or admin order refund flow.</p>
+    <p>This is an isolated provider test. It does not verify the store’s normal checkout, webhook delivery, or admin order refund flow.</p>
     {!token ? <button className="btn" disabled={busy} onClick={() => action("start")}>{busy ? "Opening PayPal…" : "Continue to PayPal — $1"}</button> : <>
       <p>PayPal returned you to the store. Click below to complete the payment after approving it on PayPal.</p>
       <button className="btn" disabled={busy || result.captureStatus === "COMPLETED"} onClick={() => action("capture")}>{busy ? "Checking…" : "Complete $1 payment"}</button>{" "}

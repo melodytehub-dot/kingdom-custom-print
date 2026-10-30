@@ -172,11 +172,9 @@ if (paymentUnavailable) {
       /waiting for payment confirmation|payment is confirmed/i.test(successText);
     check("order success explains the payment state", successCopyIsExplicit, successText.replace(/\s+/g, " ").slice(0, 240));
 
-    await page.goto(`${BASE}/track`, { waitUntil: "networkidle" });
-    await page.locator("#track-ref").fill(ref);
-    await page.getByRole("button", { name: /track order/i }).click();
-    await page.waitForURL(new RegExp(`/order/${ref}$`), { timeout: 15000 });
-    check("track order resolves the reference", page.url().endsWith(`/order/${ref}`));
+    await page.goto(`${BASE}/track`, { waitUntil: "domcontentloaded" });
+    await page.waitForURL(/\/contact$/, { timeout: 15000 });
+    check("old tracking links lead to contact", page.url().endsWith("/contact"));
   }
   console.log(`    order reference for cleanup: ${ref ?? "none"}`);
 }

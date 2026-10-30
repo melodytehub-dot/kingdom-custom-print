@@ -81,7 +81,7 @@ const GROUPS: { title: string; items: { q: string; a: string }[] }[] = [
       },
       {
         q: "What happens after I order?",
-        a: "After payment is confirmed, you can check your order page for updates as it moves through production and shipping.",
+        a: "After payment is confirmed, keep your order reference and contact us if you have any questions.",
       },
       {
         q: "Can I change my order after placing it?",

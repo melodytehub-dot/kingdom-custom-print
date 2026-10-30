@@ -1,7 +1,6 @@
 import { sql } from "./db";
 import { sendEmail } from "./email";
 import { getOrderByReference } from "./orders";
-import { publicSiteUrl } from "./site-url";
 
 /** Webhook retries are safe: Resend and our database both record the receipt. */
 export async function sendPaidOrderReceipt(reference: string): Promise<void> {
@@ -13,8 +12,8 @@ export async function sendPaidOrderReceipt(reference: string): Promise<void> {
   const providerId = await sendEmail({
     to: order.email,
     subject: `Your Kingdom Custom Print order ${reference}`,
-    text: `Hi ${order.name},\n\nThank you for your order. Your payment has been received.\n\nOrder: ${reference}\n${lines.join("\n")}\nTotal: $${order.total.toFixed(2)}\n\nCheck your order: ${publicSiteUrl()}/track\n\nKingdom Custom Print`,
-    action: { label: "Track your order", url: `${publicSiteUrl()}/track` },
+    text: `Hi ${order.name},\n\nThank you for your order. Your payment has been received.\n\nOrder: ${reference}\n${lines.join("\n")}\nTotal: $${order.total.toFixed(2)}\n\nFor questions about your order, please contact us and include your order reference.\n\nKingdom Custom Print`,
+    action: { label: "Contact us", url: "https://kingdomcustomprint.com/contact" },
     idempotencyKey: `order-receipt/${reference}`,
   });
   await sql`INSERT INTO order_email_receipts (reference, provider_id) VALUES (${reference}, ${providerId}) ON CONFLICT (reference) DO NOTHING`;

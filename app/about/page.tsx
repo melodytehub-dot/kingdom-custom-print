@@ -32,7 +32,7 @@ const STAGES = [
   {
     step: "05",
     title: "Print and ship",
-    body: "Once payment is confirmed, your order can enter production. Check your order page for updates.",
+    body: "Once payment is confirmed, your order can enter production. Contact us if you have questions about your order.",
   },
 ];
 

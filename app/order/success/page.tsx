@@ -71,8 +71,7 @@ export default async function SuccessPage({
               </div>
             )}
             <p className="small muted">
-              Keep your reference to follow
-              progress on the order page.
+              Keep your reference in case you need to contact us about your order.
             </p>
             <div className="state-actions">
               <Link href={`/order/${publicOrder.reference}`} className="btn">
@@ -86,11 +85,10 @@ export default async function SuccessPage({
         ) : (
           <>
             <p className="lede">
-              We could not find an order for that reference. Use the reference shown
-              after checkout, or track another order.
+              We could not find an order for that reference. Contact us if you need help.
             </p>
             <div className="state-actions">
-              <Link href="/track" className="btn">Track an order</Link>
+              <Link href="/contact" className="btn">Contact us</Link>
               <Link href="/shop" className="btn btn-ghost">Keep shopping</Link>
             </div>
           </>

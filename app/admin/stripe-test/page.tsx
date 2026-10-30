@@ -26,7 +26,7 @@ export default function StripeTestPage() {
     <h1>Stripe $1 live payment test</h1>
     <p>This is a real $1 USD card charge. No product will be shipped. You can request a refund after Stripe confirms payment.</p>
     <p>A refund can remain pending if the Stripe balance cannot cover it. Stripe may retain processing fees.</p>
-    <p>This is an isolated provider test. It does not verify the store’s normal checkout, order tracking, webhook delivery, or admin order refund flow.</p>
+    <p>This is an isolated provider test. It does not verify the store’s normal checkout, webhook delivery, or admin order refund flow.</p>
     {!session ? <button className="btn" disabled={busy} onClick={() => action("start")}>{busy ? "Opening Stripe…" : "Continue to Stripe — $1"}</button> : <>
       <p>After paying on Stripe, check the payment status below.</p>
       <button className="btn" disabled={busy} onClick={() => action("status")}>{busy ? "Checking…" : "Check payment status"}</button>

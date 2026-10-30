@@ -228,10 +228,10 @@ export default async function HomePage() {
                 04.
               </span>
               <h3 style={{ fontSize: "18px", marginBottom: "10px", fontFamily: "var(--font-body)", fontWeight: "600", textTransform: "none" }}>
-                Follow Order Progress
+                Keep Your Reference
               </h3>
               <p style={{ color: "#666", fontSize: "14px", lineHeight: "1.6", margin: 0 }}>
-                Use your order reference to check progress as your garments move through production and shipping.
+                Keep your order reference handy if you have a question about your order.
               </p>
             </div>
           </div>
@@ -263,7 +263,7 @@ export default async function HomePage() {
               <div className="mm-feature-body">
                 <h3>Clear delivery options</h3>
                 <p>
-                  Review shipping at checkout and follow your order through production to its shipped status.
+                  Review the shipping details and cost before placing your order.
                 </p>
               </div>
             </div>

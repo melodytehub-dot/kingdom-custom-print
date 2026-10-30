@@ -9,7 +9,6 @@ import {
   getPublicOrderStatus,
   orderBelongsToAccount,
 } from "@/lib/orders";
-import { ORDER_STATUSES } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
@@ -59,26 +58,22 @@ export default async function OrderPage({
   const order = canViewDetails ? await getOrderByReference(reference) : null;
 
   if (!order) {
-    const label = ORDER_STATUSES.find((entry) => entry.value === publicOrder.status)?.label
-      ?? publicOrder.status;
     return (
       <div className="wrap section-tight">
         <div className="panel panel-pad order-view">
           <div className="order-head">
             <div>
-              <p className="eyebrow">Order status</p>
+              <p className="eyebrow">Order</p>
               <h1 className="h2 tnum">{publicOrder.reference}</h1>
               <p className="small muted">
                 Placed {new Date(publicOrder.createdAt).toLocaleDateString()}
               </p>
             </div>
-            <span className={`badge status-${publicOrder.status}`}>{label}</span>
           </div>
           <div className="state">
             <h2 className="h3">Verify to view full order details</h2>
             <p>
-              The reference shows only production status. Your checkout email is required
-              before we display artwork, notes, items, delivery details, or totals.
+              Enter your checkout email to view your items, artwork, notes, delivery details, and totals.
             </p>
             <GuestOrderAccess reference={publicOrder.reference} />
           </div>

@@ -1,8 +1,8 @@
 /**
  * Browser regression for customer-order privacy.
  *
- * Creates one uniquely named fixture, proves a reference alone reveals only
- * low-detail status, then verifies the two authorized paths: checkout-email
+ * Creates one uniquely named fixture, proves a reference alone reveals no
+ * order progress or private details, then verifies two authorized paths: checkout-email
  * proof for a guest and an owning account session. Exact fixture rows are
  * deleted in finally; this script never resets or seeds the database.
  */
@@ -69,7 +69,8 @@ try {
   mustHide(publicBody, productName, "line item");
   mustHide(publicBody, secretNote, "design/order note");
   mustHide(publicBody, "$130.40", "order total");
-  console.log("PASS reference alone shows status but no private order details");
+  assert.equal(/order progress|order status|pending|in production|shipped/i.test(publicBody), false, "reference-only visitor should not see order tracking");
+  console.log("PASS reference alone shows no progress or private order details");
 
   await publicPage.getByLabel("Checkout email").fill(email);
   await publicPage.getByRole("button", { name: "View full order" }).click();
