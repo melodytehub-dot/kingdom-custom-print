@@ -17,6 +17,21 @@ async function checkedOrder(id: string): Promise<PayPalOrder> {
   return order;
 }
 
+export async function GET(req: Request) {
+  const denied = await requireAdmin(req);
+  if (denied) return denied;
+  try {
+    const id = new URL(req.url).searchParams.get("order") ?? "";
+    const order = await checkedOrder(id);
+    const capture = order.purchase_units?.[0]?.payments?.captures?.[0];
+    const detail = capture?.id && /^[A-Z0-9]{1,20}$/.test(capture.id)
+      ? await paypalRequest<Capture>(`/v2/payments/captures/${capture.id}`) : null;
+    return NextResponse.json({ orderStatus: order.status, captureStatus: capture?.status ?? null, captureIdValid: Boolean(capture?.id && /^[A-Z0-9]{1,20}$/.test(capture.id)), captureAmount: capture?.amount ?? null, providerCaptureStatus: detail?.status ?? null, providerCaptureAmount: detail?.amount ?? null }, { headers: { "Cache-Control": "no-store" } });
+  } catch {
+    return NextResponse.json({ error: "Could not retrieve the test payment from PayPal." }, { status: 502 });
+  }
+}
+
 export async function POST(req: Request) {
   const denied = await requireAdmin(req);
   if (denied) return denied;
