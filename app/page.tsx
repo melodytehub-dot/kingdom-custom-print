@@ -2,28 +2,32 @@
 import Image from "next/image";
 import HeroImageSlider from "@/components/HeroImageSlider";
 import HomeProducts from "@/components/HomeProducts";
+import ResumeDesignPrompt from "@/components/ResumeDesignPrompt";
 import ArrowRight from "@/components/icons/ArrowRight";
 import Truck from "@/components/icons/Truck";
 import Shield from "@/components/icons/Shield";
 import Store from "@/components/icons/Store";
-import { getProducts } from "@/lib/catalog";
+import { getProducts, getSettings, DEFAULT_SETTINGS } from "@/lib/catalog";
+import { heroImage } from "@/lib/hero-slides";
 
 export const revalidate = 60;
 
 const POD_CATEGORIES = [
-  { name: "SHIRTS", href: "/shop?kind=tee", position: "0% 0%" },
-  { name: "HOODIES", href: "/shop?kind=fleece", position: "100% 0%" },
-  { name: "CAPS", href: "/shop?kind=cap", position: "0% 100%" },
-  { name: "MERCH", href: "/shop?category=accessories", position: "100% 100%" },
+  { name: "SHIRTS", href: "/shop?kind=tee", image: "/img/category-prints/shirts.webp" },
+  { name: "POLOS", href: "/shop?kind=polo", image: "/img/category-prints/polos.webp" },
+  { name: "HOODIES", href: "/shop?kind=fleece", image: "/img/category-prints/hoodies.webp" },
+  { name: "CAPS", href: "/shop?kind=cap", image: "/img/category-prints/caps.webp" },
+  { name: "TOTES", href: "/shop?kind=tote", image: "/img/category-prints/totes.webp" },
+  { name: "MERCH", href: "/shop?kind=mug", image: "/img/category-prints/merch.webp" },
 ];
 
 const INSTA_IMAGES = [
-  "/img/products/comfort-colors-tee.jpg",
-  "/img/products/crown-classic-tee-black.jpg",
-  "/img/products/crown-classic-tee-white.jpg",
-  "/img/products/crown-classic-tee-maroon.jpg",
-  "/img/products/crown-classic-tee-red.jpg",
-  "/img/products/crown-classic-tee-ash.jpg",
+  "/img/printed-catalog/crown-classic-tee/black.webp",
+  "/img/printed-catalog/crown-classic-tee/white.webp",
+  "/img/printed-catalog/classic-pique-polo/black.webp",
+  "/img/printed-catalog/premium-pullover-hoodie/black.webp",
+  "/img/printed-catalog/canvas-tote/natural.webp",
+  "/img/printed-catalog/five-panel-cap/black.webp",
 ];
 
 const COLLECTIONS = [
@@ -34,10 +38,11 @@ const COLLECTIONS = [
 ];
 
 export default async function HomePage() {
-  const products = await getProducts().catch(() => []);
+  const [products, settings] = await Promise.all([getProducts().catch(() => []), getSettings().catch(() => DEFAULT_SETTINGS)]);
 
   return (
     <div className="mm-home-wrapper">
+      <ResumeDesignPrompt />
       {/* ------------------------------------------------------------------
           1. HERO SECTION (Minimog POD Modern Slider)
           ------------------------------------------------------------------ */}
@@ -46,14 +51,14 @@ export default async function HomePage() {
           <div className="mm-hero-grid">
             <div className="mm-hero-content">
               <div className="mm-hero-copy">
-                <span className="mm-hero-tag">PRINT ON DEMAND STUDIO</span>
+                <span className="mm-hero-tag">{settings.heroLabel}</span>
                 <h1 className="mm-hero-title">
-                  CUSTOM PRINT.
+                  {settings.heroHeadlineTop}
                   <br />
-                  MADE TO ORDER.
+                  {settings.heroHeadlineBottom}
                 </h1>
                 <p className="mm-hero-desc">
-                  Upload your artwork or build a design online. We print it to order — shirts, hoodies, caps and more.
+                  {settings.heroDescription}
                 </p>
               </div>
               <div className="mm-hero-actions">
@@ -67,7 +72,7 @@ export default async function HomePage() {
             </div>
 
             <div className="mm-hero-media">
-              <HeroImageSlider />
+              <HeroImageSlider slides={[heroImage(settings.heroImage1), heroImage(settings.heroImage2), heroImage(settings.heroImage3)]} />
             </div>
           </div>
         </div>
@@ -76,7 +81,7 @@ export default async function HomePage() {
       <nav className="mm-category-strip minimog-container" aria-label="Shop by category">
         {POD_CATEGORIES.map((category) => (
           <Link key={category.name} href={category.href} className="mm-category-link">
-            <span className="mm-category-art" aria-hidden="true" style={{ backgroundPosition: category.position }} />
+            <span className="mm-category-art" aria-hidden="true" style={{ backgroundImage: `url(${category.image})` }} />
             <span>{category.name}</span>
           </Link>
         ))}
@@ -134,7 +139,7 @@ export default async function HomePage() {
               }}
             >
               <span className="mm-banner-team-photo">
-                <Image src="/img/kingdom-team.webp" alt="Five people wearing Kingdom Custom Print shirts" fill sizes="(max-width: 768px) 100vw, 620px" className="mm-banner-photo mm-banner-photo-team" />
+                <Image src="/img/kingdom-team.webp" alt="Five people wearing Kingdom Custom Print shirts" fill sizes="(max-width: 768px) 100vw, 620px" className="mm-banner-photo mm-banner-photo-team" unoptimized />
               </span>
               <div className="mm-banner-content">
                 <h3 className="mm-banner-title">CROSSFIT & TEAMS</h3>
@@ -190,7 +195,7 @@ export default async function HomePage() {
                 Choose Your Garment
               </h3>
               <p style={{ color: "#666", fontSize: "14px", lineHeight: "1.6", margin: 0 }}>
-                Pick from heavyweight streetwear blanks, soft ringspun tees, or cozy fleeces across 30+ colors.
+                Pick from heavyweight streetwear blanks, soft ringspun tees, or cozy fleeces in the colors available for each style.
               </p>
             </div>
 
@@ -211,10 +216,10 @@ export default async function HomePage() {
                 03.
               </span>
               <h3 style={{ fontSize: "18px", marginBottom: "10px", fontFamily: "var(--font-body)", fontWeight: "600", textTransform: "none" }}>
-                Precision DTG Print
+                Review Your Design
               </h3>
               <p style={{ color: "#666", fontSize: "14px", lineHeight: "1.6", margin: 0 }}>
-                We prepare your artwork for printing and produce your garments to order.
+                Check your artwork, colors, and quantities before placing your order.
               </p>
             </div>
 
@@ -223,10 +228,10 @@ export default async function HomePage() {
                 04.
               </span>
               <h3 style={{ fontSize: "18px", marginBottom: "10px", fontFamily: "var(--font-body)", fontWeight: "600", textTransform: "none" }}>
-                Delivered With Tracking
+                Keep Your Reference
               </h3>
               <p style={{ color: "#666", fontSize: "14px", lineHeight: "1.6", margin: 0 }}>
-                Use your order reference to check progress as your garments move through production and shipping.
+                Keep your order reference handy if you have a question about your order.
               </p>
             </div>
           </div>
@@ -258,7 +263,7 @@ export default async function HomePage() {
               <div className="mm-feature-body">
                 <h3>Clear delivery options</h3>
                 <p>
-                  Review shipping at checkout and follow your order from production to delivery.
+                  Review the shipping details and cost before placing your order.
                 </p>
               </div>
             </div>
@@ -268,7 +273,7 @@ export default async function HomePage() {
                 <Store size={24} />
               </div>
               <div className="mm-feature-body">
-                <h3>Locally Owned</h3>
+                <h3>Built for custom runs</h3>
                 <p>
                   Custom apparel for businesses, creative projects, events, and teams. Talk to us about your next run.
                 </p>
@@ -308,8 +313,8 @@ export default async function HomePage() {
             {INSTA_IMAGES.map((img, i) => (
               <Link key={`insta-${i}`} href="/shop" className="mm-insta-item">
                 <Image
-                  src={img}
-                  alt={`Kingdom Custom Print garment inspiration ${i + 1}`}
+                  src={`${img}?v=blank-1`}
+                  alt={`Blank garment ready to customize ${i + 1}`}
                   fill
                   sizes="(max-width: 768px) 33vw, 200px"
                   style={{ objectFit: "cover" }}

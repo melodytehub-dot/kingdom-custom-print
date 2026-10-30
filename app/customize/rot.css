@@ -96,6 +96,7 @@
   justify-content: center;
   gap: 3px;
   min-width: 62px;
+  min-height: 44px;
   padding: 0 10px;
   font-size: 12px;
   font-weight: 500;
@@ -289,6 +290,10 @@
   background: #fff;
 }
 
+.rot-mobile-canvas-controls {
+  display: none;
+}
+
 .rot-shirt {
   position: absolute;
   top: 0;
@@ -314,6 +319,10 @@
   user-select: none;
   -webkit-user-select: none;
   overflow: visible;
+}
+
+.rot-canvas-svg.is-select {
+  cursor: crosshair;
 }
 
   .rot-shirt.is-flipping .rot-canvas {
@@ -675,7 +684,8 @@
   text-transform: uppercase;
 }
 
-.rot-side-thumb img {
+.rot-side-thumb img,
+.rot-side-thumb .rot-side-preview {
   width: 30px;
   height: 30px;
   object-fit: contain;
@@ -703,6 +713,24 @@
 .rot-stage-chip:hover {
   border-color: var(--rot-accent);
   color: var(--rot-accent);
+}
+
+.rot-stage-chip:disabled {
+  cursor: not-allowed;
+  opacity: .42;
+}
+
+.rot-desktop-zoom-controls {
+  display: flex;
+  gap: 4px;
+}
+
+.rot-zoom-button {
+  width: 36px;
+  min-width: 36px;
+  padding: 0;
+  font-size: 19px;
+  line-height: 1;
 }
 
 .rot-rotate-compact {
@@ -1387,7 +1415,7 @@
   margin-top: 14px;
 }
 
-.rot-product img {
+.rot-product-preview {
   width: 96px;
   height: 96px;
   object-fit: contain;
@@ -1455,7 +1483,8 @@
   color: #34343a;
 }
 
-.rot-blank img {
+.rot-blank img,
+.rot-blank-preview {
   width: 100%;
   aspect-ratio: 1;
   object-fit: cover;
@@ -1538,12 +1567,32 @@
   text-align: center;
 }
 .rot-template-preview img { width: 42px; height: 42px; object-fit: contain; }
+.rot-template-preview img.is-full { width: 100%; height: 100%; object-fit: contain; }
 .rot-template-preview strong { max-width: 100%; font-size: 11px; line-height: 1.05; overflow-wrap: anywhere; }
 .rot-template-preview small { max-width: 100%; color: #555b65; font-size: 7px; line-height: 1.1; overflow-wrap: anywhere; }
 .rot-template-info { display: grid; gap: 2px; min-width: 0; padding: 0 2px 2px; }
 .rot-template-info strong { overflow: hidden; font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
 .rot-template-info small { color: #666c75; font-size: 10px; }
 .rot-template-free { position: absolute; right: 6px; bottom: 6px; padding: 3px 6px; border-radius: 3px; background: #dfe2e6; color: #34343a; font-size: 9px; line-height: 1.1; }
+
+.rot-library-status {
+  margin: 8px 0 0;
+  color: #5f6570;
+  font-size: 13px;
+}
+
+.rot-library-status.is-error { color: #a22f2f; }
+
+.rot-library-more {
+  width: 100%;
+  min-height: 44px;
+  margin: 16px 0 6px;
+  border: 1.5px solid var(--rot-accent);
+  border-radius: 8px;
+  color: var(--rot-accent);
+  font-size: 13px;
+  font-weight: 700;
+}
 
 .rot-drafts {
   list-style: none;
@@ -1979,6 +2028,9 @@
   font-weight: 700;
   text-align: right;
 }
+.rot-design-notes { display: grid; gap: 8px; margin: 20px 0; font-weight: 700; }
+.rot-design-notes textarea { width: 100%; min-height: 88px; padding: 12px; border: 1px solid #bfc4c9; border-radius: 4px; font: inherit; resize: vertical; }
+.rot-design-notes textarea:focus-visible { outline: 2px solid #1875a8; outline-offset: 2px; }
 
 /* --------------------------------------------------------------------------
    Phone layout: panels take over the screen
@@ -2265,7 +2317,7 @@
   font-size: 15px;
 }
 
-.rot-product img {
+.rot-product-preview {
   width: 76px;
   height: 76px;
 }
@@ -2627,6 +2679,8 @@
   .rot-side-thumb img { width: 44px; height: 48px; }
   .rot-side-thumb > span { font-size: 10px; }
   .rot-stage-chip { width: 64px; min-height: 48px; padding: 6px; font-size: 10px; background: #fff; border: 1px solid var(--rot-line); }
+  .rot-desktop-zoom-controls { flex-direction: column; width: 64px; }
+  .rot-desktop-zoom-controls .rot-zoom-button { width: 64px; min-width: 64px; font-size: 20px; }
   .rot-rotate-compact { display: none; }
   .rot-share { right: 10px; bottom: 12px; width: 48px; min-height: 48px; }
   .rot-share svg { width: 22px; height: 22px; }
@@ -2866,10 +2920,10 @@
   .rot-bar-actions { align-items: center; min-width: 0; }
   .rot-bar-actions > button { display: flex; }
   .rot-bar-price { display: none !important; }
-  .rot-barbtn { flex-direction: row; min-width: 42px; padding: 0 8px; gap: 6px; }
+  .rot-barbtn { flex-direction: row; min-width: 44px; min-height: 44px; padding: 0 8px; gap: 6px; }
   .rot-barbtn span { display: none; }
   .rot-barbtn svg { width: 21px; height: 21px; }
-  .rot-next { flex-direction: row; min-width: 74px; gap: 4px; padding-inline: 8px; font-size: 11px; }
+  .rot-next { flex-direction: row; min-width: 74px; min-height: 44px; gap: 4px; padding-inline: 8px; font-size: 11px; }
   .rot-next svg { width: 20px; height: 20px; }
   .rot-bar-price { max-width: 120px; padding-inline: 5px; font-size: 10px; }
   .rot-bar-price small { font-size: 9px; }
@@ -2922,7 +2976,7 @@
 @media (max-width: 400px) {
   .rot-logo { flex: 0 0 68px; }
   .rot-bar-price { display: none; }
-  .rot-barbtn { min-width: 38px; padding-inline: 5px; }
+  .rot-barbtn { min-width: 44px; padding-inline: 5px; }
   .rot-next { min-width: 66px; }
 }
 
@@ -3433,3 +3487,95 @@
   .rot-selbtn { padding: 0 11px; }
   .rot-selbtn svg { width: 21px; height: 21px; }
 }
+
+/* Mobile studio controls: keep the canvas tall and put the essential actions
+   directly over the garment, matching the client's compact reference. */
+@media (max-width: 900px) {
+  .rot[data-step="design"] .rot-stage-top {
+    display: none;
+  }
+
+  .rot[data-step="design"] .rot-mobile-canvas-controls {
+    position: absolute;
+    z-index: 9;
+    inset: 8px 8px auto;
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    pointer-events: none;
+  }
+
+  .rot-mobile-history,
+  .rot-mobile-view-controls {
+    display: flex;
+    gap: 5px;
+    pointer-events: auto;
+  }
+
+  .rot-mobile-canvas-controls button {
+    display: grid;
+    place-items: center;
+    width: 44px;
+    height: 44px;
+    min-width: 44px;
+    padding: 0;
+    border: 1px solid rgba(35, 39, 45, 0.14);
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.95);
+    box-shadow: 0 3px 12px rgba(31, 35, 42, 0.16);
+    color: #24272d;
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    touch-action: manipulation;
+    transition: background 160ms ease, color 160ms ease, transform 160ms ease;
+  }
+
+  .rot-mobile-canvas-controls button:active:not(:disabled) {
+    transform: scale(0.96);
+  }
+
+  .rot-mobile-canvas-controls button:disabled {
+    opacity: 0.34;
+  }
+
+  .rot-mobile-view-controls button:first-child svg {
+    width: 28px;
+    height: 28px;
+  }
+
+  .rot-mobile-view-controls button > span {
+    font-size: 30px;
+    font-weight: 500;
+    line-height: 1;
+    transform: translateY(-1px);
+  }
+
+  .rot[data-step="design"] .rot-rail {
+    border-top-color: #30343b;
+    background: #202329;
+    box-shadow: 0 -2px 12px rgba(20, 23, 28, 0.18);
+  }
+
+  .rot[data-step="design"] .rot-tool {
+    color: #f2f4f7;
+  }
+
+  .rot[data-step="design"] .rot-tool:hover:not(:disabled) {
+    background: #2a2e35;
+  }
+
+  .rot[data-step="design"] .rot-tool.is-active {
+    background: #2a3440;
+    color: #69baf0;
+  }
+}
+.rot-resume-backdrop { position: fixed; inset: 0; z-index: 10000; display: grid; place-items: center; padding: 20px; background: rgba(0,0,0,.55); }
+.rot-resume-dialog { width: min(100%, 430px); padding: 28px; background: #fff; color: #222; border-radius: 8px; box-shadow: 0 12px 40px rgba(0,0,0,.2); }
+.rot-resume-dialog h2 { margin: 0 0 10px; font-size: 24px; }
+.rot-resume-dialog p { line-height: 1.5; }
+.rot-resume-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 22px; }
+.rot-resume-actions button { min-height: 44px; padding: 10px 16px; border: 1px solid #222; background: #fff; color: #222; font: inherit; cursor: pointer; }
+.rot-resume-actions button:first-child { background: #111; color: #fff; }
+.rot-resume-actions button:focus-visible { outline: 3px solid #1689d6; outline-offset: 2px; }
+.rot-resume-link { display: inline-flex; min-height: 44px; align-items: center; padding: 10px 16px; background: #111; color: #fff; text-decoration: none; }
+.rot-resume-link:focus-visible { outline: 3px solid #1689d6; outline-offset: 2px; }

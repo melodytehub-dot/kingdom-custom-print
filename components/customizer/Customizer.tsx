@@ -1,10 +1,18 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import DesignCanvas, { printAreaView } from "./DesignCanvas";
+import { GarmentPreview } from "./GarmentPreview";
+import { measureTextLayer } from "./textGeometry";
 import { fitStage } from "./stageGeometry";
 import {
   ArtPanel,
@@ -94,7 +102,7 @@ import {
   hostedCutoutStatus,
   photoroomAction,
 } from "@/lib/cutoutActions";
-import { hostedCutoutDataUrl, hostedCutoutReady } from "@/lib/hostedCutout";
+import { hostedCutoutDataUrl, hostedCutoutReady, loadHostedCutoutConfig } from "@/lib/hostedCutout";
 import { photoroomAltReady, photoroomCutoutDataUrl } from "@/lib/photoroomCutout";
 import {
   CUTOUT_MAX_EDGE,
@@ -102,7 +110,8 @@ import {
   type CutoutModelKind,
 } from "@/lib/cutoutModels";
 import { drawPreview } from "./preview";
-import { mockupByCode, mockupsForProduct, TEE_MOCKUPS, type TeeMockup } from "@/lib/mockups";
+import { mockupBaseForProduct, mockupByCode, mockupsForProduct, TEE_MOCKUPS, type TeeMockup } from "@/lib/mockups";
+import { ensureFontLoaded } from "@/lib/fonts";
 import { useCart } from "@/lib/cart-context";
 import { quoteProduct, formatUSD } from "@/lib/pricing";
 import type {
@@ -155,7 +164,9 @@ const NN_FONT_SIZES: Record<NNSize, { name: number; number: number; sub: number 
 
 interface DraftState {
   colorCode: string;
+  editingCartId?: string | null;
   design: Design;
+  designNotes?: string;
   lines: Record<string, number>;
   roster: RosterEntry[];
   nn: NNSettings;
@@ -229,7 +240,7 @@ export default function Customizer({
   initialLines: Record<string, number>;
   contactPhone: string;
 }) {
-  const { addItem, items } = useCart();
+  const { addItem, replaceItem, items } = useCart();
   const router = useRouter();
 
   const productMockups = useMemo(() => mockupsForProduct(product), [product]);
@@ -242,12 +253,14 @@ export default function Customizer({
     return match.code;
   });
   const [design, setDesign] = useState<Design>(emptyDesign);
+  const [designNotes, setDesignNotes] = useState("");
   const [lines, setLines] = useState<Record<string, number>>(initialLines);
   /** The selection is a list: one layer, a whole group, or a multi-pick. */
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   /** While on, canvas taps add to and remove from the selection. */
   const [multiSelect, setMultiSelect] = useState(false);
   const [drafts, setDrafts] = useState<SavedDraft[]>([]);
+  const [resumePrompt, setResumePrompt] = useState(false);
   const [notice, setNotice] = useState<{ tone: "ok" | "warn" | "error"; text: string } | null>(null);
   const [productSwitchPrompt, setProductSwitchPrompt] = useState<ProductSwitchPrompt | null>(null);
   const [busy, setBusy] = useState(false);
@@ -256,6 +269,7 @@ export default function Customizer({
   const [fxStatus, setFxStatus] = useState<string | null>(null);
   const [fxProgress, setFxProgress] = useState<number | null>(null);
   const [addedCount, setAddedCount] = useState(0);
+  const [editingCartId, setEditingCartId] = useState<string | null>(null);
   const [hist, setHist] = useState({ canUndo: false, canRedo: false });
   const [roster, setRoster] = useState<RosterEntry[]>([]);
   const [nn, setNn] = useState<NNSettings>(NN_DEFAULTS);
@@ -275,6 +289,8 @@ export default function Customizer({
   }, []);
   const [stageBox, setStageBox] = useState({ w: 0, h: 0 });
   const [compact, setCompact] = useState(true);
+  const dismissCanvasTapRef = useRef(false);
+  const [, refreshFontMetrics] = useState(0);
   const [shortViewport, setShortViewport] = useState(false);
   const [panelHeight, setPanelHeight] = useState(0);
 
@@ -312,6 +328,15 @@ export default function Customizer({
   const personalization = personalizationOf(design);
   const quote = quoteProduct(product, { sides, lines: sizeLines, personalization });
   const layers = design[side];
+  const designFonts = useMemo(() => [...new Set([...design.front, ...design.back].filter((layer): layer is TextLayer => layer.type === "text").map((layer) => layer.font))].sort().join("|"), [design]);
+  useEffect(() => {
+    if (!designFonts) return;
+    let active = true;
+    void Promise.allSettled(designFonts.split("|").map(ensureFontLoaded)).then(() => {
+      if (active) refreshFontMetrics((value) => value + 1);
+    });
+    return () => { active = false; };
+  }, [designFonts]);
   // Panels and editors belong to one layer; a group or multi-pick has no editor.
   const selectedId = selectedIds.length === 1 ? selectedIds[0] : null;
   const selected = selectedId ? layers.find((l) => l.id === selectedId) : undefined;
@@ -334,6 +359,7 @@ export default function Customizer({
       if (handoff?.targetSlug === product.slug && handoff.design?.front && handoff.design?.back) {
         restoredDesign = normalizeDesign(handoff.design);
         setDesign(restoredDesign);
+        setDesignNotes(handoff.designNotes ?? "");
         const transferredColor = productMockups.find((item) => item.slug === handoff.colorSlug);
         const matchingName = productMockups.find((item) => item.name.toLowerCase() === handoff.colorName.toLowerCase());
         setColorCode((transferredColor ?? matchingName ?? closestProductColor(productMockups, handoff.colorHex))?.code ?? TEE_MOCKUPS[0].code);
@@ -347,13 +373,43 @@ export default function Customizer({
         pendingProductHandoff = null;
       } else {
         if (handoff) pendingProductHandoff = null;
+        const query = new URLSearchParams(window.location.search);
+        const cartId = query.get("cartItem");
+        const savedId = query.get("savedDesign");
+        const cartItems = JSON.parse(window.localStorage.getItem("kcp.cart.v1") ?? "[]") as import("@/lib/types").CartItem[];
+        const cartEntry = cartId && Array.isArray(cartItems) ? cartItems.find((item) => item.id === cartId && item.productSlug === product.slug) : undefined;
+        const savedEntry = savedId ? loadDrafts().find((item) => item.id === savedId && item.productSlug === product.slug) : undefined;
+        if (cartEntry?.design?.front && cartEntry.design.back) {
+          setEditingCartId(cartEntry.id);
+          const editDraftRaw = window.localStorage.getItem(draftKey);
+          let editDraft: Partial<DraftState> | null = null;
+          try { if (editDraftRaw) editDraft = JSON.parse(editDraftRaw) as Partial<DraftState>; } catch { /* Use the cart item when a draft is invalid. */ }
+          const inProgress = editDraft?.editingCartId === cartEntry.id && editDraft.design?.front && editDraft.design.back ? editDraft : null;
+          restoredDesign = normalizeDesign(inProgress?.design ?? cartEntry.design);
+          setDesign(restoredDesign);
+          setDesignNotes(inProgress?.designNotes ?? cartEntry.designNotes ?? "");
+          setColorCode((colorForProduct(productMockups, inProgress?.colorCode ?? cartEntry.colorSlug) ?? closestProductColor(productMockups, cartEntry.colorHex)).code);
+          setLines(Object.fromEntries(product.sizes.map((size) => [size.label, inProgress?.lines?.[size.label] ?? cartEntry.lines.find((line) => line.label === size.label)?.qty ?? 0])));
+          setRoster(inProgress?.roster ?? cartEntry.roster ?? []);
+          if (inProgress?.nn) setNn({ ...NN_DEFAULTS, ...inProgress.nn });
+        } else if (savedEntry?.design?.front && savedEntry.design.back) {
+          restoredDesign = normalizeDesign(savedEntry.design);
+          setDesign(restoredDesign);
+          setDesignNotes(savedEntry.designNotes ?? "");
+          setColorCode((colorForProduct(productMockups, savedEntry.colorSlug) ?? closestProductColor(productMockups, savedEntry.colorHex)).code);
+          setLines(Object.fromEntries(product.sizes.map((size) => [size.label, savedEntry.lines?.[size.label] ?? 0])));
+          setRoster(savedEntry.roster ?? []);
+          if (savedEntry.nn) setNn({ ...NN_DEFAULTS, ...savedEntry.nn });
+        } else {
         const raw = window.localStorage.getItem(draftKey);
         if (raw) {
           const parsed = JSON.parse(raw) as Partial<DraftState>;
           if (parsed?.design?.front && parsed?.design?.back) {
             restoredDesign = normalizeDesign(parsed.design);
             setDesign(restoredDesign);
+            if ((restoredDesign.front.length || restoredDesign.back.length) && query.get("resume") !== "1") setResumePrompt(true);
           }
+          setDesignNotes(parsed?.designNotes ?? "");
           const requestedColor = colorForProduct(productMockups, initialColor);
           const savedColor = colorForProduct(productMockups, parsed?.colorCode);
           if (requestedColor) setColorCode(requestedColor.code);
@@ -367,15 +423,18 @@ export default function Customizer({
             setLines(Object.fromEntries(product.sizes.map((size) => [size.label, initialLines[size.label] ?? 0])));
           }
         }
-        if (!colorForProduct(productMockups, initialColor)) {
+        if (!raw && !colorForProduct(productMockups, initialColor)) {
           const first = productMockups[0];
           if (first) setColorCode(first.code);
+        }
         }
       }
     } catch {
       // A corrupt draft should not block the editor; start clean.
     }
-    historyRef.current = [restoredDesign ?? emptyDesign()];
+    const initialDesign = restoredDesign ?? emptyDesign();
+    setDesign(initialDesign);
+    historyRef.current = [initialDesign];
     futureRef.current = [];
     setHist({ canUndo: false, canRedo: false });
     setPanel("none");
@@ -389,11 +448,15 @@ export default function Customizer({
     if (!ready || restoredSlug !== product.slug) return;
     const url = new URL(window.location.href);
     url.searchParams.set("color", mockup.slug);
+    if (editingCartId) url.searchParams.set("cartItem", editingCartId);
+    else url.searchParams.delete("cartItem");
+    url.searchParams.delete("savedDesign");
+    url.searchParams.delete("resume");
     const encodedSizes = sizeLines.filter((line) => line.qty > 0).map((line) => `${line.label}:${line.qty}`).join(",");
     if (encodedSizes) url.searchParams.set("sizes", encodedSizes);
     else url.searchParams.delete("sizes");
     window.history.replaceState(window.history.state, "", `${url.pathname}${url.search}${url.hash}`);
-  }, [ready, restoredSlug, product.slug, mockup.slug, sizeLines]);
+  }, [ready, restoredSlug, product.slug, mockup.slug, sizeLines, editingCartId]);
   /* eslint-enable react-hooks/set-state-in-effect */
 
   /* ---- autosave draft ---- */
@@ -402,15 +465,19 @@ export default function Customizer({
     try {
       window.localStorage.setItem(
         draftKey,
-        JSON.stringify({ colorCode, design, lines, roster, nn } satisfies DraftState)
+        JSON.stringify({ colorCode, design, designNotes, lines, roster, nn, editingCartId } satisfies DraftState)
       );
+      if (design.front.length || design.back.length) {
+        window.localStorage.setItem("kcp.recent-design.v1", JSON.stringify({ slug: product.slug, name: product.name }));
+      }
     } catch {
       // Storage unavailable or full; the in-progress design still works.
     }
-  }, [ready, restoredSlug, product.slug, draftKey, colorCode, design, lines, roster, nn]);
+  }, [ready, restoredSlug, product.slug, product.name, draftKey, colorCode, design, designNotes, lines, roster, nn, editingCartId]);
 
   /* Text entry is grouped; pointer gestures commit as one history step. */
   useEffect(() => {
+    if (!ready || restoredSlug !== product.slug) return;
     if (transforming) return;
     if (applyingHistory.current) {
       applyingHistory.current = false;
@@ -429,7 +496,7 @@ export default function Customizer({
       syncHist();
     }, 450);
     return () => clearTimeout(t);
-  }, [design, syncHist, transforming]);
+  }, [design, syncHist, transforming, ready, restoredSlug, product.slug]);
 
   useEffect(() => {
     if (!notice) return;
@@ -485,7 +552,11 @@ export default function Customizer({
     let live = true;
     drawPreview(mockup.front, mockup.back, stripForCart(design), product.printArea)
       .then((p) => live && setPreviews(p))
-      .catch(() => live && setPreviews({ front: null, back: null }));
+      .catch(() => {
+        if (!live) return;
+        setPreviews({ front: null, back: null });
+        setNotice({ tone: "error", text: "We could not load the garment or artwork for the preview. Please check your connection and try again." });
+      });
     return () => {
       live = false;
     };
@@ -530,6 +601,10 @@ export default function Customizer({
    * that element's editor.
    */
   const handleTap = (id: string) => {
+    if (dismissCanvasTapRef.current) {
+      dismissCanvasTapRef.current = false;
+      return;
+    }
     const layer = layers.find((l) => l.id === id);
     if (!layer) return;
 
@@ -568,6 +643,10 @@ export default function Customizer({
     setSide((s) => (s === "front" ? "back" : "front"));
     setSelectedIds([]);
     setPanel((p) => (SPLIT_PANELS.includes(p) ? "none" : p));
+  };
+
+  const adjustZoom = (delta: number) => {
+    setZoom((current) => Math.min(1.6, Math.max(1, Math.round((current + delta) * 10) / 10)));
   };
 
   const shareDesign = async () => {
@@ -618,31 +697,59 @@ export default function Customizer({
   };
 
   const addArt = (item: ArtItem) => {
-    addImageLayer(item.src, item.name, 1);
+    addImageLayer(item.src, item.name, item.aspect ?? 1);
     setNotice({ tone: "ok", text: `${item.name} added to the ${side}.` });
   };
 
-  const addTemplate = (template: DesignTemplate) => {
+  const addTemplate = async (template: DesignTemplate) => {
+    const elements = template.elements ?? [];
+    if (!elements.length && template.previewSrc) {
+      addImageLayer(template.previewSrc, `Template: ${template.name}`, template.aspect ?? 1);
+      setNotice({ tone: "warn", text: `${template.name} was added as a single image because its editable source artwork is unavailable.` });
+      return;
+    }
+
     const additions: DesignLayer[] = [];
-    for (const element of template.elements) {
+    const textFonts = elements.filter((element) => element.type === "text").map((element) => element.layer.font);
+    await Promise.race([
+      Promise.allSettled(textFonts.map(ensureFontLoaded)),
+      new Promise((resolve) => window.setTimeout(resolve, 4000)),
+    ]);
+    const area = printAreaView(side, product.printArea);
+    for (const element of elements) {
       if (element.type === "text") {
-        additions.push(newTextLayer({
-          ...element.layer,
-          ...(darkShirt ? { color: "#FFFFFF" } : {}),
-        }));
+        const { sourceWidthPct, ...textStyle } = element.layer;
+        const text = newTextLayer({
+          ...textStyle,
+          ...(!template.id.startsWith("lumise-template-") && darkShirt ? { color: "#FFFFFF" } : {}),
+        });
+        if (sourceWidthPct && !text.arc) {
+          const width = Math.max(...measureTextLayer(text, area.h).widths);
+          if (width > 0) text.scaleX = (sourceWidthPct / 100 * area.w) / width;
+        }
+        additions.push(text);
         continue;
       }
 
-      const item = ART_LIBRARY.find((artItem) => artItem.id === element.layer.artId);
-      if (!item) continue;
-      const src = darkShirt && item.src.startsWith("data:image/svg+xml;utf8,")
-        ? `data:image/svg+xml;utf8,${encodeURIComponent(decodeURIComponent(item.src.slice("data:image/svg+xml;utf8,".length)).replaceAll("#141414", "#FFFFFF"))}`
-        : item.src;
-      additions.push(newImageLayer(src, `Template: ${template.name} / ${item.name}`, 1, {
-        x: element.layer.x,
-        y: element.layer.y,
-        scaleX: element.layer.scaleX,
-        scaleY: element.layer.scaleY,
+      const layer = element.layer;
+      const item = ART_LIBRARY.find((artItem) => artItem.id === layer.artId);
+      if (!layer.src && !item) continue;
+      const originalSrc = layer.src ?? item!.src;
+      const aspect = layer.aspect ?? item?.aspect ?? 1;
+      const baseWidth = Math.min(area.w, area.h * aspect);
+      const baseHeight = baseWidth / aspect;
+      const src = !layer.src && darkShirt && originalSrc.startsWith("data:image/svg+xml;utf8,")
+        ? `data:image/svg+xml;utf8,${encodeURIComponent(decodeURIComponent(originalSrc.slice("data:image/svg+xml;utf8,".length)).replaceAll("#141414", "#FFFFFF"))}`
+        : originalSrc;
+      additions.push(newImageLayer(src, layer.name ?? `Template: ${template.name} / ${item?.name ?? "Artwork"}`, aspect, {
+        x: layer.x,
+        y: layer.y,
+        scaleX: layer.widthPct != null ? area.w * layer.widthPct / 100 / baseWidth : layer.scaleX,
+        scaleY: layer.heightPct != null ? area.h * layer.heightPct / 100 / baseHeight : layer.scaleY,
+        rotation: layer.rotation ?? 0,
+        opacity: layer.opacity ?? 1,
+        flipH: layer.flipH ?? false,
+        flipV: layer.flipV ?? false,
         origSrc: src,
         fx: { ...DEFAULT_FX },
       }));
@@ -735,6 +842,7 @@ export default function Customizer({
       setFxStatus("Removing background…");
       keepQuick(await quickCut());
     } else {
+      await loadHostedCutoutConfig();
       if (hostedCutoutReady()) {
         try {
           dataUrl = await runHostedCutout(orig);
@@ -1142,6 +1250,7 @@ export default function Customizer({
 
   const startOver = () => {
     setDesign(emptyDesign());
+    setDesignNotes("");
     setRoster([]);
     setSelectedIds([]);
     setPanel("none");
@@ -1188,6 +1297,7 @@ export default function Customizer({
       colorName: mockup.name,
       colorHex: mockup.hex,
       design,
+      designNotes,
       lines,
       roster,
       nn,
@@ -1215,6 +1325,7 @@ export default function Customizer({
         colorName: found.colorName,
         colorHex: found.colorHex,
         design: normalizeDesign(found.design),
+        designNotes: found.designNotes ?? "",
         lines: Object.fromEntries(target.sizes.map((size) => [size.label, found.lines?.[size.label] ?? 0])),
         roster: (found.roster ?? []).map((entry) => ({
           ...entry,
@@ -1228,6 +1339,7 @@ export default function Customizer({
     }
     applyingHistory.current = true;
     setDesign(normalizeDesign(found.design));
+    setDesignNotes(found.designNotes ?? "");
     setSelectedIds([]);
     const m = productMockups.find((candidate) => candidate.slug === found.colorSlug);
     if (m) setColorCode(m.code);
@@ -1277,7 +1389,7 @@ export default function Customizer({
     try {
       const cartDesign = stripForCart(design);
       const rendered = await drawPreview(mockup.front, mockup.back, cartDesign, product.printArea);
-      addItem({
+      const item = {
         productId: product.id,
         productSlug: product.slug,
         productName: product.name,
@@ -1287,6 +1399,7 @@ export default function Customizer({
         colorHex: mockup.hex,
         sidesUsed: sides,
         design: cartDesign,
+        designNotes: designNotes.trim().slice(0, 2000),
         roster: roster.length ? roster : undefined,
         previewFront: rendered.front,
         previewBack: rendered.back,
@@ -1295,9 +1408,12 @@ export default function Customizer({
         unitPrice: quote.unitBase,
         total: quote.total,
         quantity,
-      });
+      };
+      const updated = editingCartId ? replaceItem(editingCartId, item) : false;
+      if (!updated) addItem(item);
+      setEditingCartId(null);
       setAddedCount((n) => n + 1);
-      setNotice({ tone: "ok", text: "Added to cart." });
+      setNotice({ tone: "ok", text: updated ? "Cart item updated." : "Added to cart." });
       setLines(Object.fromEntries(product.sizes.map((s) => [s.label, 0])));
       setSelectedIds([]);
     } catch {
@@ -1352,6 +1468,7 @@ export default function Customizer({
       colorName: mockup.name,
       colorHex: mockup.hex,
       design,
+      designNotes,
       lines: Object.fromEntries(target.sizes.map((size) => [size.label, transferLines[size.label] ?? 0])),
       roster: transferRoster,
       nn,
@@ -1464,6 +1581,8 @@ export default function Customizer({
           lines={sizeLines}
           roster={rosterLocked ? roster.length : 0}
           previews={previews}
+          designNotes={designNotes}
+          onDesignNotes={setDesignNotes}
           rows={
             addedCount > 0 ? (
               <Link href="/cart" className="rot-cta rot-cta-ghost">
@@ -1532,7 +1651,7 @@ export default function Customizer({
             busy={fxBusy}
             busyLabel={fxStatus ?? undefined}
             progress={fxProgress}
-            eyebrow={ART_LIBRARY.some((a) => a.src === selected.origSrc) ? "Add Art" : "Upload Art"}
+            eyebrow={ART_LIBRARY.some((a) => a.src === selected.origSrc) || selected.origSrc?.startsWith("/lumise/") ? "Add Art" : "Upload Art"}
             actions={actionsFor(selected)}
             altCutout={
               photoroomAltReady()
@@ -1763,13 +1882,34 @@ export default function Customizer({
         if (file) { event.preventDefault(); void onUpload(file); }
       }}
       onPointerDownCapture={(event) => {
+        dismissCanvasTapRef.current = false;
         if (step !== "design" || panel === "none") return;
         const target = event.target;
+        if (compact && target instanceof Element && target.closest(".rot-stage") && !target.closest(".rot-mobile-canvas-controls, .rot-share, .rot-quickadd, .rot-selbar")) {
+          dismissCanvasTapRef.current = true;
+          setPanel("none");
+          return;
+        }
         if (target instanceof Element && target.closest(".rot-panel, .rot-rail, .rot-quickadd, .rot-canvas, .rot-selbar")) return;
         closePanel();
       }}
       style={{ ["--step" as string]: stepIndex }}
     >
+      {resumePrompt ? <div className="rot-resume-backdrop">
+        <section className="rot-resume-dialog" role="dialog" aria-modal="true" aria-labelledby="resume-title">
+          <h2 id="resume-title">Continue your design?</h2>
+          <p>Your previous design for {product.name} is saved on this device.</p>
+          <div className="rot-resume-actions">
+            <button type="button" autoFocus onClick={() => setResumePrompt(false)}>Continue designing</button>
+            <button type="button" onClick={() => {
+              const blank = emptyDesign();
+              setDesign(blank); setDesignNotes(""); setRoster([]); setNn(NN_DEFAULTS);
+              setSelectedIds([]); historyRef.current = [blank]; futureRef.current = []; syncHist();
+              setResumePrompt(false);
+            }}>Start a new design</button>
+          </div>
+        </section>
+      </div> : null}
       {/* ---- App bar ---- */}
       <header className="rot-bar">
         <Link href="/" className="rot-logo" aria-label="Kingdom Custom Print — home">
@@ -1783,11 +1923,11 @@ export default function Customizer({
         </Link>
         <div className="rot-bar-actions">
           <button type="button" className="rot-barbtn rot-mobile-share" onClick={shareDesign} disabled={busy} aria-label="Share design preview" title="Share design preview"><ShareIcon size={22} /></button>
-          <Link href={callHref} className="rot-barbtn">
+          <Link href={callHref} className="rot-barbtn" aria-label={contactPhone ? "Call customer service" : "Contact customer service"}>
             <HeadsetIcon size={34} />
             <span>Call or Chat</span>
           </Link>
-          <button type="button" className="rot-barbtn rot-header-save" onClick={saveDraft}>
+          <button type="button" className="rot-barbtn rot-header-save" onClick={saveDraft} aria-label="Save design">
             <SaveIcon size={34} />
             <span>Save</span>
           </button>
@@ -1804,7 +1944,7 @@ export default function Customizer({
           </div>
           <button type="button" className="rot-next rot-header-next" onClick={goNext} disabled={busy}>
             {step === "review" ? <CartGlyph size={24} /> : <ChevronRightIcon size={24} />}
-            <span>{step === "review" ? (busy ? "Adding…" : addedCount ? "Add another" : "Add to Cart") : step === "quantity" ? "Review" : "Next"}</span>
+            <span>{step === "review" ? (busy ? "Saving…" : editingCartId ? "Update cart" : addedCount ? "Add another" : "Add to Cart") : step === "quantity" ? "Review" : "Next"}</span>
           </button>
         </div>
       </header>
@@ -1867,15 +2007,19 @@ export default function Customizer({
                       aria-pressed={side === view}
                       aria-label={view === "front" ? "Front view" : "Back view"}
                     >
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src={view === "front" ? mockup.front : mockup.back} alt="" />
+                      <GarmentPreview
+                        className="rot-side-preview"
+                        src={mockup.precolored ? (view === "front" ? mockup.front : mockup.back) : mockupBaseForProduct(product, view)}
+                        color={mockup.precolored ? undefined : mockup.hex}
+                      />
                       <span>{view}</span>
                     </button>
                   ))}
                 </div>
-                <button type="button" className="rot-stage-chip" onClick={() => setZoom((z) => (z > 1 ? 1 : 1.12))}>
-                  {zoom > 1 ? "Fit" : "Zoom"}
-                </button>
+                <div className="rot-desktop-zoom-controls" role="group" aria-label="Canvas zoom">
+                  <button type="button" className="rot-stage-chip rot-zoom-button" onClick={() => adjustZoom(0.1)} disabled={zoom >= 1.6} aria-label="Zoom in" title="Zoom in">+</button>
+                  <button type="button" className="rot-stage-chip rot-zoom-button" onClick={() => adjustZoom(-0.1)} disabled={zoom <= 1} aria-label="Zoom out" title="Zoom out">−</button>
+                </div>
                 <button type="button" className="rot-stage-chip rot-start-over" onClick={startOver}>
                   Start over
                 </button>
@@ -1893,7 +2037,49 @@ export default function Customizer({
               </div>
             </div>
 
-          <section className="rot-stage" ref={stageRef} aria-label="Design preview">
+          <section
+            className="rot-stage"
+            ref={stageRef}
+            aria-label="Design preview"
+          >
+            <div className="rot-mobile-canvas-controls" aria-label="Canvas controls">
+              <div className="rot-mobile-history" role="group" aria-label="History">
+                <button type="button" onClick={undo} disabled={!hist.canUndo || transforming} aria-label="Undo" title="Undo">
+                  <UndoIcon size={22} />
+                </button>
+                <button type="button" onClick={redo} disabled={!hist.canRedo || transforming} aria-label="Redo" title="Redo">
+                  <RedoIcon size={22} />
+                </button>
+              </div>
+              <div className="rot-mobile-view-controls" role="group" aria-label="Garment view and zoom">
+                <button
+                  type="button"
+                  onClick={rotateSide}
+                  aria-label={`Rotate to the ${side === "front" ? "back" : "front"}`}
+                  title="Rotate garment"
+                >
+                  <RotateShirtIcon />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => adjustZoom(0.1)}
+                  disabled={zoom >= 1.6}
+                  aria-label="Zoom in"
+                  title="Zoom in"
+                >
+                  <span aria-hidden="true">+</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => adjustZoom(-0.1)}
+                  disabled={zoom <= 1}
+                  aria-label="Zoom out"
+                  title="Zoom out"
+                >
+                  <span aria-hidden="true">−</span>
+                </button>
+              </div>
+            </div>
             {fit.size > 0 ? (
               <div
                 className={`rot-shirt${flipping ? " is-flipping" : ""}`}
@@ -1901,13 +2087,14 @@ export default function Customizer({
                   width: fit.size,
                   height: fit.size,
                   left: fit.left,
-                  transform: `translateY(${fit.ty}px)`,
+                  transform: `translate3d(0, ${fit.ty}px, 0)`,
                 }}
               >
                 <DesignCanvas
                   key={`${mockup.code}-${side}`}
-                  frontSrc={mockup.front}
-                  backSrc={mockup.back}
+                  frontSrc={mockup.precolored ? mockup.front : mockupBaseForProduct(product, "front")}
+                  backSrc={mockup.precolored ? mockup.back : mockupBaseForProduct(product, "back")}
+                  fabricColor={mockup.precolored ? undefined : mockup.hex}
                   side={side}
                   printArea={product.printArea}
                   design={design}
@@ -2102,7 +2289,7 @@ export default function Customizer({
           <span>Save Design</span>
         </button>
         <button type="button" className="rot-footer-button is-primary" onClick={goNext} disabled={busy}>
-          <span>{step === "review" ? (addedCount ? "Add Another" : "Add to Cart") : step === "quantity" ? "Review" : "Next Step"}</span>
+          <span>{step === "review" ? (editingCartId ? "Update Cart" : addedCount ? "Add Another" : "Add to Cart") : step === "quantity" ? "Review" : "Next Step"}</span>
           {step === "review" ? <CartGlyph size={20} /> : <ChevronRightIcon size={20} />}
         </button>
       </footer>

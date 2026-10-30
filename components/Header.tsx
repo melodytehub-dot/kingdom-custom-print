@@ -10,6 +10,7 @@ const MAIN_NAV_LINKS = [
   { href: "/", label: "HOME" },
   { href: "/shop", label: "SHOP ALL" },
   { href: "/shop?kind=tee", label: "T-SHIRTS" },
+  { href: "/shop?kind=polo", label: "POLO SHIRTS" },
   { href: "/shop?kind=hoodie", label: "HOODIES" },
   { href: "/customize", label: "DESIGN STUDIO", highlight: true },
   { href: "/contact", label: "CONTACT" },
@@ -44,7 +45,7 @@ export default async function Header({
               alt="Kingdom Custom Print"
               width={180}
               height={55}
-              priority
+              preload
               style={{ height: "46px", width: "auto", objectFit: "contain" }}
             />
           </Link>
@@ -71,6 +72,7 @@ export default async function Header({
 
           {/* Right Header Actions */}
           <div className="mm-header-actions">
+            <Link href="/account" className="mm-account-action">Account</Link>
             <WishlistLink />
 
             <CartButton />

@@ -25,7 +25,7 @@ type Tab = (typeof TABS)[number];
 export default async function AdminPage({
   searchParams,
 }: {
-  searchParams: Promise<{ tab?: string; ref?: string }>;
+  searchParams: Promise<{ tab?: string; ref?: string; edit?: string }>;
 }) {
   const configured = adminConfigured();
   const jar = await cookies();
@@ -59,13 +59,13 @@ export default async function AdminPage({
     <div className="wrap admin-page">
       <header className="admin-head">
         <div>
-          <p className="eyebrow">Admin</p>
           <h1 className="h2">Dashboard</h1>
         </div>
       </header>
 
       <AdminDashboard
         initialTab={tab}
+        editingProduct={params.edit ?? ""}
         orderDetail={orderDetail}
         data={{
           stats,
@@ -80,7 +80,7 @@ export default async function AdminPage({
         })),
           customers,
           settings,
-          paymentsLive: paymentsConfigured(),
+          paymentsLive: await paymentsConfigured(),
         }}
       />
     </div>

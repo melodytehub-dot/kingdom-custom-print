@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import Garment from "@/components/Garment";
+import DesignPreviewImage from "@/components/DesignPreviewImage";
 import Trash from "@/components/icons/Trash";
 import ArrowRight from "@/components/icons/ArrowRight";
 import { useCart } from "@/lib/cart-context";
@@ -173,12 +173,7 @@ function CartRow({
   return (
     <li className={`cart-row${busy ? " is-busy" : ""}`}>
       <div className="cart-thumb">
-        {preview ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={preview} alt={`${item.productName} in ${item.colorName} with your design`} />
-        ) : (
-          <Garment kind={item.productKind} color={item.colorHex} />
-        )}
+        <DesignPreviewImage src={preview} alt={`${item.productName} in ${item.colorName} with your design`} kind={item.productKind} color={item.colorHex} />
       </div>
 
       <div className="cart-info">
@@ -195,6 +190,7 @@ function CartRow({
               />
               {item.colorName} · {describeDesign(item.design)}
             </p>
+            {item.designNotes ? <p className="small wrap-anywhere"><strong>Design notes:</strong> {item.designNotes}</p> : null}
           </div>
           <p className="cart-price tnum">{money(item.total)}</p>
         </div>
@@ -229,7 +225,7 @@ function CartRow({
         </ul>
 
         <div className="cart-actions">
-          <Link href={`/customize/${item.productSlug}`} className="link">
+          <Link href={`/customize/${item.productSlug}?cartItem=${encodeURIComponent(item.id)}`} className="link">
             Edit design
           </Link>
           <button type="button" className="cart-remove" onClick={onRemove}>

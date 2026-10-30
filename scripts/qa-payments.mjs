@@ -18,17 +18,24 @@ function load(file, dependencies) {
 const pricing = load("lib/pricing.ts", {});
 const product = { id: 1, active: true, name: "Catalog tee", slug: "catalog-tee", kind: "tee", basePrice: 10, printFeePerSide: 4, priceBreaks: [], colors: [{ name: "Black", hex: "#111111" }], sizes: [{ label: "M", surcharge: 0 }, { label: "2XL", surcharge: 3 }] };
 let configured = false;
+let account = null;
 let orderInput;
 let sessionInput;
+let paypalInput;
+let paypalEnabled = false;
 let writes = 0;
 const checkout = load("app/api/checkout/route.ts", {
   "next/server": { NextResponse },
-  "@/lib/orders": { createOrder: async input => { writes++; orderInput = input; const subtotal = input.items.reduce((sum, item) => sum + item.total, 0); return { reference: "KCP-TEST01", subtotal, shipping: 6.95, total: subtotal + 6.95 }; }, attachStripeSession: async () => {} },
-  "@/lib/stripe": { paymentsConfigured: () => configured, siteUrl: () => "https://kingdom.example", stripeClient: () => ({ checkout: { sessions: { create: async input => { sessionInput = input; return { id: "cs_test_local", url: "https://checkout.stripe.com/test" }; } } } }) },
+  "node:crypto": { randomUUID: () => "11111111-1111-4111-8111-111111111111" },
+  "@/lib/orders": { createOrder: async input => { writes++; orderInput = input; const subtotal = input.items.reduce((sum, item) => sum + item.total, 0); return { reference: "KCP-TEST01", subtotal, shipping: 6.95, total: subtotal + 6.95 }; }, attachStripeSession: async () => {}, attachPayPalOrder: async () => {}, cancelOrder: async () => true },
+  "@/lib/paypal": { paypalConfigured: async () => paypalEnabled, paypalRequest: async (_path, options) => { paypalInput = JSON.parse(options.body); return { id: "PAYPALID", links: [{ rel: "payer-action", href: "https://www.paypal.com/checkoutnow" }] }; } },
+  "@/lib/order-access": { createOrderAccessSession: async () => "test_access_token", ORDER_ACCESS_COOKIE: "kcp_order_access", orderAccessCookieOptions: () => ({ httpOnly: true, sameSite: "lax", path: "/" }) },
+  "@/lib/stripe": { paymentsConfigured: () => configured, siteUrl: () => "https://kingdom.example", stripeClient: () => ({ checkout: { sessions: { create: async input => { sessionInput = input; return { id: "cs_test_local", url: "https://checkout.stripe.com/test" }; }, expire: async () => ({}) } } }) },
   "@/lib/catalog": { getProductById: async () => product },
   "@/lib/pricing": pricing,
   "@/lib/fonts": { FONTS: [{ id: "Anton" }] },
   "@/lib/design": { personalizationOf: () => "none" },
+  "@/lib/customer-auth": { sameOrigin: () => true, customerFromRequest: async () => account },
 });
 const payload = { email: "qa@example.com", name: "Test buyer", addressLine1: "1 Test Street", city: "Austin", postal: "78701", region: "TX", items: [{ productId: 1, productName: "Fake client name", quantity: 999, unitPrice: .01, total: .01, colorName: "Fake color", colorHex: "#ff0000", lines: [{ label: "M", qty: 2 }, { label: "2XL", qty: 1 }], design: { front: [], back: [] } }] };
 const request = data => new Request("https://kingdom.example/api/checkout", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(data) });
@@ -52,18 +59,40 @@ response = await checkout.POST(request({ ...payload, items: [{ ...payload.items[
 assert.equal(response.status, 400);
 assert.equal(writes, 1);
 console.log("PASS invalid sizes cannot create an order");
+account = { id: 7, email: "qa@example.com" };
+response = await checkout.POST(request({ ...payload, email: "another@example.com" }));
+assert.equal(response.status, 422);
+assert.equal(writes, 1);
+response = await checkout.POST(request(payload));
+assert.equal(response.status, 200);
+assert.equal(orderInput.accountId, 7);
+console.log("PASS signed-in orders stay linked to the account email and ID");
+paypalEnabled = true;
+response = await checkout.POST(request({ ...payload, paymentMethod: "paypal" }));
+assert.equal(response.status, 200);
+assert.equal(paypalInput.purchase_units[0].amount.value, "39.95");
+assert.equal(paypalInput.purchase_units[0].amount.currency_code, "USD");
+console.log("PASS PayPal checkout uses the server-calculated total");
 const stripe = new Stripe("sk_test_local_fixture");
 const secret = "whsec_local_fixture";
 const previousSecret = process.env.STRIPE_WEBHOOK_SECRET;
 process.env.STRIPE_WEBHOOK_SECRET = secret;
 let paidCalls = 0;
+let refundedCalls = 0;
+let receiptCalls = 0;
+let receiptFails = false;
 const webhook = load("app/api/webhook/route.ts", {
   "next/server": { NextResponse },
-  "@/lib/orders": { markOrderPaid: async () => { paidCalls++; } },
+  "@/lib/orders": {
+    markOrderPaid: async () => { paidCalls++; return { reference: "KCP-TEST01" }; },
+    markOrderRefunded: async () => { refundedCalls++; },
+  },
   "@/lib/stripe": { stripeClient: () => stripe },
+  "@/lib/payment-credentials": { getPaymentCredential: async () => secret },
+  "@/lib/order-email": { sendPaidOrderReceipt: async () => { receiptCalls++; if (receiptFails) throw new Error("mail unavailable"); } },
 });
-async function event(status, type = "checkout.session.completed", valid = true) {
-  const body = JSON.stringify({ id: "evt_local", type, data: { object: { id: "cs_test_local", payment_status: status, payment_intent: "pi_local" } } });
+async function event(status, type = "checkout.session.completed", valid = true, object) {
+  const body = JSON.stringify({ id: "evt_local", type, data: { object: object ?? { id: "cs_test_local", payment_status: status, payment_intent: "pi_local" } } });
   const signature = valid ? stripe.webhooks.generateTestHeaderString({ payload: body, secret }) : "t=0,v1=invalid";
   return webhook.POST(new Request("https://kingdom.example/api/webhook", { method: "POST", headers: { "stripe-signature": signature }, body }));
 }
@@ -74,9 +103,19 @@ try {
   assert.equal(paidCalls, 0);
   assert.equal((await event("paid")).status, 200);
   assert.equal(paidCalls, 1);
+  assert.equal(receiptCalls, 1);
   assert.equal((await event("paid", "checkout.session.async_payment_succeeded")).status, 200);
   assert.equal(paidCalls, 2);
-  console.log("PASS signed Stripe events: unpaid ignored, invalid signatures rejected, paid events accepted");
+  receiptFails = true;
+  assert.equal((await event("paid")).status, 503);
+  receiptFails = false;
+  assert.equal((await event("paid")).status, 200);
+  console.log("PASS a failed receipt makes Stripe retry without ignoring the paid order");
+  assert.equal((await event("paid", "charge.refunded", true, { id: "ch_partial", amount: 5000, amount_refunded: 1000, payment_intent: "pi_local" })).status, 200);
+  assert.equal(refundedCalls, 0);
+  assert.equal((await event("paid", "charge.refunded", true, { id: "ch_full", amount: 5000, amount_refunded: 5000, payment_intent: "pi_local" })).status, 200);
+  assert.equal(refundedCalls, 1);
+  console.log("PASS signed Stripe events: unpaid ignored, invalid signatures rejected, paid accepted, full refunds recorded");
 } finally {
   if (previousSecret === undefined) delete process.env.STRIPE_WEBHOOK_SECRET;
   else process.env.STRIPE_WEBHOOK_SECRET = previousSecret;

@@ -30,6 +30,11 @@ const {
   ungroupSelection,
 } = load("lib/design.ts", {
   "@/components/customizer/textGeometry": { measureTextLayer: () => ({ w: 100, h: 50 }) },
+  "./heic": { convertHeicUpload: async (file) => file },
+  "./imageFormat": {
+    detectImageFormat: async () => null,
+    formatLabel: (format) => String(format ?? "image"),
+  },
 });
 
 const image = (id, extra = {}) => ({

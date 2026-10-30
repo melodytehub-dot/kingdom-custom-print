@@ -171,6 +171,23 @@ export const RedoIcon = ({ size }: P) => (
   </Svg>
 );
 
+/** Arrow cursor used for selecting and editing artwork on the canvas. */
+export const PointerIcon = ({ size }: P) => (
+  <Svg size={size} fill="currentColor" stroke={false}>
+    <path d="M5.1 2.8a1 1 0 0 1 1.1-.16l12.1 7.2a1 1 0 0 1-.25 1.84l-4.7 1.13 2.72 5.18a1 1 0 0 1-.42 1.35l-2.48 1.3a1 1 0 0 1-1.35-.42L9.1 15.03l-3.16 3.67a1 1 0 0 1-1.75-.65V3.54a1 1 0 0 1 .91-.74Z" />
+  </Svg>
+);
+
+/** Open hand used for panning the garment without moving artwork. */
+export const HandIcon = ({ size }: P) => (
+  <Svg size={size}>
+    <path d="M7.6 11V6.7a1.5 1.5 0 0 1 3 0V10" />
+    <path d="M10.6 9V4.8a1.5 1.5 0 0 1 3 0V10" />
+    <path d="M13.6 9V6a1.5 1.5 0 0 1 3 0v5" />
+    <path d="M16.6 10V8.4a1.5 1.5 0 0 1 3 0v5.2c0 4.7-2.7 7.4-7.3 7.4h-.8a6 6 0 0 1-4.5-2l-3.3-3.7a1.7 1.7 0 0 1 2.4-2.4l1.5 1.25V11a1.5 1.5 0 0 1 3 0" />
+  </Svg>
+);
+
 export const CenterIcon = ({ size }: P) => (
   <Svg size={size}>
     <path d="M12 3v18" strokeDasharray="2 2.4" />

@@ -661,22 +661,13 @@ a {
   overflow: hidden;
 }
 
-.mm-card-img-primary,
-.mm-card-img-secondary {
+.mm-card-img-primary {
   position: absolute;
   inset: 0;
   width: 100%;
   height: 100%;
   object-fit: cover;
   transition: opacity 0.4s ease, transform 0.6s cubic-bezier(0.25, 0.46, 0.45, 0.94);
-}
-
-.mm-card-img-secondary {
-  opacity: 0;
-}
-
-.mm-card:hover .mm-card-img-secondary {
-  opacity: 1;
 }
 
 .mm-card:hover .mm-card-img-primary {

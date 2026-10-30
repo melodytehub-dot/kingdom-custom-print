@@ -64,6 +64,7 @@ check("design canvas rendered", !!canvas && canvas.width > 200, canvas ? `${Math
 
 await page.getByRole("button", { name: /^review$/i }).first().click();
 await page.waitForTimeout(700);
+await page.getByRole("textbox", { name: "Design notes (optional)" }).fill("Center the artwork above the chest pocket.");
 await page.getByRole("button", { name: /^add to cart$/i }).first().click();
 await page.waitForTimeout(1800);
 
@@ -81,6 +82,8 @@ const cartText = await page.locator("main, body").first().innerText();
 check("cart shows the product", cartText.toLowerCase().includes(PRODUCT_NAME));
 const designSummary = cartText.match(/front:\s*\d+\s*\w+/i) ?? cartText.match(/blank/i);
 check("cart records the design", !!designSummary, designSummary?.[0] ?? "no design summary");
+check("cart shows design notes", cartText.includes("Center the artwork above the chest pocket."));
+check("cart retains design notes", await page.evaluate(() => JSON.parse(localStorage.getItem("kcp.cart.v1") ?? "[]")[0]?.designNotes === "Center the artwork above the chest pocket."));
 const cartTotal = money((cartText.match(/subtotal[\s\S]{0,60}?(\d+\.\d{2})/i) ?? [])[1]);
 check("subtotal is a positive amount", cartTotal > 0, `$${cartTotal}`);
 
@@ -89,6 +92,7 @@ console.log("\n3. persistence across reload");
 await page.reload({ waitUntil: "networkidle" });
 const afterReload = await page.locator("main, body").first().innerText();
 check("cart still populated after reload", afterReload.toLowerCase().includes(PRODUCT_NAME));
+check("design notes survive reload", await page.evaluate(() => JSON.parse(localStorage.getItem("kcp.cart.v1") ?? "[]")[0]?.designNotes === "Center the artwork above the chest pocket."));
 
 /* ---- 4. Size quantity change reprices correctly ---- */
 console.log("\n4. repricing on size change");
@@ -111,6 +115,7 @@ console.log("\n5. checkout submission");
 await page.goto(`${BASE}/checkout`, { waitUntil: "networkidle" });
 const hasForm = await page.locator("form, input[type=email]").count();
 check("checkout form renders", hasForm > 0);
+check("checkout shows design notes", (await page.locator("main").innerText()).includes("Center the artwork above the chest pocket."));
 
 const email = page.locator('input[name="email"], input[type="email"]').first();
 const paymentUnavailable = await page.getByRole("button", { name: "Card checkout unavailable" }).count();
@@ -167,11 +172,9 @@ if (paymentUnavailable) {
       /waiting for payment confirmation|payment is confirmed/i.test(successText);
     check("order success explains the payment state", successCopyIsExplicit, successText.replace(/\s+/g, " ").slice(0, 240));
 
-    await page.goto(`${BASE}/track`, { waitUntil: "networkidle" });
-    await page.locator("#track-ref").fill(ref);
-    await page.getByRole("button", { name: /track order/i }).click();
-    await page.waitForURL(new RegExp(`/order/${ref}$`), { timeout: 15000 });
-    check("track order resolves the reference", page.url().endsWith(`/order/${ref}`));
+    await page.goto(`${BASE}/track`, { waitUntil: "domcontentloaded" });
+    await page.waitForURL(/\/contact$/, { timeout: 15000 });
+    check("old tracking links lead to contact", page.url().endsWith("/contact"));
   }
   console.log(`    order reference for cleanup: ${ref ?? "none"}`);
 }

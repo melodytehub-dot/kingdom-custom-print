@@ -1,13 +1,22 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import Garment from "@/components/Garment";
+import DesignPreviewImage from "@/components/DesignPreviewImage";
 import ArrowRight from "@/components/icons/ArrowRight";
+import AdminRefund from "./AdminRefund";
+import { HERO_IMAGES } from "@/lib/hero-slides";
 import { formatUSD } from "@/lib/pricing";
 import { mockupsForProduct } from "@/lib/mockups";
-import { ORDER_STATUSES, type OrderStatus, type Product, type ProductKind } from "@/lib/types";
+import {
+  ADMIN_ORDER_TRANSITIONS,
+  ORDER_STATUSES,
+  type OrderStatus,
+  type Product,
+  type ProductKind,
+} from "@/lib/types";
 import type {
   AdminOrder,
   AdminOrderDetail,
@@ -28,6 +37,7 @@ const TABS: { id: Tab; label: string }[] = [
 
 const KIND_OPTIONS: { value: ProductKind; label: string }[] = [
   { value: "tee", label: "T-shirt" },
+  { value: "polo", label: "Polo shirt" },
   { value: "longsleeve", label: "Long sleeve" },
   { value: "hoodie", label: "Hoodie" },
   { value: "crew", label: "Crewneck" },
@@ -49,20 +59,38 @@ interface AdminData {
 export default function AdminDashboard({
   data,
   initialTab,
+  editingProduct,
   orderDetail,
 }: {
   data: AdminData;
   initialTab: Tab;
+  editingProduct: string;
   orderDetail: AdminOrderDetail | null;
 }) {
   const [tab, setTab] = useState<Tab>(initialTab);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuToggleRef = useRef<HTMLButtonElement>(null);
   const router = useRouter();
   const [signedOut, setSignedOut] = useState(false);
 
+  function closeMenu() {
+    setMenuOpen(false);
+    menuToggleRef.current?.focus();
+  }
+
   function selectTab(next: Tab) {
     setTab(next);
+    setMenuOpen(false);
+    if (menuOpen) menuToggleRef.current?.focus();
     router.replace(`/admin?tab=${next}`, { scroll: false });
   }
+
+  useEffect(() => {
+    if (!menuOpen) return;
+    const onKeyDown = (event: KeyboardEvent) => { if (event.key === "Escape") { setMenuOpen(false); menuToggleRef.current?.focus(); } };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [menuOpen]);
 
   async function signOut() {
     await fetch("/api/admin/logout", { method: "POST" });
@@ -77,7 +105,13 @@ export default function AdminDashboard({
   return (
     <div className="admin">
       <div className="admin-bar">
-        <nav aria-label="Dashboard sections" className="admin-tabs">
+        <button ref={menuToggleRef} type="button" className="admin-menu-toggle" aria-expanded={menuOpen} aria-controls="admin-menu" onClick={() => setMenuOpen(true)}>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><path d="M3 6h18M3 12h18M3 18h18" /></svg>
+          Menu <span className="admin-menu-current">{TABS.find((item) => item.id === tab)?.label}</span>
+        </button>
+        {menuOpen ? <button className="admin-menu-backdrop" type="button" onClick={closeMenu} aria-label="Close menu" /> : null}
+        <nav id="admin-menu" aria-label="Dashboard sections" className={`admin-tabs${menuOpen ? " is-open" : ""}`}>
+          <div className="admin-menu-heading"><strong>Dashboard</strong><button type="button" onClick={closeMenu} aria-label="Close menu"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><path d="M5 5l14 14M19 5 5 19" /></svg></button></div>
           {TABS.map((t) => (
             <button
               key={t.id}
@@ -103,8 +137,7 @@ export default function AdminDashboard({
 
       {!data.paymentsLive ? (
         <p className="banner-note" role="status">
-          Card payments are not connected on this deployment, so orders arrive as
-          invoice requests. Add the Stripe keys to enable checkout.
+          Card payments are unavailable. Contact your website administrator before accepting card orders.
         </p>
       ) : null}
 
@@ -112,7 +145,7 @@ export default function AdminDashboard({
       {tab === "orders" ? (
         <Orders data={data} detail={orderDetail} />
       ) : null}
-      {tab === "products" ? <ProductsPanel data={data} /> : null}
+      {tab === "products" ? <ProductsPanel key={editingProduct} data={data} editingProduct={editingProduct} /> : null}
       {tab === "customers" ? <Customers data={data} /> : null}
       {tab === "settings" ? <SettingsPanel settings={data.settings} categories={data.categories} /> : null}
     </div>
@@ -192,13 +225,14 @@ function Orders({
 }) {
   const [orders, setOrders] = useState(data.orders);
   const [filter, setFilter] = useState<OrderStatus | "">("");
+  const [search, setSearch] = useState("");
   const [selected, setSelected] = useState(detail);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const visible = useMemo(
-    () => (filter ? orders.filter((o) => o.status === filter) : orders),
-    [orders, filter]
+    () => orders.filter((o) => (!filter || o.status === filter) && (!search.trim() || `${o.reference} ${o.name} ${o.email}`.toLowerCase().includes(search.trim().toLowerCase()))),
+    [orders, filter, search]
   );
 
   const updateStatus = useCallback(
@@ -219,7 +253,8 @@ function Orders({
         setOrders((prev) =>
           prev.map((o) => (o.reference === reference ? { ...o, status } : o))
         );
-        setSelected((prev) => (prev && prev.reference === reference ? { ...prev, status } : prev));
+        const detailResponse = await fetch(`/api/admin/orders?ref=${encodeURIComponent(reference)}`);
+        if (detailResponse.ok) setSelected(await detailResponse.json());
       } catch {
         setError("Network error. Try again.");
       } finally {
@@ -253,6 +288,8 @@ function Orders({
           </p>
         </div>
         <div className="field-inline">
+          <label className="sr-only" htmlFor="order-search">Search orders</label>
+          <input id="order-search" className="input" type="search" placeholder="Search orders" value={search} onChange={(e) => setSearch(e.target.value)} />
           <label className="label" htmlFor="order-filter">
             Status
           </label>
@@ -291,10 +328,10 @@ function Orders({
         <OrderTable orders={visible} onOpen={openOrder} />
       ) : (
         <EmptyState
-          title={filter ? "No orders with that status" : "No orders yet"}
+          title={filter || search ? "No matching orders" : "No orders yet"}
           body={
-            filter
-              ? "Try clearing the status filter."
+            filter || search
+              ? "Try a different search or status."
               : "Orders appear here as soon as someone checks out."
           }
         />
@@ -312,7 +349,7 @@ function OrderTable({
 }) {
   return (
     <div className="table-scroll">
-      <table className="data-table">
+      <table className="data-table admin-orders-table">
         <caption className="sr-only">Orders</caption>
         <thead>
           <tr>
@@ -334,19 +371,19 @@ function OrderTable({
         <tbody>
           {orders.map((o) => (
             <tr key={o.reference}>
-              <td className="mono">{o.reference}</td>
-              <td>
+              <td className="mono" data-label="Reference">{o.reference}</td>
+              <td data-label="Customer">
                 <span className="wrap-anywhere">{o.name}</span>
                 <span className="cell-sub wrap-anywhere">{o.email}</span>
               </td>
-              <td className="tnum">{o.garmentCount}</td>
-              <td>
+              <td className="tnum" data-label="Garments">{o.garmentCount}</td>
+              <td data-label="Status">
                 <span className={`badge status-${o.status}`}>
                   {ORDER_STATUSES.find((s) => s.value === o.status)?.label ?? o.status}
                 </span>
               </td>
-              <td className="num tnum">{formatUSD(o.total)}</td>
-              <td className="cell-sub">
+              <td className="num tnum" data-label="Total">{formatUSD(o.total)}</td>
+              <td className="cell-sub" data-label="Date">
                 {new Date(o.createdAt).toLocaleDateString()}
               </td>
               {onOpen ? (
@@ -379,6 +416,10 @@ function OrderDetailPanel({
   onStatus: (reference: string, status: OrderStatus) => void;
   onClose: () => void;
 }) {
+  const allowedStatuses = ADMIN_ORDER_TRANSITIONS[detail.status] ?? [];
+  const statusOptions = ORDER_STATUSES.filter(
+    (entry) => entry.value === detail.status || allowedStatuses.includes(entry.value)
+  );
   return (
     <div className="order-panel" role="region" aria-label={`Order ${detail.reference}`}>
       <div className="order-panel-head">
@@ -441,28 +482,70 @@ function OrderDetailPanel({
           <h4 className="panel-heading">Items</h4>
           <ul className="admin-items">
             {detail.items.map((item, i) => (
-              <li key={i}>
-                <div className="admin-item-thumb">
-                  {item.previewFront ?? item.previewBack ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={(item.previewFront ?? item.previewBack) as string} alt="" />
-                  ) : (
-                    <Garment kind={item.productKind} color={item.colorHex} />
-                  )}
+              <li key={i} className="admin-order-item">
+                <div className="admin-order-item-head">
+                  <div>
+                    <p className="small wrap-anywhere">
+                      <strong>{item.quantity} × {item.productName}</strong>
+                    </p>
+                    <p className="small muted wrap-anywhere">
+                      {item.colorName} ·{" "}
+                      {item.sizeBreakdown
+                        .filter((s) => s.qty > 0)
+                        .map((s) => `${s.label}×${s.qty}`)
+                        .join(", ")}
+                    </p>
+                  </div>
+                  <p className="tnum small">{formatUSD(item.unitPrice * item.quantity)}</p>
                 </div>
-                <div className="grow">
-                  <p className="small wrap-anywhere">
-                    <strong>{item.quantity} × {item.productName}</strong>
-                  </p>
-                  <p className="small muted wrap-anywhere">
-                    {item.colorName} ·{" "}
-                    {item.sizeBreakdown
-                      .filter((s) => s.qty > 0)
-                      .map((s) => `${s.label}×${s.qty}`)
-                      .join(", ")}
-                  </p>
+
+                <div className="admin-proof-grid" aria-label={`${item.productName} customer proof previews`}>
+                  {(["front", "back"] as const).map((side) => {
+                    const preview = side === "front" ? item.previewFront : item.previewBack;
+                    const layerCount = Array.isArray(item.design[side]) ? item.design[side].length : 0;
+                    return (
+                      <figure key={side} className="admin-proof">
+                        <div className="admin-proof-image">
+                          <DesignPreviewImage src={preview} alt={`${item.productName} ${side} customer proof`} kind={item.productKind} color={item.colorHex} back={side === "back"} />
+                        </div>
+                        <figcaption>
+                          <strong>{side === "front" ? "Front" : "Back"}</strong>
+                          <span className="muted">{layerCount} design {layerCount === 1 ? "element" : "elements"}</span>
+                          {preview ? <a className="link" href={preview} download={`${detail.reference}-${i + 1}-${side}-proof.png`}>Download proof</a> : null}
+                        </figcaption>
+                      </figure>
+                    );
+                  })}
                 </div>
-                <p className="tnum small">{formatUSD(item.unitPrice * item.quantity)}</p>
+
+                <p className="hint">Customer-approved screen proof; verify dimensions and source quality before production.</p>
+                {sourceArtwork(item.design).length ? (
+                  <div className="admin-source-files">
+                    <strong className="small">Source artwork saved with order</strong>
+                    {sourceArtwork(item.design).map((art, artIndex) => (
+                      <a key={`${art.side}-${artIndex}`} className="link small" href={art.src} download={`${detail.reference}-${art.side}-artwork-${artIndex + 1}`}>
+                        Download {art.side} artwork {artIndex + 1}
+                      </a>
+                    ))}
+                  </div>
+                ) : null}
+                {item.designNotes ? <p className="small wrap-anywhere"><strong>Design notes:</strong> {item.designNotes}</p> : null}
+                {item.roster.length ? (
+                  <div className="table-scroll admin-roster-wrap">
+                    <table className="data-table admin-roster-table">
+                      <caption>Names and numbers ({item.roster.length})</caption>
+                      <thead><tr><th>Name</th><th>Number</th><th>Subtitle</th><th>Size</th></tr></thead>
+                      <tbody>
+                        {item.roster.map((entry) => (
+                          <tr key={entry.id}>
+                            <td>{entry.name || "—"}</td><td>{entry.number || "—"}</td>
+                            <td>{entry.subtitle || "—"}</td><td>{entry.size || "—"}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : null}
               </li>
             ))}
           </ul>
@@ -475,15 +558,44 @@ function OrderDetailPanel({
             id="status-select"
             className="select"
             value={detail.status}
-            disabled={saving}
+            disabled={saving || allowedStatuses.length === 0}
             onChange={(e) => onStatus(detail.reference, e.target.value as OrderStatus)}
           >
-            {ORDER_STATUSES.map((s) => (
+            {statusOptions.map((s) => (
               <option key={s.value} value={s.value}>
                 {s.label}
               </option>
             ))}
           </select>
+          <p className="hint">
+            {detail.status === "pending"
+              ? "Payment is confirmed by the payment provider. You may cancel this unpaid order."
+              : allowedStatuses.length
+                ? "Only the next valid fulfillment step is available."
+                : "This order has no further manual status changes."}
+          </p>
+
+          {detail.refundProvider ? <AdminRefund reference={detail.reference} total={detail.total} provider={detail.refundProvider} /> : null}
+
+          <h4 className="panel-heading">Status history</h4>
+          {detail.statusHistory.length ? (
+            <ol className="admin-status-history">
+              {detail.statusHistory.map((event, index) => (
+                <li key={`${event.createdAt}-${index}`} className="small">
+                  <strong>
+                    {ORDER_STATUSES.find((entry) => entry.value === event.toStatus)?.label
+                      ?? event.toStatus}
+                  </strong>{" "}
+                  <span className="muted">
+                    by {event.actor} · {new Date(event.createdAt).toLocaleString()}
+                  </span>
+                  {event.note ? <span className="wrap-anywhere"> — {event.note}</span> : null}
+                </li>
+              ))}
+            </ol>
+          ) : (
+            <p className="small muted">No recorded transitions yet.</p>
+          )}
 
           <dl className="summary-list">
             <div>
@@ -505,6 +617,19 @@ function OrderDetailPanel({
       </div>
     </div>
   );
+}
+
+function sourceArtwork(design: AdminOrderDetail["items"][number]["design"]) {
+  return (["front", "back"] as const).flatMap((side) => {
+    const layers = Array.isArray(design[side]) ? design[side] : [];
+    return layers.flatMap((layer) => {
+      if (!layer || typeof layer !== "object") return [];
+      const value = layer as { type?: unknown; src?: unknown };
+      return value.type === "image" && typeof value.src === "string"
+        ? [{ side, src: value.src }]
+        : [];
+    });
+  });
 }
 
 /* -------------------------------------------------------------------------
@@ -530,7 +655,7 @@ interface DraftProduct {
   backH: string;
   featured: boolean;
   active: boolean;
-  colors: { slug: string; name: string; hex: string }[];
+  colors: { slug: string; name: string; hex: string; autoSlug?: boolean }[];
   sizes: { label: string; surcharge: string }[];
   priceBreaks: { minQty: number; amountOff: string }[];
 }
@@ -554,7 +679,7 @@ function emptyProduct(): DraftProduct {
     backH: "0.66",
     featured: false,
     active: true,
-    colors: [{ slug: "black", name: "Black", hex: "#141414" }],
+    colors: [{ slug: "black", name: "Black", hex: "#141414", autoSlug: true }],
     sizes: [
       { label: "S", surcharge: "0" },
       { label: "M", surcharge: "0" },
@@ -591,9 +716,11 @@ function toDraft(p: Product): DraftProduct {
   };
 }
 
-function ProductsPanel({ data }: { data: AdminData }) {
+function ProductsPanel({ data, editingProduct }: { data: AdminData; editingProduct: string }) {
+  const router = useRouter();
   const [products, setProducts] = useState(data.products);
-  const [draft, setDraft] = useState<DraftProduct | null>(null);
+  const [productSearch, setProductSearch] = useState("");
+  const [draft, setDraft] = useState<DraftProduct | null>(() => editingProduct === "new" ? emptyProduct() : editingProduct ? (data.products.find((p) => String(p.id) === editingProduct) ? toDraft(data.products.find((p) => String(p.id) === editingProduct)!) : null) : null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
@@ -653,7 +780,8 @@ function ProductsPanel({ data }: { data: AdminData }) {
       setSaved(true);
       setDraft(null);
       // Refresh from the server so the list reflects stored values.
-      window.location.reload();
+      router.push("/admin?tab=products");
+      router.refresh();
     } catch {
       setError("Network error. Try again.");
     } finally {
@@ -692,6 +820,12 @@ function ProductsPanel({ data }: { data: AdminData }) {
     }
   }
 
+  if (editingProduct) return <section aria-label="Product editor">
+    <div className="admin-block-head"><div><h2 className="h3">{draft?.id ? `Edit ${draft.name}` : draft ? "New product" : "Product not found"}</h2></div><button type="button" className="btn btn-light btn-sm" onClick={() => router.push("/admin?tab=products")}>Back to products</button></div>
+    {error ? <p className="banner-note is-error" role="alert">{error}</p> : null}
+    {draft ? <ProductForm draft={draft} categories={data.categories} saving={saving} onChange={patchDraft} onSave={save} onCancel={() => router.push("/admin?tab=products")} /> : null}
+  </section>;
+
   return (
     <section aria-label="Products">
       <div className="admin-block-head">
@@ -706,9 +840,7 @@ function ProductsPanel({ data }: { data: AdminData }) {
           type="button"
           className="btn btn-sm"
           onClick={() => {
-            setDraft(emptyProduct());
-            setError(null);
-            setSaved(false);
+            router.push("/admin?tab=products&edit=new");
           }}
         >
           New product
@@ -726,6 +858,8 @@ function ProductsPanel({ data }: { data: AdminData }) {
         </p>
       ) : null}
 
+      {products.length ? <label className="field admin-product-search">Find a product<input className="input" type="search" placeholder="Search by name or style" value={productSearch} onChange={(event) => setProductSearch(event.target.value)} /></label> : null}
+
       {draft ? (
         <ProductForm
           draft={draft}
@@ -739,7 +873,7 @@ function ProductsPanel({ data }: { data: AdminData }) {
 
       {products.length ? (
         <ul className="product-admin-list">
-          {products.map((p) => (
+          {products.filter((p) => `${p.name} ${p.styleCode}`.toLowerCase().includes(productSearch.trim().toLowerCase())).map((p) => (
             <li key={p.id} className="product-admin-row">
               <AdminProductThumb product={p} />
               <div className="grow">
@@ -751,8 +885,7 @@ function ProductsPanel({ data }: { data: AdminData }) {
                 </p>
                 <p className="small muted wrap-anywhere">
                   {KIND_OPTIONS.find((k) => k.value === p.kind)?.label ?? p.kind} ·{" "}
-                  {p.colors.length} colors · {p.sizes.length} sizes ·{" "}
-                  <span className="mono">/{p.slug}</span>
+                  {p.colors.length} colors · {p.sizes.length} sizes
                 </p>
               </div>
               <p className="tnum pa-price">{formatUSD(p.basePrice)}</p>
@@ -777,8 +910,7 @@ function ProductsPanel({ data }: { data: AdminData }) {
                   type="button"
                   className="link"
                   onClick={() => {
-                    setDraft(toDraft(p));
-                    setError(null);
+                    router.push(`/admin?tab=products&edit=${p.id}`);
                   }}
                 >
                   Edit
@@ -796,6 +928,7 @@ function ProductsPanel({ data }: { data: AdminData }) {
           body="Create your first blank to populate the storefront."
         />
       )}
+      {products.length > 0 && !products.some((p) => `${p.name} ${p.styleCode}`.toLowerCase().includes(productSearch.trim().toLowerCase())) ? <p role="status">No matching products. Try a different search.</p> : null}
     </section>
   );
 }
@@ -830,6 +963,7 @@ function ProductForm({
   onSave: () => void;
   onCancel: () => void;
 }) {
+  const [colorSearch, setColorSearch] = useState("");
   return (
     <form
       className="product-form"
@@ -838,12 +972,10 @@ function ProductForm({
         onSave();
       }}
     >
-      <h3 className="h3">{draft.id ? `Edit ${draft.name}` : "New product"}</h3>
-
       <div className="field-grid">
         <div className="field">
           <label className="label" htmlFor="p-name">
-            Name
+            Product name
           </label>
           <input
             id="p-name"
@@ -851,18 +983,6 @@ function ProductForm({
             value={draft.name}
             required
             onChange={(e) => onChange({ name: e.target.value })}
-          />
-        </div>
-        <div className="field">
-          <label className="label" htmlFor="p-slug">
-            URL slug
-          </label>
-          <input
-            id="p-slug"
-            className="input"
-            value={draft.slug}
-            placeholder="generated from the name"
-            onChange={(e) => onChange({ slug: e.target.value })}
           />
         </div>
         <div className="field">
@@ -993,6 +1113,8 @@ function ProductForm({
         />
       </div>
 
+      <details className="admin-advanced">
+      <summary>Print area settings</summary>
       <fieldset className="fieldset">
         <legend className="label">Printable area</legend>
         <p className="hint">
@@ -1026,15 +1148,18 @@ function ProductForm({
           ))}
         </div>
       </fieldset>
+      </details>
 
       <fieldset className="fieldset">
         <legend className="label">Colors</legend>
+        <p className="hint">Enter the color name and choose a matching swatch. Customers will select from these colors.</p>
+        {draft.colors.length > 8 ? <label className="field">Find a color<input className="input" type="search" value={colorSearch} onChange={(e) => setColorSearch(e.target.value)} placeholder="Search colors" /></label> : null}
         <div className="repeat-list">
-          {draft.colors.map((c, i) => (
+          {draft.colors.map((c, i) => ({ c, i })).filter(({ c }) => !c.name || c.name.toLowerCase().includes(colorSearch.trim().toLowerCase())).map(({ c, i }) => (
             <div className="repeat-row" key={i}>
               <div className="field">
                 <label className="label" htmlFor={`c-name-${i}`}>
-                  Name
+                  Color name
                 </label>
                 <input
                   id={`c-name-${i}`}
@@ -1042,29 +1167,15 @@ function ProductForm({
                   value={c.name}
                   onChange={(e) => {
                     const colors = [...draft.colors];
-                    colors[i] = { ...c, name: e.target.value };
-                    onChange({ colors });
-                  }}
-                />
-              </div>
-              <div className="field">
-                <label className="label" htmlFor={`c-slug-${i}`}>
-                  Slug
-                </label>
-                <input
-                  id={`c-slug-${i}`}
-                  className="input"
-                  value={c.slug}
-                  onChange={(e) => {
-                    const colors = [...draft.colors];
-                    colors[i] = { ...c, slug: e.target.value };
+                    const name = e.target.value;
+                    colors[i] = { ...c, name, slug: c.autoSlug ? name.toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 60) : c.slug };
                     onChange({ colors });
                   }}
                 />
               </div>
               <div className="field">
                 <label className="label" htmlFor={`c-hex-${i}`}>
-                  Hex
+                  Swatch color
                 </label>
                 <input
                   id={`c-hex-${i}`}
@@ -1096,7 +1207,7 @@ function ProductForm({
           className="btn btn-light btn-sm add-row"
           onClick={() =>
             onChange({
-              colors: [...draft.colors, { slug: "", name: "", hex: "#3A3A3C" }],
+              colors: [...draft.colors, { slug: "", name: "", hex: "#3A3A3C", autoSlug: true }],
             })
           }
         >
@@ -1397,6 +1508,21 @@ function SettingsPanel({
       ) : null}
 
       <form className="settings-form" onSubmit={save}>
+        <fieldset className="fieldset">
+          <legend className="label">Homepage introduction</legend>
+          <p className="hint">Edit the text shown over the homepage slideshow.</p>
+          {([
+            ["heroLabel", "Small heading"], ["heroHeadlineTop", "Headline, first line"],
+            ["heroHeadlineBottom", "Headline, second line"], ["heroDescription", "Description"],
+          ] as const).map(([key, label]) => <div className="field" key={key}>
+            <label className="label" htmlFor={`s-${key}`}>{label}</label>
+            <input id={`s-${key}`} className="input" value={form[key]} onChange={(e) => setForm({ ...form, [key]: e.target.value })} />
+          </div>)}
+          {(["heroImage1", "heroImage2", "heroImage3"] as const).map((key, index) => <div className="field" key={key}>
+            <label className="label" htmlFor={`s-${key}`}>Slideshow image {index + 1}</label>
+            <select id={`s-${key}`} className="select" value={form[key]} onChange={(e) => setForm({ ...form, [key]: e.target.value })}>{HERO_IMAGES.map((image) => <option key={image.src} value={image.src}>{image.name}</option>)}</select>
+          </div>)}
+        </fieldset>
         <div className="field">
           <label className="label" htmlFor="s-announcement">
             Announcement bar
@@ -1544,7 +1670,6 @@ function SettingsPanel({
           >
             <div className="field-grid">
               <div className="field"><label className="label" htmlFor="cat-name">Name</label><input id="cat-name" className="input" required value={categoryDraft.name} onChange={(e) => setCategoryDraft({ ...categoryDraft, name: e.target.value })} /></div>
-              <div className="field"><label className="label" htmlFor="cat-slug">URL slug</label><input id="cat-slug" className="input" value={categoryDraft.slug} placeholder="generated from name" onChange={(e) => setCategoryDraft({ ...categoryDraft, slug: e.target.value })} /></div>
               <div className="field"><label className="label" htmlFor="cat-order">Order</label><input id="cat-order" className="input" type="number" min="0" value={categoryDraft.sortOrder} onChange={(e) => setCategoryDraft({ ...categoryDraft, sortOrder: e.target.value })} /></div>
             </div>
             <div className="field"><label className="label" htmlFor="cat-description">Description</label><textarea id="cat-description" className="textarea" rows={2} value={categoryDraft.description} onChange={(e) => setCategoryDraft({ ...categoryDraft, description: e.target.value })} /></div>
@@ -1554,7 +1679,7 @@ function SettingsPanel({
         <ul className="category-admin-list">
           {categories.map((category) => (
             <li key={category.id} className="category-admin-row">
-              <div className="grow"><strong>{category.name}</strong><span className="small muted">/{category.slug}{category.description ? ` · ${category.description}` : ""}</span></div>
+              <div className="grow"><strong>{category.name}</strong>{category.description ? <span className="small muted">{category.description}</span> : null}</div>
               <button type="button" className="link" onClick={() => setCategoryDraft({ id: category.id, name: category.name, slug: category.slug, description: category.description, sortOrder: String(category.sortOrder) })}>Edit</button>
               <button type="button" className="cart-remove" onClick={async () => { if (!window.confirm(`Delete “${category.name}”? Products will become uncategorised.`)) return; const res = await fetch(`/api/admin/categories?id=${category.id}`, { method: "DELETE" }); if (res.ok) setCategories((prev) => prev.filter((item) => item.id !== category.id)); else setState({ tone: "error", text: "Category could not be deleted." }); }}>Delete</button>
             </li>

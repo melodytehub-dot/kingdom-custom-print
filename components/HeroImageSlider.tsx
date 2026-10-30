@@ -3,28 +3,7 @@
 import Image from "next/image";
 import { useEffect, useRef, useState, type PointerEvent } from "react";
 
-const SLIDES = [
-  {
-    src: "/img/shop-studio.png",
-    alt: "Kingdom Custom Print studio with a custom printed shirt",
-    name: "Print studio",
-    position: "center",
-  },
-  {
-    src: "/img/shop-printing.png",
-    alt: "A custom graphic being printed on a shirt in the studio",
-    name: "Custom printing",
-    position: "center",
-  },
-  {
-    src: "/img/kingdom-team.webp",
-    alt: "A team wearing Kingdom Custom Print shirts",
-    name: "Kingdom team",
-    position: "center top",
-  },
-];
-
-export default function HeroImageSlider() {
+export default function HeroImageSlider({ slides: SLIDES }: { slides: readonly { src: string; alt: string; name: string; position: string }[] }) {
   const [activeSlide, setActiveSlide] = useState(0);
   const [isMobile, setIsMobile] = useState(false);
   const [reducedMotion, setReducedMotion] = useState(false);
@@ -62,7 +41,7 @@ export default function HeroImageSlider() {
       setActiveSlide((current) => (current + 1) % SLIDES.length);
     }, 4500);
     return () => window.clearInterval(interval);
-  }, [focused, hovered, pageVisible, paused, reducedMotion]);
+  }, [focused, hovered, pageVisible, paused, reducedMotion, SLIDES.length]);
 
   const handlePointerDown = (event: PointerEvent<HTMLDivElement>) => {
     if (!isMobile || (event.pointerType !== "touch" && event.pointerType !== "pen")) return;
@@ -103,7 +82,7 @@ export default function HeroImageSlider() {
       <div className="mm-hero-slider-track" style={{ transform: `translateX(-${activeSlide * 100}%)` }}>
         {SLIDES.map((slide, index) => (
           <div
-            key={slide.src}
+            key={`${slide.src}-${index}`}
             className="mm-hero-slide"
             role="group"
             aria-roledescription="slide"
@@ -114,8 +93,9 @@ export default function HeroImageSlider() {
               src={slide.src}
               alt={slide.alt}
               fill
-              sizes="100vw"
-              priority={index === 0}
+              sizes="(max-width: 768px) 100vw, 50vw"
+              preload={index === 0}
+              unoptimized={slide.src.endsWith(".webp")}
               style={{ objectFit: "cover", objectPosition: slide.position }}
             />
           </div>
@@ -126,7 +106,7 @@ export default function HeroImageSlider() {
         <div className="mm-hero-slider-dots">
           {SLIDES.map((slide, index) => (
             <button
-              key={slide.src}
+              key={`${slide.src}-${index}`}
               type="button"
               className={`mm-hero-slider-dot${activeSlide === index ? " is-active" : ""}`}
               aria-label={`Show photo ${index + 1}: ${slide.name}`}

@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Generator: Adobe Illustrator 16.0.0, SVG Export Plug-In . SVG Version: 6.00 Build 0)  -->
+<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1 Tiny//EN" "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11-tiny.dtd">
+<svg version="1.1" baseProfile="tiny" id="Layer_1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"
+	 x="0px" y="0px" width="350px" height="350px" viewBox="0 0 350 350" overflow="scroll" xml:space="preserve">
+<g>
+	<rect x="171" y="60" fill="#B2B2B2" width="9" height="34"/>
+	<g>
+		<polygon fill="#A3A3A3" points="171,89.988 180,93.096 180,88.144 171,85.036 		"/>
+		<polygon fill="#B2B2B2" points="171,85.328 180,88.435 180,83.482 171,80.375 		"/>
+		<polygon fill="#A3A3A3" points="171,80.084 180,83.191 180,78.239 171,75.131 		"/>
+		<polygon fill="#A3A3A3" points="171,65.227 171,70.179 180,73.286 180,68.334 		"/>
+		<polygon fill="#B2B2B2" points="171,94 180,94 180,93.387 171,90.28 		"/>
+		<polygon fill="#B2B2B2" points="180,63.673 171,60.565 171,65.518 180,68.625 		"/>
+		<polygon fill="#A3A3A3" points="180,60 171,60 171,60.274 180,63.381 		"/>
+		<polygon fill="#B2B2B2" points="171,75.423 180,78.53 180,73.578 171,70.47 		"/>
+	</g>
+	<polyline fill="#D6D6D6" points="174.92,301.861 175.671,302.822 176.241,301.914 177.394,110 174,110 	"/>
+	<g>
+		<path fill="#B2B2B2" d="M156.225,96c1.474,8,9.542,13.255,19.275,13.255c9.734,0,17.802-5.255,19.275-13.255H156.225z"/>
+	</g>
+	<path fill="#919191" d="M182.638,54.626c0,6.284-3.262,11.377-7.283,11.377c-4.022,0-7.283-5.094-7.283-11.377
+		s3.261-7.008,7.283-7.008C179.376,47.618,182.638,48.342,182.638,54.626z"/>
+	<image width="5" height="19" xlink:href="F8567598.png"  transform="matrix(1 0 0 1 178 47)">
+	</image>
+	<image width="20" height="14" xlink:href="F8567599.png"  transform="matrix(1 0 0 1 175 96)">
+	</image>
+	<path fill="#6B6B6B" d="M140.105,95.5c0,0.721,1.704,1.5,3.787,1.5h63.215c2.084,0,3.787-0.779,3.787-1.5s-1.703-1.5-3.787-1.5
+		h-63.215C141.809,94,140.105,94.779,140.105,95.5z"/>
+</g>
+</svg>

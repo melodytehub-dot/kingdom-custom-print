@@ -1,8 +1,12 @@
 import { NextResponse } from "next/server";
 import { adminConfigured, readSessionCookie, validateSession } from "@/lib/admin-auth";
+import { sameOrigin } from "@/lib/customer-auth";
 
 /** Returns a 401 response when the caller is not an authenticated admin. */
 export async function requireAdmin(req: Request): Promise<NextResponse | null> {
+  if (req.method !== "GET" && req.method !== "HEAD" && !sameOrigin(req)) {
+    return NextResponse.json({ error: "Invalid request origin." }, { status: 403 });
+  }
   if (!adminConfigured()) {
     return NextResponse.json(
       { error: "Admin access is not set up on this deployment." },

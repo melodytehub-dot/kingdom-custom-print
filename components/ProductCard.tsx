@@ -4,6 +4,7 @@ import { useWishlist } from "@/lib/wishlist-context";
 import { useState } from "react";
 import Link from "next/link";
 import ProductPhotography from "./ProductPhotography";
+import { brandForProduct } from "@/lib/product-brands";
 import Garment from "./Garment";
 import { formatUSD, lowestPrintedUnit } from "@/lib/pricing";
 import type { Product } from "@/lib/types";
@@ -35,7 +36,7 @@ export default function ProductCard({
 }) {
   const { has, toggle } = useWishlist();
   const saved = has(product.slug);
-  const [selectedColorIdx, setSelectedColorIdx] = useState(0);
+  const [selectedColorIdx, setSelectedColorIdx] = useState(() => product.kind === "polo" ? Math.max(0, product.colors.findIndex((color) => color.slug === "black")) : 0);
   const selectedColor = product.colors[selectedColorIdx] ?? product.colors[0];
   const baseHex = selectedColor?.hex ?? product.colors[0]?.hex ?? "#141414";
 
@@ -45,14 +46,11 @@ export default function ProductCard({
 
   return (
     <article className="mm-card">
-      {/* 1. Thumbnail Media with Dual-Image Hover Swap */}
-      <div className="mm-card-media">
+      {/* Catalog preview is a single finished image for the selected color. */}
+      <div className={`mm-card-media mm-card-media-${product.kind}`}>
         <Link prefetch={false} href={`/product/${product.slug}?color=${encodeURIComponent(selectedColor?.slug ?? "")}`} tabIndex={-1} aria-label={product.name}>
           {selectedColor ? (
-            <>
-              <ProductPhotography product={product} color={selectedColor} priority={priority} className="mm-card-img-primary" />
-              <ProductPhotography product={product} color={selectedColor} view="back" className="mm-card-img-secondary" />
-            </>
+            <ProductPhotography key={`${product.slug}:${selectedColor.slug}`} product={product} color={selectedColor} priority={priority} className="mm-card-img-primary" />
           ) : <Garment kind={product.kind} color={baseHex} className="mm-card-img-primary" />}
         </Link>
 
@@ -85,7 +83,7 @@ export default function ProductCard({
       {/* 2. Card Body Details */}
       <div className="mm-card-body">
         <span className="mm-card-cat">
-          {product.categoryName ?? "Print on Demand"}
+          {brandForProduct(product)?.name ?? product.categoryName ?? "Print on Demand"}
           {product.styleCode ? ` · ${product.styleCode}` : ""}
         </span>
 

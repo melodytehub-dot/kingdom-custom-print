@@ -31,7 +31,7 @@ interface ProductRow {
   sort_order: number;
 }
 
-const PRODUCT_COLUMNS = sql`
+const productColumns = () => sql`
   p.id, p.slug, p.name, p.style_code, p.kind, p.category_id,
   c.slug AS category_slug, c.name AS category_name,
   p.blurb, p.description, p.material,
@@ -69,16 +69,16 @@ async function loadVariants(ids: number[]) {
   const [colorRows, sizeRows, breakRows, imageRows] = await Promise.all([
     sql<VariantRow[]>`
       SELECT id, product_id, slug, name, hex FROM product_colors
-      WHERE product_id = ANY(${ids}::int[]) ORDER BY sort_order, id`,
+      WHERE product_id = ANY(${sql.array(ids, 1007)}) ORDER BY sort_order, id`,
     sql<SizeRow[]>`
       SELECT id, product_id, label, surcharge FROM product_sizes
-      WHERE product_id = ANY(${ids}::int[]) ORDER BY sort_order, id`,
+      WHERE product_id = ANY(${sql.array(ids, 1007)}) ORDER BY sort_order, id`,
     sql<BreakRow[]>`
       SELECT product_id, min_qty, amount_off FROM price_breaks
-      WHERE product_id = ANY(${ids}::int[]) ORDER BY min_qty DESC`,
+      WHERE product_id = ANY(${sql.array(ids, 1007)}) ORDER BY min_qty DESC`,
     sql<ImageRow[]>`
       SELECT id, product_id, url, alt FROM product_images
-      WHERE product_id = ANY(${ids}::int[]) ORDER BY sort_order, id`,
+      WHERE product_id = ANY(${sql.array(ids, 1007)}) ORDER BY sort_order, id`,
   ]);
 
   return {
@@ -142,7 +142,7 @@ export async function getProducts(options?: {
   const activeFilter = options?.includeInactive ? sql`` : sql`AND p.active = true`;
 
   const rows = await sql<ProductRow[]>`
-    SELECT ${PRODUCT_COLUMNS}
+    SELECT ${productColumns()}
     FROM products p
     LEFT JOIN categories c ON c.id = p.category_id
     WHERE (${options?.categorySlug ?? null}::text IS NULL OR c.slug = ${options?.categorySlug ?? null})
@@ -161,7 +161,7 @@ export async function getProductBySlug(
   includeInactive = false
 ): Promise<Product | null> {
   const rows = await sql<ProductRow[]>`
-    SELECT ${PRODUCT_COLUMNS}
+    SELECT ${productColumns()}
     FROM products p
     LEFT JOIN categories c ON c.id = p.category_id
     WHERE p.slug = ${slug} AND (${includeInactive} = true OR p.active = true)
@@ -174,7 +174,7 @@ export async function getProductBySlug(
 
 export async function getProductById(id: number): Promise<Product | null> {
   const rows = await sql<ProductRow[]>`
-    SELECT ${PRODUCT_COLUMNS}
+    SELECT ${productColumns()}
     FROM products p
     LEFT JOIN categories c ON c.id = p.category_id
     WHERE p.id = ${id}
@@ -359,6 +359,13 @@ export async function deleteProduct(id: number): Promise<boolean> {
    ------------------------------------------------------------------------- */
 
 export interface SiteSettings {
+  heroLabel: string;
+  heroHeadlineTop: string;
+  heroHeadlineBottom: string;
+  heroDescription: string;
+  heroImage1: string;
+  heroImage2: string;
+  heroImage3: string;
   announcement: string;
   shippingFlat: number;
   freeShippingThreshold: number;
@@ -369,6 +376,13 @@ export interface SiteSettings {
 }
 
 export const DEFAULT_SETTINGS: SiteSettings = {
+  heroLabel: "PRINT ON DEMAND STUDIO",
+  heroHeadlineTop: "YOUR IDEAS.",
+  heroHeadlineBottom: "MADE TO WEAR.",
+  heroDescription: "Custom apparel for your everyday, your brand, or your team. Design it online. Make it yours.",
+  heroImage1: "/img/shop-studio.png",
+  heroImage2: "/img/shop-printing.png",
+  heroImage3: "/img/kingdom-team.webp",
   announcement: "Free US shipping on orders over $75",
   shippingFlat: 6.95,
   freeShippingThreshold: 75,
@@ -383,6 +397,13 @@ export async function getSettings(): Promise<SiteSettings> {
     SELECT key, value FROM site_settings`;
   const map = new Map(rows.map((r) => [r.key, r.value]));
   return {
+    heroLabel: String(map.get("hero_label") ?? DEFAULT_SETTINGS.heroLabel),
+    heroHeadlineTop: String(map.get("hero_headline_top") ?? DEFAULT_SETTINGS.heroHeadlineTop),
+    heroHeadlineBottom: String(map.get("hero_headline_bottom") ?? DEFAULT_SETTINGS.heroHeadlineBottom),
+    heroDescription: String(map.get("hero_description") ?? DEFAULT_SETTINGS.heroDescription),
+    heroImage1: String(map.get("hero_image_1") ?? DEFAULT_SETTINGS.heroImage1),
+    heroImage2: String(map.get("hero_image_2") ?? DEFAULT_SETTINGS.heroImage2),
+    heroImage3: String(map.get("hero_image_3") ?? DEFAULT_SETTINGS.heroImage3),
     announcement: String(map.get("announcement") ?? DEFAULT_SETTINGS.announcement),
     shippingFlat: num(map.get("shipping_flat") ?? DEFAULT_SETTINGS.shippingFlat),
     freeShippingThreshold: num(
@@ -398,6 +419,13 @@ export async function getSettings(): Promise<SiteSettings> {
 export async function saveSettings(settings: SiteSettings): Promise<void> {
   await sql.begin(async (tx) => {
     const entries: [string, unknown][] = [
+      ["hero_label", settings.heroLabel],
+      ["hero_headline_top", settings.heroHeadlineTop],
+      ["hero_headline_bottom", settings.heroHeadlineBottom],
+      ["hero_description", settings.heroDescription],
+      ["hero_image_1", settings.heroImage1],
+      ["hero_image_2", settings.heroImage2],
+      ["hero_image_3", settings.heroImage3],
       ["announcement", settings.announcement],
       ["shipping_flat", settings.shippingFlat],
       ["free_shipping_threshold", settings.freeShippingThreshold],

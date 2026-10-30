@@ -64,6 +64,11 @@
 .admin-tabs::-webkit-scrollbar {
   display: none;
 }
+.admin-menu-toggle, .admin-menu-heading, .admin-menu-backdrop { display: none; }
+.fieldset .repeat-row:has(.input-color) { grid-template-columns: minmax(0, 1fr) 100px auto; }
+@media (max-width: 767px) {
+  .fieldset .repeat-row:has(.input-color) { grid-template-columns: minmax(0, 1fr) 90px; }
+}
 
 .admin-tab {
   padding: 8px 14px;
@@ -90,6 +95,20 @@
   display: flex;
   align-items: center;
   gap: 14px;
+}
+
+@media (max-width: 640px) {
+  .admin-page { padding-inline: 16px; }
+  .admin-bar { display: grid; gap: 12px; }
+  .admin-tabs { width: 100%; gap: 4px; padding-bottom: 4px; }
+  .admin-tab { min-height: 44px; padding-inline: 12px; }
+  .admin-bar-right { justify-content: space-between; width: 100%; }
+  .admin-bar-right a, .admin-bar-right button { min-height: 44px; display: inline-flex; align-items: center; }
+  .stat-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+  .stat { padding: 12px; }
+  .stat dd { font-size: 1.25rem; }
+  .table-scroll { max-width: 100%; }
+  .admin input, .admin select, .admin textarea { font-size: 16px; }
 }
 
 /* Stats */
@@ -281,6 +300,76 @@
   width: 100%;
   height: 100%;
   object-fit: contain;
+}
+
+.admin-items .admin-order-item {
+  display: block;
+  padding: 16px 0;
+}
+
+.admin-order-item-head {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.admin-proof-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.admin-proof {
+  margin: 0;
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  overflow: hidden;
+  background: var(--bone);
+}
+
+.admin-proof-image {
+  display: grid;
+  place-items: center;
+  aspect-ratio: 4 / 5;
+  min-height: 140px;
+}
+
+.admin-proof-image img,
+.admin-proof-image svg {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.admin-proof figcaption {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px 10px;
+  padding: 8px 10px;
+  background: #fff;
+  font-size: 12px;
+}
+
+.admin-source-files {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+  margin: 10px 0;
+}
+
+.admin-roster-wrap {
+  margin-top: 12px;
+}
+
+.admin-roster-table caption {
+  text-align: left;
+  font-weight: 700;
+  padding-bottom: 6px;
 }
 
 /* Products */
@@ -528,16 +617,50 @@
   }
 }
 
-@media (max-width: 560px) {
+@media (max-width: 767px) {
+  .admin-block-head .field-inline { width: 100%; flex-wrap: wrap; }
+  .admin-block-head .field-inline input { flex: 1 1 100%; }
+  .admin-orders-table { min-width: 0; }
+  .admin-orders-table thead { display: none; }
+  .admin-orders-table, .admin-orders-table tbody, .admin-orders-table tr { display: block; width: 100%; }
+  .admin-orders-table tr { padding: 12px 14px; border-bottom: 1px solid var(--line); }
+  .admin-orders-table tr:last-child { border-bottom: 0; }
+  .admin-orders-table td { display: flex; justify-content: space-between; gap: 16px; border: 0; padding: 5px 0; text-align: right; }
+  .admin-orders-table td::before { content: attr(data-label); color: var(--muted); font-size: 12px; text-align: left; }
+  .admin-orders-table td:nth-child(2) { display: block; text-align: right; }
+  .admin-orders-table td:nth-child(2)::before { float: left; }
+  .admin-orders-table td button { min-height: 44px; }
   .admin-bar {
     flex-direction: column;
     align-items: stretch;
   }
 
   .admin-tabs {
-    margin-inline: calc(var(--gutter) * -1);
-    padding-inline: var(--gutter);
+    position: fixed;
+    z-index: 1002;
+    inset: 0 auto 0 0;
+    width: min(84vw, 300px);
+    max-width: 300px;
+    padding: 16px;
+    margin: 0;
+    flex-direction: column;
+    flex-wrap: nowrap;
+    overflow-y: auto;
+    background: #fff;
+    box-shadow: 6px 0 28px rgb(0 0 0 / 18%);
+    transform: translateX(-110%);
+    visibility: hidden;
+    transition: transform 180ms ease, visibility 180ms;
   }
+  .admin-tabs.is-open { transform: translateX(0); visibility: visible; }
+  .admin-tabs .admin-tab { width: 100%; min-height: 48px; text-align: left; padding: 12px; border-bottom: 0; }
+  .admin-tabs .admin-tab.is-active { background: #f4f3f1; color: #a40e27; }
+  .admin-menu-toggle { display: flex; align-items: center; gap: 10px; min-height: 44px; font: inherit; font-weight: 700; }
+  .admin-menu-current { margin-left: auto; color: #555; font-weight: 400; }
+  .admin-menu-backdrop { display: block; position: fixed; z-index: 1001; inset: 0; background: rgb(0 0 0 / 45%); border: 0; }
+  .admin-menu-heading { display: flex; justify-content: space-between; align-items: center; padding: 4px 8px 16px; border-bottom: 1px solid var(--line); }
+  .admin-menu-heading button { min-width: 44px; min-height: 44px; font-size: 26px; }
+  @media (prefers-reduced-motion: reduce) { .admin-tabs { transition: none; } }
 
   .admin-bar-right {
     justify-content: space-between;

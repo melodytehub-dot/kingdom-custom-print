@@ -33,9 +33,14 @@ export default async function PrivacyPage() {
             handled by our payment provider and never reach our servers.
           </p>
           <p>
-            Artwork you upload is stored with your order so we can print it and so you
-            can reorder. Designs saved in the browser are kept on your own device until
+            Artwork you upload is stored with your order so we can produce and support
+            that order. Designs saved in the browser are kept on your own device until
             you clear them.
+          </p>
+          <p>
+            If you create an account, we store your name, email address and a one-way
+            hash of your password. Orders placed while signed in are linked to that
+            account; earlier guest orders are not linked just because the email matches.
           </p>
         </section>
 
@@ -82,9 +87,11 @@ export default async function PrivacyPage() {
         <section>
           <h2 className="h3">Cookies</h2>
           <p>
-            This site stores your cart, your saved designs and your admin session in your
-            browser&rsquo;s local storage and cookies. No advertising or tracking cookies
-            are set.
+            This site stores your cart and saved designs in your browser. If you sign in,
+            an essential account session cookie keeps you signed in; administrators use
+            a separate session cookie. A short-lived essential cookie is also used after
+            checkout or order-email verification so private order details are not exposed
+            by the reference alone. No advertising or tracking cookies are set.
           </p>
         </section>
 

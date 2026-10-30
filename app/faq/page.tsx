@@ -14,11 +14,11 @@ const GROUPS: { title: string; items: { q: string; a: string }[] }[] = [
     items: [
       {
         q: "What file types can I upload?",
-        a: "PNG, JPG, WebP, HEIC, AVIF, GIF and SVG. Vector files such as SVG print sharpest at any size. For raster artwork, 300 DPI at the finished print size is the target — a design printing 12 inches wide should be at least 3600 × 3600 pixels.",
+        a: "You can upload PNG, JPG, WebP, HEIC, AVIF, GIF, or SVG. Keep your original high-resolution file for the best print quality.",
       },
       {
         q: "Why is there a dashed outline on the garment?",
-        a: "That marks the printable area for the side you are viewing. Anything outside it will be cropped in production, so the outline is how you check your artwork will print whole.",
+        a: "It marks the printable area for the side you're viewing. Keep your artwork inside the outline.",
       },
       {
         q: "Can I print on the sleeves?",
@@ -26,7 +26,7 @@ const GROUPS: { title: string; items: { q: string; a: string }[] }[] = [
       },
       {
         q: "Will my design be exactly what I see?",
-        a: "Yes. What you position in the designer is what we print, within the printable area. We will contact you before production if anything looks like it will not come out cleanly.",
+        a: "The preview shows your artwork's placement. Colors and detail may vary between your screen and the finished print.",
       },
     ],
   },
@@ -35,7 +35,7 @@ const GROUPS: { title: string; items: { q: string; a: string }[] }[] = [
     items: [
       {
         q: "Is there a minimum order?",
-        a: "No. A single garment is printed the same way as a hundred. Price breaks apply automatically as your total rises, so larger runs cost less per garment.",
+        a: "No. Price breaks apply to the quantity of each product configuration in the cart, so larger runs of the same configured item cost less per garment.",
       },
       {
         q: "Why is the price different on some products?",
@@ -64,7 +64,7 @@ const GROUPS: { title: string; items: { q: string; a: string }[] }[] = [
       },
       {
         q: "Can I order a size run to keep?",
-        a: "Yes. The designer saves drafts on your device, and you can reorder the same design later without designing it again.",
+        a: "Your design drafts are saved on this device. Sign in to view your past orders.",
       },
     ],
   },
@@ -81,11 +81,11 @@ const GROUPS: { title: string; items: { q: string; a: string }[] }[] = [
       },
       {
         q: "What happens after I order?",
-        a: "We review your artwork, contact you if anything needs changing, print once you approve, then ship. Your order page shows where it is at each stage.",
+        a: "After payment is confirmed, keep your order reference and contact us if you have any questions.",
       },
       {
         q: "Can I change my order after placing it?",
-        a: "If it has not entered production we can usually change sizes or cancel. Once printing has started it is too late, so contact us quickly.",
+        a: "Contact us immediately. A size change or cancellation may be possible before production begins, but it is not guaranteed and cannot be made after printing starts.",
       },
     ],
   },

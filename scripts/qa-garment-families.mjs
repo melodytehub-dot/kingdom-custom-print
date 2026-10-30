@@ -23,6 +23,7 @@ const products = [
   ["youth-classic-tee", "youth", 48],
   ["v-neck-tee", "vneck", 6],
   ["long-sleeve-tee", "longsleeve", 6],
+  ["classic-pique-polo", "polo", 5],
   ["premium-pullover-hoodie", "hoodie", 8],
   ["heavyweight-crewneck", "crew", 8],
   ["five-panel-cap", "cap", 6],
@@ -84,7 +85,7 @@ for (const [slug, family, expectedColors] of products) {
     await photo.waitFor({ state: "attached", timeout: 15000 });
     const href = await photo.getAttribute("href");
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
-    const productsButton = page.locator("button.rot-tool").filter({ hasText: "Products" }).first();
+    const productsButton = page.locator('button.rot-tool[data-tool="products"]');
     await productsButton.evaluate((button) => button.click());
     await page.locator(".rot-garment").first().waitFor({ state: "attached", timeout: 5000 });
     const colors = await page.locator(".rot-garment").count();
@@ -117,9 +118,9 @@ for (const [slug, family, expectedColors] of products) {
       if (src) renderedColors.add(src);
     }
     const front = await photo.getAttribute("href");
-    await page.getByRole("button", { name: "Back view", exact: true }).click();
+    await page.getByRole("button", { name: "Rotate to the back" }).click();
     const back = await photo.getAttribute("href");
-    await page.getByRole("button", { name: "Front view", exact: true }).click();
+    await page.getByRole("button", { name: "Rotate to the front" }).click();
     const selected = page.locator(".rot-blank.is-active .rot-blank-details");
     const catalogDetails = await selected.innerText();
     const familyOk = href?.includes(`/api/garment-preview?family=${family ?? "tee"}&`);

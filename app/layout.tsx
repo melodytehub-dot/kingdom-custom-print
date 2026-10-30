@@ -33,6 +33,7 @@ import Footer from "@/components/Footer";
 import { WishlistProvider } from "@/lib/wishlist-context";
 import MobileTabBar from "@/components/MobileTabBar";
 import PageTransition from "@/components/PageTransition";
+import StorefrontChrome from "@/components/StorefrontChrome";
 
 const outfit = Outfit({
   subsets: ["latin"],
@@ -153,7 +154,7 @@ const FONT_VARS = [
   permanentMarker.variable,
 ].join(" ");
 
-const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
+const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || (process.env.NODE_ENV === "production" ? "https://kingdomcustomprint.com" : "http://localhost:3000");
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
@@ -195,16 +196,16 @@ export default async function RootLayout({
   ]);
 
   return (
-    <html lang="en" className={FONT_VARS}>
+    <html lang="en" className={FONT_VARS} data-scroll-behavior="smooth">
       <body>
         <a className="skip-link" href="#main">
           Skip to content
         </a>
         <CartProvider>
           <WishlistProvider>
-          <Header categories={categories} announcement={settings.announcement} />
+          <StorefrontChrome><Header categories={categories} announcement={settings.announcement} /></StorefrontChrome>
           <main id="main"><PageTransition>{children}</PageTransition></main>
-          <Footer />
+          <StorefrontChrome><Footer /></StorefrontChrome>
           <MobileTabBar />
           </WishlistProvider>
         </CartProvider>

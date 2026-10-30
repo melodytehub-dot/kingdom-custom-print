@@ -1,34 +1,41 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useSyncExternalStore } from "react";
 import { useRouter } from "next/navigation";
+
+function subscribeHydration() { return () => {}; }
 
 export default function AdminLogin({ configured }: { configured: boolean }) {
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const hydrated = useSyncExternalStore(subscribeHydration, () => true, () => false);
   const router = useRouter();
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     setBusy(true);
     setError(null);
+    const controller = new AbortController();
+    const timeout = window.setTimeout(() => controller.abort(), 15000);
     try {
       const res = await fetch("/api/admin/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ password }),
+        signal: controller.signal,
       });
-      const json = (await res.json()) as { error?: string };
       if (!res.ok) {
-        setError(json.error ?? "Could not sign in.");
+        const json = (await res.json().catch(() => ({}))) as { error?: string };
+        setError(json.error ?? "Could not sign in. Please try again.");
         return;
       }
-      router.refresh();
       router.push("/admin");
+      router.refresh();
     } catch {
-      setError("Network error. Try again.");
+      setError(controller.signal.aborted ? "Sign-in took too long. Please try again." : "Could not connect. Please try again.");
     } finally {
+      window.clearTimeout(timeout);
       setBusy(false);
     }
   }
@@ -50,7 +57,7 @@ export default function AdminLogin({ configured }: { configured: boolean }) {
           </p>
         )}
 
-        <form onSubmit={submit}>
+        <form method="post" action="/api/admin/login" onSubmit={submit}>
           <div className="field">
             <label className="label" htmlFor="admin-password">
               Password
@@ -73,7 +80,7 @@ export default function AdminLogin({ configured }: { configured: boolean }) {
             ) : null}
           </div>
 
-          <button type="submit" className="btn btn-block" disabled={!configured || busy}>
+          <button type="submit" className="btn btn-block" disabled={!configured || busy || !hydrated}>
             {busy ? "Signing in…" : "Sign in"}
           </button>
         </form>

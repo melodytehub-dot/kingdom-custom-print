@@ -7,8 +7,10 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 
 export default function ContactForm({
   contactEmail,
+  canSend,
 }: {
   contactEmail: string;
+  canSend: boolean;
 }) {
   const [fields, setFields] = useState({
     name: "",
@@ -43,7 +45,7 @@ export default function ContactForm({
     setErrors(found);
     if (Object.keys(found).length) return;
 
-    if (!contactEmail) {
+    if (!canSend) {
       setState({
         tone: "error",
         text: "Email is not set up on this site yet. Please check back shortly.",
@@ -53,32 +55,26 @@ export default function ContactForm({
 
     setBusy(true);
     setState(null);
-    // Opens the visitor's mail client so the enquiry reaches the business inbox.
-    const subject = fields.orderReference
-      ? `Order enquiry ${fields.orderReference}`
-      : "Custom printing enquiry";
-    const body = [
-      `Name: ${fields.name}`,
-      `Email: ${fields.email}`,
-      fields.orderReference ? `Order reference: ${fields.orderReference}` : "",
-      "",
-      fields.message,
-    ]
-      .filter(Boolean)
-      .join("\n");
-
-    window.location.href = `mailto:${contactEmail}?subject=${encodeURIComponent(
-      subject
-    )}&body=${encodeURIComponent(body)}`;
-    setBusy(false);
-    setState({
-      tone: "ok",
-      text: "Your email app should now be open with the message ready to send.",
-    });
+    try {
+      const response = await fetch("/api/contact", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(fields) });
+      const result = await response.json() as { error?: string };
+      if (!response.ok) throw new Error(result.error || "Could not send your message.");
+      setFields({ name: "", email: "", orderReference: "", message: "" });
+      setState({ tone: "ok", text: "Your message was sent. We’ll be in touch." });
+    } catch (error) {
+      setState({ tone: "error", text: error instanceof Error ? error.message : "Could not send your message." });
+    } finally {
+      setBusy(false);
+    }
   }
 
   return (
-    <form className="contact-form" onSubmit={submit} noValidate>
+    <form className="contact-form" method="post" action="/api/contact" onSubmit={submit} noValidate>
+      <p className={`banner-note${canSend ? "" : " is-error"}`} role="status">
+        {canSend
+          ? "Send us a message and we’ll reply by email."
+          : contactEmail ? `Online enquiries are temporarily unavailable. Please email ${contactEmail}.` : "Online enquiries are temporarily unavailable."}
+      </p>
       {state ? (
         <p
           className={`banner-note${state.tone === "error" ? " is-error" : " is-ok"}`}
@@ -150,8 +146,8 @@ export default function ContactForm({
         </div>
       </div>
 
-      <button type="submit" className="btn btn-lg" disabled={busy}>
-        Send message
+      <button type="submit" className="btn btn-lg" disabled={busy || !canSend}>
+        {busy ? "Sending…" : "Send message"}
       </button>
 
       <p className="hint">

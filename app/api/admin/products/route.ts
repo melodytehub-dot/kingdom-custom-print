@@ -13,7 +13,7 @@ import type { ProductKind } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
-const KINDS: ProductKind[] = ["tee", "longsleeve", "hoodie", "crew", "cap", "mug", "tote"];
+const KINDS: ProductKind[] = ["tee", "polo", "longsleeve", "hoodie", "crew", "cap", "mug", "tote"];
 const HEX_RE = /^#[0-9A-Fa-f]{6}$/;
 const SLUG_RE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 
@@ -53,22 +53,27 @@ function validate(raw: RawProduct): { value?: ProductInput; error?: string } {
 
   const slug = slugify(String(raw.slug || name));
   if (!slug || !SLUG_RE.test(slug)) {
-    return { error: "The URL slug can only contain letters, numbers and hyphens." };
+    return { error: "Use a product name containing letters or numbers." };
   }
 
   if (!KINDS.includes(raw.kind as ProductKind)) {
     return { error: "Choose a valid product type." };
   }
 
-  const colors = (raw.colors ?? [])
-    .filter((c) => c && c.slug && c.name && HEX_RE.test(String(c.hex)))
-    .slice(0, 24)
-    .map((c) => ({
+  if (!Array.isArray(raw.colors) || !raw.colors.length || raw.colors.length > 200) return { error: "Add between 1 and 200 colors." };
+  if (raw.colors.some((c) => !c || !c.slug || !c.name?.trim() || !HEX_RE.test(String(c.hex)))) return { error: "Give each color a name and choose a swatch color." };
+  const colors = raw.colors.map((c) => ({
       slug: slugify(String(c.slug)),
       name: String(c.name).slice(0, 40),
       hex: String(c.hex).toLowerCase(),
     }));
   if (!colors.length) return { error: "Add at least one color with a valid hex value." };
+  const seenColors = new Set<string>();
+  for (const color of colors) {
+    if (!color.slug) return { error: "Each color needs a name containing letters or numbers." };
+    if (seenColors.has(color.slug)) return { error: "Give each color a different name." };
+    seenColors.add(color.slug);
+  }
 
   const sizes = (raw.sizes ?? [])
     .filter((s) => s && s.label)
@@ -164,7 +169,7 @@ export async function POST(req: Request) {
   } catch (err) {
     const message =
       err instanceof Error && err.message.includes("duplicate")
-        ? "That URL slug is already used by another product."
+        ? "A product with this name or link already exists."
         : "The product could not be saved.";
     return NextResponse.json({ error: message }, { status: 409 });
   }
@@ -197,7 +202,7 @@ export async function PUT(req: Request) {
   } catch (err) {
     const message =
       err instanceof Error && err.message.includes("duplicate")
-        ? "That URL slug is already used by another product."
+        ? "A product with this name or link already exists."
         : "The product could not be saved.";
     return NextResponse.json({ error: message }, { status: 409 });
   }

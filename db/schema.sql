@@ -17,7 +17,7 @@ CREATE TABLE IF NOT EXISTS products (
   style_code  text NOT NULL DEFAULT '',
   category_id int REFERENCES categories(id) ON DELETE SET NULL,
   -- garment kind drives which customizer template renders
-  kind        text NOT NULL CHECK (kind IN ('tee','longsleeve','hoodie','crew','cap','mug','tote')),
+  kind        text NOT NULL CHECK (kind IN ('tee','polo','longsleeve','hoodie','crew','cap','mug','tote')),
   blurb       text NOT NULL DEFAULT '',
   description text NOT NULL DEFAULT '',
   -- fabric/weight spec shown on the product page
@@ -37,6 +37,9 @@ CREATE TABLE IF NOT EXISTS products (
 
 -- Idempotent add for databases created before the style number existed.
 ALTER TABLE products ADD COLUMN IF NOT EXISTS style_code text NOT NULL DEFAULT '';
+ALTER TABLE products DROP CONSTRAINT IF EXISTS products_kind_check;
+ALTER TABLE products ADD CONSTRAINT products_kind_check
+  CHECK (kind IN ('tee','polo','longsleeve','hoodie','crew','cap','mug','tote'));
 
 CREATE INDEX IF NOT EXISTS products_active_idx ON products (active, sort_order);
 CREATE INDEX IF NOT EXISTS products_featured_idx ON products (featured) WHERE featured;
@@ -79,6 +82,13 @@ CREATE TABLE IF NOT EXISTS product_images (
   sort_order int NOT NULL DEFAULT 0
 );
 
+-- Payment credentials are encrypted before storage with a separate Worker secret.
+CREATE TABLE IF NOT EXISTS payment_credentials (
+  name text PRIMARY KEY,
+  ciphertext text NOT NULL,
+  updated_at timestamptz NOT NULL DEFAULT now()
+);
+
 CREATE TABLE IF NOT EXISTS customers (
   id         serial PRIMARY KEY,
   email      text NOT NULL UNIQUE,
@@ -87,10 +97,46 @@ CREATE TABLE IF NOT EXISTS customers (
   created_at timestamptz NOT NULL DEFAULT now()
 );
 
+-- Storefront accounts are separate from guest checkout contacts. A matching
+-- email alone must not grant access to orders placed before registration.
+CREATE TABLE IF NOT EXISTS customer_accounts (
+  id            serial PRIMARY KEY,
+  email         text NOT NULL UNIQUE,
+  name          text NOT NULL,
+  password_hash text NOT NULL,
+  google_sub    text,
+  created_at    timestamptz NOT NULL DEFAULT now()
+);
+
+ALTER TABLE customer_accounts ADD COLUMN IF NOT EXISTS google_sub text;
+ALTER TABLE customer_accounts ADD COLUMN IF NOT EXISTS email_verified boolean NOT NULL DEFAULT true;
+CREATE UNIQUE INDEX IF NOT EXISTS customer_accounts_google_sub_idx ON customer_accounts (google_sub) WHERE google_sub IS NOT NULL;
+
+CREATE TABLE IF NOT EXISTS customer_email_verifications (
+  token_hash text PRIMARY KEY,
+  account_id int NOT NULL REFERENCES customer_accounts(id) ON DELETE CASCADE,
+  expires_at timestamptz NOT NULL
+);
+CREATE INDEX IF NOT EXISTS customer_email_verifications_account_idx ON customer_email_verifications (account_id);
+
+CREATE TABLE IF NOT EXISTS customer_sessions (
+  token_hash text PRIMARY KEY,
+  account_id int NOT NULL REFERENCES customer_accounts(id) ON DELETE CASCADE,
+  expires_at timestamptz NOT NULL
+);
+CREATE INDEX IF NOT EXISTS customer_sessions_account_idx ON customer_sessions (account_id);
+
+CREATE TABLE IF NOT EXISTS customer_auth_attempts (
+  key text PRIMARY KEY,
+  attempts int NOT NULL DEFAULT 0,
+  reset_at timestamptz NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS orders (
   id             serial PRIMARY KEY,
   reference      text NOT NULL UNIQUE,
   customer_id    int REFERENCES customers(id) ON DELETE SET NULL,
+  account_id     int REFERENCES customer_accounts(id) ON DELETE SET NULL,
   email          text NOT NULL,
   name           text NOT NULL,
   phone          text NOT NULL DEFAULT '',
@@ -102,20 +148,76 @@ CREATE TABLE IF NOT EXISTS orders (
   country        text NOT NULL DEFAULT 'US',
   notes          text NOT NULL DEFAULT '',
   status         text NOT NULL DEFAULT 'pending'
-                 CHECK (status IN ('pending','paid','in_proof','in_production','shipped','cancelled')),
+                 CHECK (status IN ('pending','paid','in_proof','in_production','shipped','refunded','cancelled')),
   subtotal       numeric(10,2) NOT NULL DEFAULT 0,
   shipping       numeric(10,2) NOT NULL DEFAULT 0,
   total          numeric(10,2) NOT NULL DEFAULT 0,
   -- set once the Stripe webhook confirms payment
   stripe_session_id text,
   stripe_payment_intent text,
+  checkout_attempt_id text,
   paid_at        timestamptz,
   created_at     timestamptz NOT NULL DEFAULT now(),
   updated_at     timestamptz NOT NULL DEFAULT now()
 );
 
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS account_id int REFERENCES customer_accounts(id) ON DELETE SET NULL;
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS paypal_order_id text;
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS paypal_capture_id text;
+CREATE UNIQUE INDEX IF NOT EXISTS orders_paypal_order_idx ON orders (paypal_order_id) WHERE paypal_order_id IS NOT NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS orders_paypal_capture_idx ON orders (paypal_capture_id) WHERE paypal_capture_id IS NOT NULL;
+ALTER TABLE orders DROP CONSTRAINT IF EXISTS orders_status_check;
+ALTER TABLE orders ADD CONSTRAINT orders_status_check
+  CHECK (status IN ('pending','paid','in_proof','in_production','shipped','refunded','cancelled'));
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS checkout_attempt_id text;
+CREATE UNIQUE INDEX IF NOT EXISTS orders_checkout_attempt_idx
+  ON orders (checkout_attempt_id) WHERE checkout_attempt_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS orders_account_idx ON orders (account_id, created_at DESC);
+
 CREATE INDEX IF NOT EXISTS orders_created_idx ON orders (created_at DESC);
 CREATE INDEX IF NOT EXISTS orders_status_idx ON orders (status);
+
+-- Durable record prevents repeated Stripe webhook deliveries from sending
+-- additional receipts after Resend's idempotency window has expired.
+CREATE TABLE IF NOT EXISTS order_email_receipts (
+  reference text PRIMARY KEY REFERENCES orders(reference) ON DELETE CASCADE,
+  provider_id text NOT NULL,
+  sent_at timestamptz NOT NULL DEFAULT now()
+);
+
+-- Short-lived proof that a guest verified an order with its checkout email.
+-- Only a hash is stored; the raw token lives in an httpOnly browser cookie.
+CREATE TABLE IF NOT EXISTS order_access_sessions (
+  token_hash text PRIMARY KEY,
+  order_id int NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
+  expires_at timestamptz NOT NULL,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS order_access_sessions_order_idx
+  ON order_access_sessions (order_id, expires_at);
+
+CREATE TABLE IF NOT EXISTS order_access_attempts (
+  key text PRIMARY KEY,
+  attempts int NOT NULL DEFAULT 0,
+  reset_at timestamptz NOT NULL
+);
+
+-- Payment and admin transitions are recorded separately from the mutable order
+-- row so the production team can see how an order reached its current state.
+CREATE TABLE IF NOT EXISTS order_status_events (
+  id bigserial PRIMARY KEY,
+  order_id int NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
+  from_status text,
+  to_status text NOT NULL,
+  actor text NOT NULL CHECK (actor IN ('stripe','admin','system')),
+  note text NOT NULL DEFAULT '',
+  external_event_id text,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE UNIQUE INDEX IF NOT EXISTS order_status_events_external_idx
+  ON order_status_events (external_event_id) WHERE external_event_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS order_status_events_order_idx
+  ON order_status_events (order_id, created_at DESC);
 
 -- One row per garment configuration inside an order.
 CREATE TABLE IF NOT EXISTS order_items (
@@ -136,8 +238,11 @@ CREATE TABLE IF NOT EXISTS order_items (
   -- data URL previews rendered at add-to-cart time
   preview_front text,
   preview_back  text,
+  roster        jsonb NOT NULL DEFAULT '[]'::jsonb,
   notes        text NOT NULL DEFAULT ''
 );
+
+ALTER TABLE order_items ADD COLUMN IF NOT EXISTS roster jsonb NOT NULL DEFAULT '[]'::jsonb;
 
 CREATE INDEX IF NOT EXISTS order_items_order_idx ON order_items (order_id);
 

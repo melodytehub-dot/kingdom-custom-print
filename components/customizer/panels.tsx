@@ -9,10 +9,13 @@ import { sizeDisplayLabel, splitSizeGroups } from "@/lib/sizes";
 import type { SavedDraft } from "@/lib/design";
 import { PERSONALIZATION_FEE, formatUSD, lowestPrintedUnit, type PriceQuote } from "@/lib/pricing";
 import { sizeSummary } from "@/lib/sizes";
-import { TEE_MOCKUPS, type TeeMockup } from "@/lib/mockups";
-import { FONTS, svgFontStack } from "@/lib/fonts";
+import { mockupBaseForProduct, TEE_MOCKUPS, type TeeMockup } from "@/lib/mockups";
+import { GarmentPreview } from "./GarmentPreview";
+import DesignPreviewImage from "@/components/DesignPreviewImage";
+import { ensureFontLoaded, FONTS, svgFontStack } from "@/lib/fonts";
 import { ART_CATEGORIES, ART_LIBRARY, type ArtItem } from "./art";
 import { DESIGN_TEMPLATES, TEMPLATE_CATEGORIES, type DesignTemplate } from "./templates";
+import { useLumiseLibrary } from "./lumise-library";
 import {
   ColorView,
   PanelHeader,
@@ -20,7 +23,7 @@ import {
   inkName,
 } from "./editors";
 import { CheckGlyph, DuplicateIcon, GroupIcon, MinusGlyph, PlusGlyph, TrashIcon, UngroupIcon } from "./icons";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 
 /* -------------------------------------------------------------------------
    Products
@@ -74,8 +77,7 @@ export function ProductsPanel({
       />
 
       <div className="rot-product">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={mockup.front} alt="" />
+        <GarmentPreview className="rot-product-preview" src={mockup.precolored ? mockup.front : mockupBaseForProduct(product, "front")} color={mockup.precolored ? undefined : mockup.hex} />
         <div>
           <p className="rot-product-name">{product.name}</p>
           {product.styleCode ? <p className="rot-muted">Style {product.styleCode}</p> : null}
@@ -140,9 +142,11 @@ export function ProductsPanel({
               if (!onSwitchProduct(p)) event.preventDefault();
             }}
           >
-            {p.id === product.id || p.images[0] ? (
+            {p.id === product.id ? (
+              <GarmentPreview className="rot-blank-preview" src={mockup.precolored ? mockup.front : mockupBaseForProduct(product, "front")} color={mockup.precolored ? undefined : mockup.hex} />
+            ) : p.images[0] ? (
               // eslint-disable-next-line @next/next/no-img-element
-              <img src={p.id === product.id ? mockup.front : p.images[0].url} alt="" />
+              <img src={p.images[0].url} alt="" />
             ) : (
               <Image src="/brand/kingdom-logo.png" alt="" width={40} height={24} />
             )}
@@ -246,11 +250,21 @@ export function AddTextPanel({ onAdd, onClose }: { onAdd: (patch: Partial<TextLa
 
 export function ArtPanel({ onAdd, onClose }: { onAdd: (item: ArtItem) => void; onClose: () => void }) {
   const [query, setQuery] = useState("");
-  const [category, setCategory] = useState<(typeof ART_CATEGORIES)[number]>("All");
-  const results = ART_LIBRARY.filter((item) =>
-    (category === "All" || (item.category ?? "Symbols") === category)
-    && item.name.toLowerCase().includes(query.trim().toLowerCase()),
+  const [category, setCategory] = useState("All");
+  const [visibleCount, setVisibleCount] = useState(60);
+  const lumise = useLumiseLibrary<ArtItem>("/lumise/cliparts.json");
+  const categories = useMemo(
+    () => ["All", ...new Set([...ART_CATEGORIES.filter((item) => item !== "All"), ...lumise.categories])],
+    [lumise.categories],
   );
+  const results = useMemo(() => {
+    const normalizedQuery = query.trim().toLowerCase();
+    return [...ART_LIBRARY, ...lumise.items].filter((item) =>
+      (category === "All" || (item.category ?? "Symbols") === category)
+      && (!normalizedQuery || `${item.name} ${(item.tags ?? []).join(" ")}`.toLowerCase().includes(normalizedQuery)),
+    );
+  }, [category, lumise.items, query]);
+  const visibleResults = results.slice(0, visibleCount);
   return (
     <div className="rot-scroll">
       <PanelHeader
@@ -258,13 +272,15 @@ export function ArtPanel({ onAdd, onClose }: { onAdd: (item: ArtItem) => void; o
         title="Clipart"
         onClose={onClose}
       />
-      <input className="rot-art-search" type="search" aria-label="Search artwork" placeholder="Search artwork" value={query} onChange={(event) => setQuery(event.target.value)} />
-      <select className="rot-art-category" aria-label="Artwork category" value={category} onChange={(event) => setCategory(event.target.value as (typeof ART_CATEGORIES)[number])}>
-        {ART_CATEGORIES.map((option) => <option key={option} value={option}>{option === "All" ? "All artwork" : option}</option>)}
+      <input className="rot-art-search" type="search" aria-label="Search artwork" placeholder="Search 3,000+ graphics" value={query} onChange={(event) => { setQuery(event.target.value); setVisibleCount(60); }} />
+      <select className="rot-art-category" aria-label="Artwork category" value={category} onChange={(event) => { setCategory(event.target.value); setVisibleCount(60); }}>
+        {categories.map((option) => <option key={option} value={option}>{option === "All" ? "All artwork" : option}</option>)}
       </select>
-      {!results.length ? <p role="status">No artwork found.</p> : null}
+      {lumise.loading ? <p className="rot-library-status" role="status">Loading the full clipart library…</p> : null}
+      {lumise.error ? <p className="rot-library-status is-error" role="status">The extended clipart library could not be loaded.</p> : null}
+      {!lumise.loading && !results.length ? <p role="status">No artwork found.</p> : null}
       <ul className="rot-artgrid">
-        {results.map((item) => (
+        {visibleResults.map((item) => (
           <li key={item.id}>
             <button type="button" onClick={() => onAdd(item)} title={item.name}>
               {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -274,6 +290,11 @@ export function ArtPanel({ onAdd, onClose }: { onAdd: (item: ArtItem) => void; o
           </li>
         ))}
       </ul>
+      {visibleCount < results.length ? (
+        <button type="button" className="rot-library-more" onClick={() => setVisibleCount((count) => count + 60)}>
+          Load more graphics · {results.length - visibleCount} remaining
+        </button>
+      ) : null}
     </div>
   );
 }
@@ -423,34 +444,46 @@ export function LayersPanel({
 
 export function TemplatesPanel({ onAdd, onClose }: { onAdd: (template: DesignTemplate) => void; onClose: () => void }) {
   const [query, setQuery] = useState("");
-  const [category, setCategory] = useState<(typeof TEMPLATE_CATEGORIES)[number]>("All");
+  const [category, setCategory] = useState("All");
+  const [visibleCount, setVisibleCount] = useState(40);
+  const lumise = useLumiseLibrary<DesignTemplate>("/lumise/templates.json");
   const normalizedQuery = query.trim().toLowerCase();
-  const results = DESIGN_TEMPLATES.filter((item) =>
-    (category === "All" || item.category === category)
-    && (!normalizedQuery || `${item.name} ${item.category} ${item.subtitle} ${item.tags.join(" ")}`.toLowerCase().includes(normalizedQuery)),
+  const categories = useMemo(
+    () => ["All", ...new Set([...TEMPLATE_CATEGORIES.filter((item) => item !== "All"), ...lumise.categories])],
+    [lumise.categories],
   );
+  const results = useMemo(
+    () => [...DESIGN_TEMPLATES, ...lumise.items].filter((item) =>
+      (category === "All" || item.category === category)
+      && (!normalizedQuery || `${item.name} ${item.category} ${item.subtitle} ${item.tags.join(" ")}`.toLowerCase().includes(normalizedQuery)),
+    ),
+    [category, lumise.items, normalizedQuery],
+  );
+  const visibleResults = results.slice(0, visibleCount);
 
   return (
     <div className="rot-scroll">
       <PanelHeader eyebrow="Design Library" title="Templates" onClose={onClose} />
-      <input className="rot-art-search" type="search" aria-label="Search templates" placeholder="Search templates" value={query} onChange={(event) => setQuery(event.target.value)} />
-      <select className="rot-art-category" aria-label="Template category" value={category} onChange={(event) => setCategory(event.target.value as (typeof TEMPLATE_CATEGORIES)[number])}>
-        {TEMPLATE_CATEGORIES.map((option) => <option key={option} value={option}>{option === "All" ? "All categories" : option}</option>)}
+      <input className="rot-art-search" type="search" aria-label="Search templates" placeholder="Search 300+ templates" value={query} onChange={(event) => { setQuery(event.target.value); setVisibleCount(40); }} />
+      <select className="rot-art-category" aria-label="Template category" value={category} onChange={(event) => { setCategory(event.target.value); setVisibleCount(40); }}>
+        {categories.map((option) => <option key={option} value={option}>{option === "All" ? "All categories" : option}</option>)}
       </select>
-      {!results.length ? <p role="status">No templates found.</p> : null}
+      {lumise.loading ? <p className="rot-library-status" role="status">Loading the full template library…</p> : null}
+      {lumise.error ? <p className="rot-library-status is-error" role="status">The extended template library could not be loaded.</p> : null}
+      {!lumise.loading && !results.length ? <p role="status">No templates found.</p> : null}
       <ul className="rot-template-grid">
-        {results.map((item) => {
-          const previewArt = ART_LIBRARY.find((artItem) => artItem.id === item.artId);
-          const previewText = item.elements.filter((element) => element.type === "text").map((element) => element.layer);
+        {visibleResults.map((item) => {
+          const previewArt = item.artId ? ART_LIBRARY.find((artItem) => artItem.id === item.artId) : undefined;
+          const previewText = (item.elements ?? []).filter((element) => element.type === "text").map((element) => element.layer);
           const [headline, tagline] = previewText;
           return (
             <li key={item.id}>
               <button type="button" className="rot-template-card" onClick={() => onAdd(item)} aria-label={`Use ${item.name} template`}>
                 <span className="rot-template-preview" aria-hidden="true">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
-                  {previewArt ? <img src={previewArt.src} alt="" /> : null}
-                  {headline ? <strong style={{ fontFamily: svgFontStack(headline.font), color: headline.color }}>{headline.text}</strong> : null}
-                  {tagline ? <small>{tagline.text}</small> : null}
+                  {item.previewSrc ? <img className="is-full" src={item.previewSrc} alt="" /> : previewArt ? <img src={previewArt.src} alt="" /> : null}
+                  {!item.previewSrc && headline ? <strong style={{ fontFamily: svgFontStack(headline.font), color: headline.color }}>{headline.text}</strong> : null}
+                  {!item.previewSrc && tagline ? <small>{tagline.text}</small> : null}
                   <span className="rot-template-free">FREE</span>
                 </span>
                 <span className="rot-template-info"><strong>{item.name}</strong><small>{item.category}</small></span>
@@ -459,6 +492,11 @@ export function TemplatesPanel({ onAdd, onClose }: { onAdd: (template: DesignTem
           );
         })}
       </ul>
+      {visibleCount < results.length ? (
+        <button type="button" className="rot-library-more" onClick={() => setVisibleCount((count) => count + 40)}>
+          Load more templates · {results.length - visibleCount} remaining
+        </button>
+      ) : null}
     </div>
   );
 }
@@ -775,7 +813,10 @@ export function NamesTools({
           label: f.label.toUpperCase(),
         }))}
         fontOf={svgFontStack}
-        onChange={(v) => onChange({ font: v })}
+        onChange={(v) => {
+          onChange({ font: v });
+          void ensureFontLoaded(v).catch(() => undefined);
+        }}
       />
       <div className={`rot-row${off ? " is-disabled" : ""}`}>
         <span className="rot-row-label">Color</span>
@@ -1166,6 +1207,8 @@ export function ReviewPanel({
   lines,
   roster,
   previews,
+  designNotes,
+  onDesignNotes,
   rows,
 }: {
   product: Product;
@@ -1177,6 +1220,8 @@ export function ReviewPanel({
   lines: { label: string; qty: number }[];
   roster: number;
   previews: { front: string | null; back: string | null };
+    designNotes: string;
+    onDesignNotes: (value: string) => void;
   rows?: ReactNode;
 }) {
   const item = (label: string, value: ReactNode) => (
@@ -1200,8 +1245,7 @@ export function ReviewPanel({
           ] as const
         ).map(([label, src]) => (
           <figure key={label}>
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={src} alt={`${label} of your design`} />
+            <DesignPreviewImage src={src} alt={`${label} of your design`} kind={product.kind} color={mockup.hex} back={label === "Back"} />
             <figcaption>{label}</figcaption>
           </figure>
         ))}
@@ -1231,6 +1275,10 @@ export function ReviewPanel({
           <strong>{formatUSD(quote.total)}</strong>
         </li>
       </ul>
+        <label className="rot-design-notes">
+          Design notes (optional)
+          <textarea value={designNotes} onChange={(event) => onDesignNotes(event.target.value)} maxLength={2000} rows={3} placeholder="Placement, ink color, or production instructions" />
+        </label>
       {rows}
     </div>
   );

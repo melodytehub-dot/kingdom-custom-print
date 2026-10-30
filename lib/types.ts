@@ -1,5 +1,6 @@
 export type ProductKind =
   | "tee"
+  | "polo"
   | "longsleeve"
   | "hoodie"
   | "crew"
@@ -207,6 +208,7 @@ export interface CartItem {
   colorHex: string;
   sidesUsed: GarmentSide[];
   design: Design;
+  designNotes?: string;
   /** Per-shirt names/numbers captured by the names & numbers tool. */
   roster?: RosterEntry[];
   previewFront: string | null;
@@ -227,16 +229,25 @@ export type OrderStatus =
   | "in_proof"
   | "in_production"
   | "shipped"
+  | "refunded"
   | "cancelled";
 
 export const ORDER_STATUSES: { value: OrderStatus; label: string }[] = [
   { value: "pending", label: "Pending" },
   { value: "paid", label: "Paid" },
-  { value: "in_proof", label: "Proof sent" },
+  { value: "in_proof", label: "Proof review" },
   { value: "in_production", label: "In production" },
   { value: "shipped", label: "Shipped" },
+  { value: "refunded", label: "Refunded" },
   { value: "cancelled", label: "Cancelled" },
 ];
+
+export const ADMIN_ORDER_TRANSITIONS: Partial<Record<OrderStatus, OrderStatus[]>> = {
+  pending: ["cancelled"],
+  paid: ["in_proof"],
+  in_proof: ["in_production"],
+  in_production: ["shipped"],
+};
 
 /** Brief text summary of a design, shown on order rows and in the cart. */
 export function describeDesign(design: Design): string {

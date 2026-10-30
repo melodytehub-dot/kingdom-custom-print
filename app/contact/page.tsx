@@ -2,15 +2,17 @@ import Link from "next/link";
 import type { Metadata } from "next";
 import ContactForm from "@/components/ContactForm";
 import { getSettings } from "@/lib/catalog";
+import { emailConfigured } from "@/lib/email";
 
 export const metadata: Metadata = {
   title: "Contact",
   description:
-    "Questions about artwork, sizing or a bulk run? Send us the details and we will come back to you.",
+    "Questions about artwork, sizing or a bulk run? Find the business contact options currently available.",
 };
 
 export default async function ContactPage() {
   const settings = await getSettings();
+  const contactEmail = process.env.SUPPORT_EMAIL?.trim() || settings.contactEmail;
 
   return (
     <>
@@ -25,18 +27,18 @@ export default async function ContactPage() {
 
       <div className="wrap section-tight contact-layout">
         <div>
-          <ContactForm contactEmail={settings.contactEmail} />
+          <ContactForm contactEmail={contactEmail} canSend={emailConfigured() && Boolean(process.env.SUPPORT_EMAIL)} />
         </div>
 
         <aside className="contact-side" aria-label="Contact details">
           <div className="panel panel-pad">
             <h2 className="h3">Direct</h2>
             <dl className="contact-list">
-              {settings.contactEmail ? (
+              {contactEmail ? (
                 <div>
                   <dt>Email</dt>
                   <dd>
-                    <a href={`mailto:${settings.contactEmail}`}>{settings.contactEmail}</a>
+                    <a href={`mailto:${contactEmail}`}>{contactEmail}</a>
                   </dd>
                 </div>
               ) : null}
@@ -58,7 +60,7 @@ export default async function ContactPage() {
               </div>
             </dl>
 
-            {!settings.contactEmail && !settings.contactPhone ? (
+            {!contactEmail && !settings.contactPhone ? (
               <p className="hint">
                 Contact details are published once the business sets them in the admin
                 dashboard.

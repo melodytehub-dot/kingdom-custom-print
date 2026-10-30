@@ -34,6 +34,9 @@ The site runs at http://localhost:3000 and the admin at `/admin`.
 | `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` | for card payments | Stripe.js key |
 | `STRIPE_WEBHOOK_SECRET` | for card payments | Verifies `/api/webhook` events |
 | `NEXT_PUBLIC_SITE_URL` | recommended | Absolute base URL for Stripe redirects |
+| `GOOGLE_CLIENT_ID` | for Google sign-in | Google OAuth web client ID |
+| `GOOGLE_CLIENT_SECRET` | for Google sign-in | Google OAuth web client secret |
+| `GOOGLE_REDIRECT_URI` | for Google sign-in | Exact authorized callback URL |
 
 Without the Stripe secret key and webhook signing secret, checkout is disabled.
 The customer cart stays saved and the API creates no unpaid manual-payment order.
@@ -82,15 +85,61 @@ valid for 12 hours, with repeated failed attempts throttled. From there you can
 review and update orders, manage products and variants, edit site settings
 (shipping rates, production time, contact details) and browse customers.
 
+## Customer accounts
+
+`/account` supports customer registration, password sign-in, and order history
+for purchases made while signed in. Sessions are stored server-side in PostgreSQL;
+only a random session token is kept in an httpOnly cookie. Guest checkout still
+works, and older guest orders are not exposed to an account created later with
+the same email address. Apply `npm run db:migrate` before enabling the account
+routes on an existing database.
+
+The starter polo is added by `npm run db:seed-additional`. Confirm its final
+blank specification and pricing in the admin catalog before taking live orders.
+Automated password recovery and email verification require an email delivery
+service and are not configured yet.
+
+To enable Google sign-in, create a Google OAuth web client, authorize
+`https://kingdom-custom-print.vercel.app/api/account/google/callback` as a
+redirect URI, and set all three `GOOGLE_*` variables in the Vercel production
+environment. Apply `npm run db:migrate` to add the account link column before
+enabling it. The Google button stays hidden until client credentials are set.
+The brand filters currently cover verified styles in the local catalog; the
+VictoryTee designer is a design reference, not a live supplier inventory feed.
+
 ## Deployment
 
 The project is linked to Vercel and reads `DATABASE_URL` from the Neon
 integration. Set `ADMIN_PASSWORD` and the Stripe variables in the Vercel project
-settings, then run `npm run db:migrate` and `npm run db:seed` against the
-production database before the first live order.
+settings, then run `npm run db:migrate` against the production database before
+the first live order. **Do not run `db:reset` or `db:seed` on a database that
+contains customer or catalog data**; the seed task truncates tables. Seed only a
+confirmed-empty database, or add catalog records through the admin workspace.
 
 Point a Stripe webhook at `https://<your-domain>/api/webhook` and subscribe it
-to `checkout.session.completed`, `checkout.session.async_payment_succeeded`, and `checkout.session.expired`. Only verified paid sessions confirm payment.
+to `checkout.session.completed`, `checkout.session.async_payment_succeeded`,
+`checkout.session.async_payment_failed`, `checkout.session.expired`, and
+`charge.refunded`. Only signed paid events confirm payment, and only a signed
+full-refund event changes an order to refunded.
+
+Stripe test-mode checklist:
+
+1. Set test values for `STRIPE_SECRET_KEY` and `STRIPE_WEBHOOK_SECRET` in a
+   non-production deployment and run `npm run db:migrate`.
+2. Register the webhook events above and confirm Stripe reports successful 2xx
+   delivery to `/api/webhook`.
+3. Place a test-card order and verify it stays pending until the signed paid
+   event arrives, then appears as paid in admin with an audit event.
+4. Replay the paid event and verify no duplicate order, item, or status change
+   is created.
+5. Expire or fail an unpaid Checkout Session and verify only the matching
+   pending order is cancelled.
+6. Issue a partial refund and verify fulfillment state is retained; issue a
+   full refund and verify the order is marked refunded once.
+7. Confirm failed Checkout Session creation leaves the cart intact and does not
+   leave an actionable unpaid order.
+8. Repeat once with a signed-in customer and once as a guest, then remove only
+   those exact test records. Never use a live card for routine verification.
 
 ## Before going live
 
@@ -99,4 +148,7 @@ to `checkout.session.completed`, `checkout.session.async_payment_succeeded`, and
 - The storefront uses the Kingdom Custom Print logo at `public/brand/kingdom-logo.png`.
 - Card checkout requires both `STRIPE_SECRET_KEY` and `STRIPE_WEBHOOK_SECRET`. Missing configuration disables payment and preserves the customer cart; no manual-payment order is created.
 - Local admin access uses the generated `ADMIN_PASSWORD` in the git-ignored `.env.local`; configure a separate password in the deployment environment.
-- Run `npm run qa-storefront` and `npm run qa-payments` for the storefront and payment contract regression checks. The payment contract tests use mock transports and make no real charges.
+- Run `npm run qa-site`, `npm run qa-order-privacy`,
+  `npm run qa-checkout-idempotency`, `npm run qa-order-transitions`, and
+  `npm run qa-order-payment-replay` before launch. Payment contract tests use
+  mock transports and make no real charges.

@@ -1,5 +1,5 @@
-import Garment from "@/components/Garment";
-import { ORDER_STATUSES, describeDesign } from "@/lib/types";
+import DesignPreviewImage from "@/components/DesignPreviewImage";
+import { describeDesign } from "@/lib/types";
 import type { OrderSummary } from "@/lib/orders";
 
 function money(n: number) {
@@ -7,10 +7,6 @@ function money(n: number) {
 }
 
 export default function OrderDetail({ order }: { order: OrderSummary }) {
-  const current = ORDER_STATUSES.find((s) => s.value === order.status);
-  const steps = ORDER_STATUSES.filter((s) => s.value !== "cancelled");
-  const activeIndex = steps.findIndex((s) => s.value === order.status);
-
   return (
     <div className="order-view">
       <div className="order-head">
@@ -21,27 +17,7 @@ export default function OrderDetail({ order }: { order: OrderSummary }) {
             Placed {new Date(order.createdAt).toLocaleDateString()} · {order.email}
           </p>
         </div>
-        <span className={`badge status-${order.status}`}>
-          {current?.label ?? order.status}
-        </span>
       </div>
-
-      {order.status !== "cancelled" ? (
-        <ol className="status-track" aria-label="Order progress">
-          {steps.map((s, i) => (
-            <li
-              key={s.value}
-              className={`track-step${i <= activeIndex ? " is-done" : ""}${
-                i === activeIndex ? " is-current" : ""
-              }`}
-              aria-current={i === activeIndex ? "step" : undefined}
-            >
-              <span className="track-dot" aria-hidden="true" />
-              <span className="track-label">{s.label}</span>
-            </li>
-          ))}
-        </ol>
-      ) : null}
 
       <section className="order-items" aria-label="Items">
         <h2 className="h3">Items</h2>
@@ -49,15 +25,7 @@ export default function OrderDetail({ order }: { order: OrderSummary }) {
           {order.items.map((item, i) => (
             <li key={i} className="order-item">
               <div className="order-thumb">
-                {item.previewFront ?? item.previewBack ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    src={(item.previewFront ?? item.previewBack) as string}
-                    alt={`${item.productName} in ${item.colorName} with your design`}
-                  />
-                ) : (
-                  <Garment kind={item.productKind} color={item.colorHex} />
-                )}
+                <DesignPreviewImage src={item.previewFront ?? item.previewBack} alt={`${item.productName} in ${item.colorName} with your design`} kind={item.productKind} color={item.colorHex} />
               </div>
 
               <div className="grow">
@@ -74,6 +42,19 @@ export default function OrderDetail({ order }: { order: OrderSummary }) {
                       </li>
                     ))}
                 </ul>
+                {item.designNotes ? <p className="small wrap-anywhere"><strong>Design notes:</strong> {item.designNotes}</p> : null}
+                {item.roster.length ? (
+                  <details className="small">
+                    <summary>Names &amp; numbers ({item.roster.length})</summary>
+                    <ul className="order-sizes">
+                      {item.roster.map((entry) => (
+                        <li key={entry.id}>
+                          {[entry.name, entry.number, entry.subtitle, entry.size].filter(Boolean).join(" · ")}
+                        </li>
+                      ))}
+                    </ul>
+                  </details>
+                ) : null}
               </div>
 
               <p className="order-item-qty tnum">×{item.quantity}</p>
@@ -103,8 +84,8 @@ export default function OrderDetail({ order }: { order: OrderSummary }) {
 
         {order.status === "pending" ? (
           <p className="hint">
-            Payment instructions have been sent to {order.email}. We start production
-            once payment clears.
+            Payment has not been confirmed. Production begins only after we confirm
+            a successful payment.
           </p>
         ) : null}
       </div>

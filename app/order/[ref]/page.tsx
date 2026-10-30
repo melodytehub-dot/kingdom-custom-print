@@ -1,7 +1,14 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import OrderDetail from "@/components/OrderDetail";
-import { getOrderByReference } from "@/lib/orders";
+import GuestOrderAccess from "@/components/GuestOrderAccess";
+import { customerFromCookies } from "@/lib/customer-auth";
+import { guestCanAccessOrderFromCookies } from "@/lib/order-access";
+import {
+  getOrderByReference,
+  getPublicOrderStatus,
+  orderBelongsToAccount,
+} from "@/lib/orders";
 
 export const dynamic = "force-dynamic";
 
@@ -16,9 +23,10 @@ export default async function OrderPage({
   params: Promise<{ ref: string }>;
 }) {
   const { ref } = await params;
-  const order = await getOrderByReference(decodeURIComponent(ref));
+  const reference = decodeURIComponent(ref).trim().toUpperCase().slice(0, 32);
+  const publicOrder = await getPublicOrderStatus(reference);
 
-  if (!order) {
+  if (!publicOrder) {
     return (
       <>
         <div className="wrap section-tight">
@@ -30,8 +38,7 @@ export default async function OrderPage({
             </svg>
             <h1 className="h3">We could not find that order</h1>
             <p>
-              Double-check the reference from your confirmation email. It is in the form
-              KCP-XXXXXX.
+              Double-check the reference shown after checkout. It is in the form KCP-XXXXXX.
             </p>
             <div className="state-actions">
               <Link href="/contact" className="btn">Contact us</Link>
@@ -39,6 +46,39 @@ export default async function OrderPage({
           </div>
         </div>
       </>
+    );
+  }
+
+  const account = await customerFromCookies();
+  const [ownedByAccount, guestAccess] = await Promise.all([
+    orderBelongsToAccount(reference, account?.id ?? null),
+    guestCanAccessOrderFromCookies(reference),
+  ]);
+  const canViewDetails = ownedByAccount || guestAccess;
+  const order = canViewDetails ? await getOrderByReference(reference) : null;
+
+  if (!order) {
+    return (
+      <div className="wrap section-tight">
+        <div className="panel panel-pad order-view">
+          <div className="order-head">
+            <div>
+              <p className="eyebrow">Order</p>
+              <h1 className="h2 tnum">{publicOrder.reference}</h1>
+              <p className="small muted">
+                Placed {new Date(publicOrder.createdAt).toLocaleDateString()}
+              </p>
+            </div>
+          </div>
+          <div className="state">
+            <h2 className="h3">Verify to view full order details</h2>
+            <p>
+              Enter your checkout email to view your items, artwork, notes, delivery details, and totals.
+            </p>
+            <GuestOrderAccess reference={publicOrder.reference} />
+          </div>
+        </div>
+      </div>
     );
   }
 

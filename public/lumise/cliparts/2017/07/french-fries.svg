@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Generator: Adobe Illustrator 16.0.0, SVG Export Plug-In . SVG Version: 6.00 Build 0)  -->
+<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
+<svg version="1.1" id="Layer_1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" x="0px" y="0px"
+	 width="350px" height="350px" viewBox="0 0 350 350" enable-background="new 0 0 350 350" xml:space="preserve">
+<g id="XMLID_960_">
+	<path id="XMLID_961_" fill="#802812" d="M258,158.4c0,0-37.161,24.9-83,24.9c-45.839,0-83-24.9-83-24.9c0-45.84,37.16-58.1,83-58.1
+		S258,112.56,258,158.4z"/>
+	<polygon id="XMLID_962_" fill="#FFDA44" points="208.2,92 208.2,75.4 175,75.4 175,58.8 141.8,58.8 141.8,92 108.6,92 108.6,241.4 
+		141.8,241.4 141.8,208.2 175,208.2 175,224.8 208.2,224.8 208.2,241.4 241.4,241.4 241.4,92 	"/>
+	<rect id="XMLID_963_" x="108.6" y="92" fill="#FFAD41" width="33.2" height="149.4"/>
+	<rect id="XMLID_964_" x="141.8" y="58.8" fill="#FFDA44" width="33.2" height="149.4"/>
+	<rect id="XMLID_965_" x="175" y="75.4" fill="#FFE98F" width="33.2" height="149.4"/>
+	<rect id="XMLID_966_" x="208.2" y="92" fill="#FFDA44" width="33.2" height="149.4"/>
+	<g id="XMLID_967_">
+		<path id="XMLID_968_" fill="#FF5023" d="M227.501,158.4c-9.324,19.628-29.324,33.2-52.501,33.2
+			c-23.176,0-43.177-13.571-52.502-33.2H92l16.6,132.8h132.8L258,158.4H227.501z"/>
+		<path id="XMLID_969_" fill="#BD3C1A" d="M175,191.6c-23.176,0-43.177-13.571-52.502-33.2H92l16.6,132.8H175
+			C175,291.2,175,224.246,175,191.6z"/>
+	</g>
+	<ellipse id="XMLID_970_" fill="#FFFFFF" cx="175" cy="241.4" rx="33.2" ry="16.6"/>
+	<path id="XMLID_971_" fill="#FFE98F" d="M175,258c-18.335,0-33.2-7.432-33.2-16.6c0-9.169,14.865-16.601,33.2-16.601"/>
+</g>
+</svg>

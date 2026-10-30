@@ -190,30 +190,15 @@
   }
 }
 /* --------------------------------------------------------------------------
-   Track order
+   Order access
    -------------------------------------------------------------------------- */
 
-.track-panel {
-  max-width: 560px;
-}
-
-.track-form {
+.order-access-form {
   display: flex;
   flex-direction: column;
   gap: 18px;
 }
 
-.track-form .btn {
+.order-access-form .btn {
   align-self: flex-start;
-}
-
-.track-help {
-  max-width: 560px;
-  margin-top: 22px;
-}
-
-.track-links {
-  display: flex;
-  gap: 20px;
-  margin-top: 12px;
 }

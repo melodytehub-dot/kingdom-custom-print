@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Generator: Adobe Illustrator 16.0.0, SVG Export Plug-In . SVG Version: 6.00 Build 0)  -->
+<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
+<svg version="1.1" id="Layer_1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" x="0px" y="0px"
+	 width="350px" height="350px" viewBox="0 0 350 350" enable-background="new 0 0 350 350" xml:space="preserve">
+<g id="XMLID_1483_">
+	<path id="XMLID_1484_" fill="#FFE98F" d="M258.94,162.729c24.363,0,44.113,19.75,44.113,44.113
+		c0,16.976-9.472,31.702-23.527,39.078h-41.051c-14.056-7.376-23.65-22.103-23.65-39.078
+		C214.827,182.479,234.576,162.729,258.94,162.729z"/>
+	<circle id="XMLID_1485_" fill="#FF5023" cx="245.92" cy="167.535" r="41.059"/>
+	<path id="XMLID_1486_" fill="#FFDA44" d="M91.06,162.729c-24.363,0-44.114,19.75-44.114,44.113
+		c0,16.976,9.472,31.702,23.528,39.078h41.051c14.056-7.376,23.649-22.103,23.649-39.078
+		C135.173,182.479,115.423,162.729,91.06,162.729z"/>
+	<circle id="XMLID_1487_" fill="#BD3C1A" cx="104.08" cy="167.535" r="41.059"/>
+	<circle id="XMLID_1488_" fill="#64C37D" cx="145.139" cy="148.872" r="44.792"/>
+	<circle id="XMLID_1489_" fill="#91DC5A" cx="204.861" cy="148.872" r="44.792"/>
+	<g id="XMLID_1490_">
+		<path id="XMLID_1491_" fill="#FFAD41" d="M279.514,245.92v-40.327c0-43.695-35.421-79.117-79.117-79.117h-50.794
+			c-43.695,0-79.116,35.421-79.116,79.117v40.327H279.514z"/>
+	</g>
+	<g id="XMLID_1492_">
+		<path id="XMLID_1493_" fill="#FF9811" d="M175,126.476h-25.397c-43.695,0-79.116,35.421-79.116,79.116v40.327H175V126.476
+			L175,126.476z"/>
+	</g>
+	<g id="XMLID_1494_">
+		<circle id="XMLID_1495_" fill="#804C09" cx="107.813" cy="201.129" r="7.465"/>
+		<circle id="XMLID_1496_" fill="#804C09" cx="145.139" cy="178.732" r="7.465"/>
+		<circle id="XMLID_1497_" fill="#BD720D" cx="242.187" cy="201.129" r="7.465"/>
+		<circle id="XMLID_1498_" fill="#BD720D" cx="204.861" cy="178.732" r="7.465"/>
+		<circle id="XMLID_1499_" fill="#BD720D" cx="175" cy="201.129" r="7.465"/>
+		<path id="XMLID_1500_" fill="#804C09" d="M175,193.664c-4.123,0-7.465,3.341-7.465,7.464s3.342,7.466,7.465,7.466"/>
+	</g>
+</g>
+</svg>

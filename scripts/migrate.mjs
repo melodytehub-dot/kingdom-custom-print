@@ -17,7 +17,8 @@ async function main() {
   if (force) {
     console.log("Dropping existing tables...");
     await sql.unsafe(`
-      DROP TABLE IF EXISTS order_items, orders, customers, admin_sessions,
+      DROP TABLE IF EXISTS order_items, orders, customer_auth_attempts,
+        customer_sessions, customer_accounts, customers, admin_sessions,
         site_settings, product_images, price_breaks, product_sizes,
         product_colors, products, categories CASCADE;
       DROP FUNCTION IF EXISTS touch_updated_at() CASCADE;

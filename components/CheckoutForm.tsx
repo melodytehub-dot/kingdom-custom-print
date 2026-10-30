@@ -1,8 +1,8 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import Garment from "@/components/Garment";
+import DesignPreviewImage from "@/components/DesignPreviewImage";
 import ArrowRight from "@/components/icons/ArrowRight";
 import { useCart } from "@/lib/cart-context";
 import { describeDesign } from "@/lib/types";
@@ -33,18 +33,19 @@ function validate(fields: Fields): Errors {
   if (!fields.city.trim()) e.city = "Enter a city.";
   if (!fields.region.trim()) e.region = "Enter a state or region.";
   if (!fields.postal.trim()) e.postal = "Enter a postal code.";
+  if (fields.country !== "US") e.country = "Online checkout currently supports United States delivery only.";
   if (fields.phone.trim() && !/^[\d\s()+-]{7,}$/.test(fields.phone.trim())) {
     e.phone = "Enter a valid phone number, or leave it blank.";
   }
   return e;
 }
 
-export default function CheckoutForm({ settings, paymentsReady }: { settings: SiteSettings; paymentsReady: boolean }) {
+export default function CheckoutForm({ settings, paymentsReady, paypalReady, account }: { settings: SiteSettings; paymentsReady: boolean; paypalReady: boolean; account: { email: string; name: string } | null }) {
   const { items, hydrated, subtotal } = useCart();
 
   const [fields, setFields] = useState<Fields>({
-    email: "",
-    name: "",
+    email: account?.email ?? "",
+    name: account?.name ?? "",
     phone: "",
     addressLine1: "",
     addressLine2: "",
@@ -54,9 +55,12 @@ export default function CheckoutForm({ settings, paymentsReady }: { settings: Si
     country: "US",
     notes: "",
   });
+  const [paymentMethod, setPaymentMethod] = useState<"stripe" | "paypal">(paymentsReady ? "stripe" : "paypal");
+  const selectedReady = paymentMethod === "stripe" ? paymentsReady : paypalReady;
   const [errors, setErrors] = useState<Errors>({});
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
+  const checkoutAttempt = useRef(crypto.randomUUID());
 
   const shipping = useMemo(() => {
     if (subtotal <= 0) return 0;
@@ -82,8 +86,8 @@ export default function CheckoutForm({ settings, paymentsReady }: { settings: Si
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     setFormError(null);
-    if (!paymentsReady) {
-      setFormError("Card checkout is temporarily unavailable. Your cart is saved.");
+    if (!selectedReady) {
+      setFormError("That payment method is temporarily unavailable. Your cart is saved.");
       return;
     }
 
@@ -100,7 +104,7 @@ export default function CheckoutForm({ settings, paymentsReady }: { settings: Si
       const res = await fetch("/api/checkout", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...fields, items }),
+        body: JSON.stringify({ ...fields, items, checkoutAttemptId: checkoutAttempt.current, paymentMethod }),
       });
       const data = (await res.json()) as {
         url?: string;
@@ -111,6 +115,7 @@ export default function CheckoutForm({ settings, paymentsReady }: { settings: Si
       };
 
       if (!res.ok) {
+        checkoutAttempt.current = crypto.randomUUID();
         if (data.fieldErrors) setErrors(data.fieldErrors);
         setFormError(data.error ?? "We could not start checkout.");
         return;
@@ -154,10 +159,10 @@ export default function CheckoutForm({ settings, paymentsReady }: { settings: Si
   }
 
   return (
-    <form className="wrap section-tight checkout" onSubmit={onSubmit} noValidate>
+    <form className="wrap section-tight checkout" method="post" action="/api/checkout" onSubmit={onSubmit} noValidate>
       <div className="checkout-main">
         <h1 className="h2">Checkout</h1>
-        {!paymentsReady ? <p className="banner-note" role="status">Card checkout is temporarily unavailable. Your design stays saved in your cart. Please check back soon.</p> : null}
+        {!paymentsReady && !paypalReady ? <p className="banner-note" role="status">Online checkout is temporarily unavailable. Your design stays saved in your cart. Please check back soon.</p> : null}
 
         {formError ? (
           <p className="banner-note is-error" role="alert">
@@ -167,6 +172,7 @@ export default function CheckoutForm({ settings, paymentsReady }: { settings: Si
 
         <fieldset className="field-group">
           <legend className="legend">Contact</legend>
+          {account ? <p className="hint">Signed in as {account.email}. Your order will appear in <Link href="/account">your account</Link>.</p> : <p className="hint"><Link href="/account">Sign in</Link> to keep your order in your account.</p>}
           <div className="field-grid">
             <TextField
               id="email"
@@ -176,6 +182,7 @@ export default function CheckoutForm({ settings, paymentsReady }: { settings: Si
               value={fields.email}
               onChange={(v) => set("email", v)}
               error={errors.email}
+              readOnly={Boolean(account)}
               required
             />
             <TextField
@@ -260,14 +267,16 @@ export default function CheckoutForm({ settings, paymentsReady }: { settings: Si
                 className="select"
                 value={fields.country}
                 onChange={(e) => set("country", e.target.value)}
+                aria-invalid={errors.country ? "true" : undefined}
+                aria-describedby={errors.country ? "country-error" : "country-hint"}
               >
                 <option value="US">United States</option>
-                <option value="CA">Canada</option>
-                <option value="GB">United Kingdom</option>
-                <option value="AU">Australia</option>
-                <option value="NZ">New Zealand</option>
-                <option value="IE">Ireland</option>
               </select>
+              {errors.country ? (
+                <span className="error-text" id="country-error">{errors.country}</span>
+              ) : (
+                <span className="hint" id="country-hint">International rates require a custom quote.</span>
+              )}
             </div>
             <div className="field span-2">
               <label className="label" htmlFor="notes">
@@ -294,15 +303,7 @@ export default function CheckoutForm({ settings, paymentsReady }: { settings: Si
             {items.map((item) => (
               <li key={item.id}>
                 <div className="co-thumb">
-                  {item.previewFront ?? item.previewBack ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
-                      src={(item.previewFront ?? item.previewBack) as string}
-                      alt={`${item.productName} in ${item.colorName}`}
-                    />
-                  ) : (
-                    <Garment kind={item.productKind} color={item.colorHex} />
-                  )}
+                  <DesignPreviewImage src={item.previewFront ?? item.previewBack} alt={`${item.productName} in ${item.colorName}`} kind={item.productKind} color={item.colorHex} />
                 </div>
                 <div className="grow">
                   <p className="wrap-anywhere co-name">{item.productName}</p>
@@ -313,6 +314,7 @@ export default function CheckoutForm({ settings, paymentsReady }: { settings: Si
                       .map((l) => `${l.label}×${l.qty}`)
                       .join(", ")}
                   </p>
+                  {item.designNotes ? <p className="small wrap-anywhere"><strong>Design notes:</strong> {item.designNotes}</p> : null}
                 </div>
                 <p className="tnum co-price">{money(item.total)}</p>
               </li>
@@ -334,13 +336,17 @@ export default function CheckoutForm({ settings, paymentsReady }: { settings: Si
             </div>
           </dl>
 
-          <button type="submit" className="btn btn-lg btn-block" disabled={submitting || !paymentsReady}>
-            {submitting ? "Starting checkout…" : !paymentsReady ? "Card checkout unavailable" : "Continue to payment"}
+          <fieldset className="fieldset"><legend className="label">Payment method</legend>
+            {paymentsReady ? <label><input type="radio" name="paymentMethod" checked={paymentMethod === "stripe"} onChange={() => { setPaymentMethod("stripe"); checkoutAttempt.current = crypto.randomUUID(); }} /> Credit or debit card</label> : null}
+            {paypalReady ? <label><input type="radio" name="paymentMethod" checked={paymentMethod === "paypal"} onChange={() => { setPaymentMethod("paypal"); checkoutAttempt.current = crypto.randomUUID(); }} /> PayPal</label> : null}
+          </fieldset>
+          <button type="submit" className="btn btn-lg btn-block" disabled={submitting || !selectedReady}>
+            {submitting ? "Starting checkout…" : !selectedReady ? "Checkout unavailable" : "Continue to payment"}
             {!submitting ? <ArrowRight /> : null}
           </button>
 
           <p className="hint">
-            Payment is handled by Stripe. Artwork is proofed before anything is printed.
+            Review your order before continuing to payment.
           </p>
         </div>
       </aside>
@@ -357,6 +363,7 @@ function TextField({
   type = "text",
   autoComplete,
   required,
+  readOnly,
 }: {
   id: string;
   label: string;
@@ -366,6 +373,7 @@ function TextField({
   type?: string;
   autoComplete?: string;
   required?: boolean;
+  readOnly?: boolean;
 }) {
   return (
     <div className="field">
@@ -387,6 +395,7 @@ function TextField({
         aria-invalid={error ? "true" : undefined}
         aria-describedby={error ? `${id}-error` : undefined}
         onChange={(e) => onChange(e.target.value)}
+        readOnly={readOnly}
       />
       {error ? (
         <span className="error-text" id={`${id}-error`}>

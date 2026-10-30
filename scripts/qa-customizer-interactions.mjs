@@ -229,7 +229,10 @@ const { TextIdeasPanel } = load("components/customizer/panels.tsx", {
   "next/link": {}, "next/image": {},
   "@/lib/design": { newTextLayer: values => ({ type: "text", ...values }) },
   "@/lib/sizes": {}, "@/lib/pricing": {}, "@/lib/mockups": {}, "@/lib/fonts": {},
+  "./GarmentPreview": { GarmentPreview: () => null },
+  "@/components/DesignPreviewImage": { default: () => null },
   "./art": {}, "./editors": { PanelHeader: () => null }, "./templates": {},
+  "./lumise-library": { useLumiseLibrary: () => ({ categories: [], items: [], loading: false, error: false }) },
   "./icons": { CheckGlyph: () => null },
 });
 slots = []; cursor = 0;
@@ -257,7 +260,10 @@ const { default: Customizer } = load("components/customizer/Customizer.tsx", {
     return react.useState(initial?.w === 0 && initial?.h === 0 ? { w: 400, h: 500 } : initial);
   } },
   "react/jsx-runtime": jsx, "next/link": {}, "next/image": {}, "next/navigation": { useRouter: () => ({ push() {} }) }, "../ProductPhotography": {},
+  "./GarmentPreview": { GarmentPreview: () => null },
+  "./textGeometry": {},
   "./DesignCanvas": { default: Canvas, printAreaView: () => ({ w: 360, h: 450, x: 90, y: 100 }) }, "./stageGeometry": { fitStage },
+  "@/lib/fonts": {},
   "./panels": { NN_DEFAULTS: {}, LayersPanel: () => null }, "./editors": {}, "./icons": {}, "./art": { ART_LIBRARY: [] },
   "@/lib/design": {
     emptyDesign: blank, usedSides: () => [], personalizationOf: () => "none", loadDrafts: () => [], removeLayers: d => d, selectionIsWholeGroup: () => false, selectionIds: (d, s, id) => [id], groupMembers: () => [],
@@ -275,12 +281,20 @@ const { default: Customizer } = load("components/customizer/Customizer.tsx", {
     removeBackgroundLocally: async () => ({ dataUrl: "", source: "portrait", report: {} }),
     CutoutError: class CutoutError extends Error { constructor(reason, message) { super(message); this.reason = reason; } },
   },
+  "@/lib/hostedCutout": {
+    hostedCutoutDataUrl: async () => ({ dataUrl: "", aspect: 1 }),
+    hostedCutoutReady: () => false,
+  },
+  "@/lib/photoroomCutout": {
+    photoroomAltReady: () => false,
+    photoroomCutoutDataUrl: async () => ({ dataUrl: "", aspect: 1 }),
+  },
   "@/lib/cutoutActions": load("lib/cutoutActions.ts", { "@/lib/cutoutModels": { formatModelSize: () => "6 MB" } }),
   "@/lib/cutoutModels": {
     CUTOUT_MAX_EDGE: 1400, DETAILED_PLAN: ["general"], cutoutPlan: () => ["portrait"], formatModelSize: () => "6 MB",
   },
   "./preview": {},
-  "@/lib/mockups": { mockupsForProduct: () => [mockup], TEE_MOCKUPS: [mockup] },
+  "@/lib/mockups": { mockupsForProduct: () => [mockup], mockupBaseForProduct: () => "front.png", TEE_MOCKUPS: [mockup] },
   "@/lib/cart-context": { useCart: () => ({ items: [], addItem() {} }) },
   "@/lib/pricing": { quoteProduct: () => ({}), formatUSD: value => `$${value}` },
 }, { Element: PanelTarget });

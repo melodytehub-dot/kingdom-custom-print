@@ -22,6 +22,7 @@ interface CartContextValue {
   count: number;
   subtotal: number;
   addItem: (item: Omit<CartItem, "id" | "createdAt">) => CartItem;
+  replaceItem: (id: string, item: Omit<CartItem, "id" | "createdAt">) => boolean;
   removeItem: (id: string) => void;
   updateLine: (itemId: string, label: string, qty: number) => void;
   clear: () => void;
@@ -149,6 +150,13 @@ export function CartProvider({ children }: { children: ReactNode }) {
     commit(getSnapshot().filter((i) => i.id !== id));
   }, []);
 
+  const replaceItem = useCallback((id: string, item: Omit<CartItem, "id" | "createdAt">) => {
+    const current = getSnapshot();
+    if (!current.some((entry) => entry.id === id)) return false;
+    commit(current.map((entry) => entry.id === id ? { ...item, id, createdAt: entry.createdAt } : entry));
+    return true;
+  }, []);
+
   const updateLine = useCallback((itemId: string, label: string, qty: number) => {
     commit(
       getSnapshot()
@@ -181,8 +189,8 @@ export function CartProvider({ children }: { children: ReactNode }) {
   const subtotal = round2(items.reduce((n, i) => n + i.total, 0));
 
   const value = useMemo<CartContextValue>(() => {
-    return { items, hydrated, count, subtotal, addItem, removeItem, updateLine, clear };
-  }, [items, count, subtotal, addItem, removeItem, updateLine, clear]);
+    return { items, hydrated, count, subtotal, addItem, replaceItem, removeItem, updateLine, clear };
+  }, [items, count, subtotal, addItem, replaceItem, removeItem, updateLine, clear]);
 
   return <CartContext.Provider value={value}>{children}</CartContext.Provider>;
 }

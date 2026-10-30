@@ -46,6 +46,7 @@ export default async function Footer() {
               <li><Link href="/cart">My Cart</Link></li>
               <li><Link href="/wishlist">Wishlist</Link></li>
               <li><Link href="/checkout">Checkout</Link></li>
+              <li><Link href="/account">My Account</Link></li>
             </ul>
           </div>
 

@@ -29,20 +29,49 @@ const BREAKS = [
 
 export const additionalCategories = [
   {
+    slug: "polo-shirts",
+    name: "Polo Shirts",
+    description: "Collared polos ready for teams, uniforms and custom prints.",
+    sort: 2,
+  },
+  {
     slug: "sweatshirts",
     name: "Sweatshirts",
     description: "Fleece layers built for bold, durable custom prints.",
-    sort: 2,
+    sort: 3,
   },
   {
     slug: "accessories",
     name: "Accessories",
     description: "Caps, totes and mugs that carry your brand beyond the tee.",
-    sort: 3,
+    sort: 4,
   },
 ];
 
 export const additionalProducts = [
+  {
+    slug: "classic-pique-polo",
+    name: "Classic Piqué Polo",
+    style: "KCP-P100",
+    category: "polo-shirts",
+    kind: "polo",
+    material: "Short-sleeve piqué knit with a two-button collar",
+    blurb: "A neat collared shirt for teams, workwear and everyday custom graphics.",
+    description: "A classic short-sleeve polo silhouette with a structured collar and a smooth area for a chest mark or larger back design. Choose a color and build your own front or back print in the studio.",
+    base_price: 18,
+    compare_at: null,
+    print_fee: 5,
+    print_area: { frontW: 0.44, frontH: 0.48, backW: 0.56, backH: 0.6 },
+    featured: true,
+    sort: 14,
+    colors: CLASSIC_COLORS.slice(0, 5),
+    sizes: ADULT_SIZES,
+    breaks: BREAKS,
+    images: [
+      { url: "/img/products/polo-front.png", alt: "Classic Piqué Polo, front view" },
+      { url: "/img/products/polo-back.png", alt: "Classic Piqué Polo, back view" },
+    ],
+  },
   {
     slug: "premium-pullover-hoodie",
     name: "Premium Pullover Hoodie",

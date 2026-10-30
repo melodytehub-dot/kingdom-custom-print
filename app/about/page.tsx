@@ -17,7 +17,7 @@ const STAGES = [
   {
     step: "02",
     title: "Add artwork in the browser",
-    body: "Type text directly, or upload a PNG, JPG, WEBP or SVG. Drag it into position, resize with the handles, rotate if needed, and switch between the front and back. The dashed outline shows exactly what will print.",
+    body: "Type text directly, or upload supported artwork. Drag it into position, resize with the handles, rotate if needed, and switch between front and back. The dashed outline is a placement guide for the customer proof, not a press-ready resolution guarantee.",
   },
   {
     step: "03",
@@ -27,19 +27,19 @@ const STAGES = [
   {
     step: "04",
     title: "We check the file",
-    body: "Before anything goes to press we check resolution, placement and print area. If something will not print cleanly we will flag it and tell you what to change.",
+    body: "For the best print, upload a clear, high-resolution image and review its placement before ordering.",
   },
   {
     step: "05",
     title: "Print and ship",
-    body: "Once artwork is approved and payment clears, the order goes into production. You will be told when it leaves the floor.",
+    body: "Once payment is confirmed, your order can enter production. Contact us if you have questions about your order.",
   },
 ];
 
 const FAQ_LINKS = [
   {
     q: "What artwork should I upload?",
-    a: "Vector files such as SVG or AI print sharpest at any size. For raster artwork, 300 DPI at the finished print size gives the cleanest result — a design that will print 12 inches wide should be at least 3600 × 3600 pixels.",
+    a: "SVG is the best browser upload when available. Raster and phone photos are optimized for the placement proof, so keep the original high-resolution file for production review.",
   },
   {
     q: "Can I print on both sides?",
@@ -47,7 +47,7 @@ const FAQ_LINKS = [
   },
   {
     q: "Is there a minimum order?",
-    a: "No. Single garments are printed the same way as bulk runs. Quantity breaks apply automatically as your total goes up, so the per-garment price drops on larger runs.",
+    a: "No. Quantity breaks apply separately to each product configuration, and the designer and checkout show the resulting per-garment price.",
   },
   {
     q: "How do I know my size run is right?",
@@ -68,8 +68,7 @@ export default async function AboutPage() {
           to the finished run
         </h1>
         <p className="lede">
-          We print custom apparel to order. Nothing is made until it is ordered, and
-          nothing is printed until the artwork is right. Production takes{" "}
+          Create custom apparel for your team, event, or everyday wear. Production takes{" "}
           {settings.productionDays}.
         </p>
       </div>

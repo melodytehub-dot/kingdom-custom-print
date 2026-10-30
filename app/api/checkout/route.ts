@@ -1,10 +1,18 @@
 import { NextResponse } from "next/server";
-import { createOrder, attachStripeSession } from "@/lib/orders";
+import { randomUUID } from "node:crypto";
+import { createOrder, attachStripeSession, attachPayPalOrder, cancelOrder } from "@/lib/orders";
+import { paypalConfigured, paypalRequest } from "@/lib/paypal";
+import {
+  createOrderAccessSession,
+  ORDER_ACCESS_COOKIE,
+  orderAccessCookieOptions,
+} from "@/lib/order-access";
 import { siteUrl, stripeClient, paymentsConfigured } from "@/lib/stripe";
 import { getProductById } from "@/lib/catalog";
 import { quoteProduct } from "@/lib/pricing";
 import { FONTS } from "@/lib/fonts";
 import { personalizationOf } from "@/lib/design";
+import { customerFromRequest, sameOrigin } from "@/lib/customer-auth";
 import type { CartItem, Design, DesignLayer, GarmentSide, RosterEntry } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -12,6 +20,8 @@ export const dynamic = "force-dynamic";
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 
 interface Body {
+  paymentMethod?: string;
+  checkoutAttemptId?: string;
   email?: string;
   name?: string;
   phone?: string;
@@ -98,6 +108,7 @@ async function sanitise(items: CartItem[]): Promise<PricedCartItem[]> {
       previewFront: truncateDataUrl(item.previewFront),
       previewBack: truncateDataUrl(item.previewBack),
       design: sanitiseDesign(item.design),
+      designNotes: String(item.designNotes ?? "").trim().slice(0, 2000),
       roster: sanitiseRoster(item.roster),
     });
   }
@@ -221,22 +232,27 @@ function clampNum(v: unknown, min: number, max: number, fallback: number): numbe
 }
 
 export async function POST(req: Request) {
-  if (!paymentsConfigured()) {
+  if (!sameOrigin(req)) return NextResponse.json({ error: "Invalid request origin." }, { status: 403 });
+  let body: Body;
+  try { body = (await req.json()) as Body; } catch { return NextResponse.json({ error: "Invalid request." }, { status: 400 }); }
+  const paypal = body.paymentMethod === "paypal";
+  if (!(paypal ? await paypalConfigured() : await paymentsConfigured())) {
     return NextResponse.json(
-      { error: "Card checkout is temporarily unavailable. Your design is saved in your cart; please try again later." },
+      { error: "That payment method is temporarily unavailable. Your design is saved in your cart; please try again later." },
       { status: 503 }
     );
   }
-  const stripe = stripeClient();
-  if (!stripe) return NextResponse.json({ error: "Card checkout is temporarily unavailable." }, { status: 503 });
-  let body: Body;
-  try {
-    body = (await req.json()) as Body;
-  } catch {
-    return NextResponse.json({ error: "Invalid request." }, { status: 400 });
-  }
+  const stripe = paypal ? null : await stripeClient();
+  if (!paypal && !stripe) return NextResponse.json({ error: "Card checkout is temporarily unavailable." }, { status: 503 });
 
-  const email = String(body.email ?? "").trim();
+  const email = String(body.email ?? "").trim().toLowerCase();
+  const checkoutAttemptId = /^[0-9a-f]{8}-[0-9a-f-]{27}$/i.test(String(body.checkoutAttemptId ?? ""))
+    ? String(body.checkoutAttemptId)
+    : randomUUID();
+  const account = await customerFromRequest(req);
+  if (account && email !== account.email) {
+    return NextResponse.json({ error: "Use the email on your account or sign out before checking out." }, { status: 422 });
+  }
   const name = String(body.name ?? "").trim();
   const addressLine1 = String(body.addressLine1 ?? "").trim();
 
@@ -246,6 +262,9 @@ export async function POST(req: Request) {
   if (addressLine1.length < 3) fieldErrors.addressLine1 = "Enter a street address.";
   if (!String(body.city ?? "").trim()) fieldErrors.city = "Enter a city.";
   if (!String(body.postal ?? "").trim()) fieldErrors.postal = "Enter a postal code.";
+  if (String(body.country ?? "US").toUpperCase() !== "US") {
+    fieldErrors.country = "Online checkout currently supports United States delivery only.";
+  }
 
   if (Object.keys(fieldErrors).length) {
     return NextResponse.json({ error: "Check the highlighted fields.", fieldErrors }, { status: 422 });
@@ -271,8 +290,13 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Please split this size run into smaller orders, or contact us for a bulk order." }, { status: 422 });
   }
 
+  let createdReference: string | null = null;
+  let createdOrderWasNew = false;
+  let stripeSessionId: string | null = null;
   try {
     const order = await createOrder({
+      checkoutAttemptId,
+      accountId: account?.id ?? null,
       email,
       name,
       phone: String(body.phone ?? "").trim().slice(0, 40),
@@ -285,8 +309,24 @@ export async function POST(req: Request) {
       notes: String(body.notes ?? "").trim().slice(0, 2000),
       items,
     });
+    createdReference = order.reference;
+    createdOrderWasNew = !order.reused;
 
     const base = siteUrl();
+    if (paypal) {
+      const result = await paypalRequest<{ id?: string; links?: { rel: string; href: string }[] }>("/v2/checkout/orders", {
+        method: "POST", requestId: `c-${checkoutAttemptId.replaceAll("-", "")}`,
+        body: JSON.stringify({ intent: "CAPTURE", purchase_units: [{ custom_id: order.reference, amount: { currency_code: "USD", value: order.total.toFixed(2) } }], payment_source: { paypal: { experience_context: { return_url: `${base}/api/paypal/return`, cancel_url: `${base}/cart?cancelled=1`, user_action: "PAY_NOW", shipping_preference: "NO_SHIPPING" } } } }),
+      });
+      const approval = result.links?.find((link) => link.rel === "payer-action" || link.rel === "approve")?.href;
+      if (!result.id || !approval || !/^https:\/\/(www\.)?paypal\.com\//i.test(approval)) throw new Error("Invalid PayPal approval response.");
+      await attachPayPalOrder(order.reference, result.id);
+      const accessToken = await createOrderAccessSession(order.reference);
+      const response = NextResponse.json({ url: approval, reference: order.reference });
+      if (accessToken) response.cookies.set(ORDER_ACCESS_COOKIE, accessToken, orderAccessCookieOptions());
+      return response;
+    }
+    if (!stripe) throw new Error("Stripe is unavailable.");
     const session = await stripe.checkout.sessions.create({
       mode: "payment",
       payment_method_types: ["card"],
@@ -323,19 +363,39 @@ export async function POST(req: Request) {
       ],
       success_url: `${base}/order/success?ref=${encodeURIComponent(order.reference)}`,
       cancel_url: `${base}/cart?cancelled=1`,
-    });
+    }, { idempotencyKey: `checkout-${checkoutAttemptId}` });
+    stripeSessionId = session.id;
 
     if (!session.url) {
-      return NextResponse.json(
-        { error: "Payment could not be started. Please try again." },
-        { status: 502 }
-      );
+      throw new Error("Stripe Checkout returned no redirect URL.");
     }
 
     await attachStripeSession(order.reference, session.id);
-    return NextResponse.json({ url: session.url, reference: order.reference });
+    const accessToken = await createOrderAccessSession(order.reference);
+    const response = NextResponse.json({ url: session.url, reference: order.reference });
+    if (accessToken) {
+      response.cookies.set(ORDER_ACCESS_COOKIE, accessToken, orderAccessCookieOptions());
+    }
+    return response;
   } catch (err) {
     console.error("checkout error:", err);
+    if (stripeSessionId && stripe) {
+      try {
+        await stripe.checkout.sessions.expire(stripeSessionId);
+      } catch (expireError) {
+        console.error("checkout session cleanup error:", expireError);
+      }
+    }
+    if (createdReference && createdOrderWasNew) {
+      try {
+        await cancelOrder(createdReference, {
+          actor: "system",
+          note: "Checkout setup failed before the customer could complete payment.",
+        });
+      } catch (cleanupError) {
+        console.error("checkout order cleanup error:", cleanupError);
+      }
+    }
     return NextResponse.json(
       { error: "We could not start checkout. Please try again." },
       { status: 500 }

@@ -1,7 +1,14 @@
-import type { OrderStatus, ProductKind } from "./types";
+import type { OrderStatus, ProductKind, RosterEntry } from "./types";
 import type { Product } from "./types";
 
 export interface SiteSettings {
+  heroLabel: string;
+  heroHeadlineTop: string;
+  heroHeadlineBottom: string;
+  heroDescription: string;
+  heroImage1: string;
+  heroImage2: string;
+  heroImage3: string;
   announcement: string;
   shippingFlat: number;
   freeShippingThreshold: number;
@@ -52,6 +59,8 @@ export interface AdminOrderItem {
   design: { front: unknown[]; back: unknown[] };
   previewFront: string | null;
   previewBack: string | null;
+  designNotes: string;
+  roster: RosterEntry[];
 }
 
 export interface AdminOrderDetail {
@@ -72,6 +81,14 @@ export interface AdminOrderDetail {
   total: number;
   createdAt: string;
   paidAt: string | null;
+  refundProvider: "stripe" | "paypal" | null;
+  statusHistory: {
+    fromStatus: OrderStatus | null;
+    toStatus: OrderStatus;
+    actor: "stripe" | "admin" | "system";
+    note: string;
+    createdAt: string;
+  }[];
   items: AdminOrderItem[];
 }
 
