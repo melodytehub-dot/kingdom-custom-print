@@ -1,6 +1,5 @@
 import Link from "next/link";
 import type { Metadata } from "next";
-import { getSettings } from "@/lib/catalog";
 
 export const metadata: Metadata = {
   title: "Frequently asked questions",
@@ -73,7 +72,7 @@ const GROUPS: { title: string; items: { q: string; a: string }[] }[] = [
     items: [
       {
         q: "How long does production take?",
-        a: settings.productionDays,
+        a: "Production typically takes 7-10 business days after your order is confirmed. Rush options may be available - contact us with your deadline and details.",
       },
       {
         q: "Can I get a rush order?",
@@ -95,9 +94,7 @@ const GROUPS: { title: string; items: { q: string; a: string }[] }[] = [
   },
 ];
 
-export default async function FaqPage() {
-  const settings = await getSettings();
-
+export default function FaqPage() {
   return (
     <>
       <div className="wrap page-head">
