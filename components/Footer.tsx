@@ -23,7 +23,7 @@ export default async function Footer() {
               />
             </Link>
             <p>
-              Custom printed t-shirts, hoodies, and caps — made to order. Upload artwork or design directly in the browser.
+              Custom apparel for your ideas, your team, and your everyday. Choose a garment and make it yours in our online design studio.
             </p>
             <Link href="/customize" className="mm-footer-studio">Make something yours ↗</Link>
           </div>
