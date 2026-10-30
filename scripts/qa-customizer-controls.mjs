@@ -65,17 +65,17 @@ try {
   await page.locator(".rot-garment").nth(1).waitFor({ state: "visible", timeout: 5000 });
   const swatches = page.locator(".rot-garment");
   const swatchCount = await swatches.count();
-  const productPreview = page.locator(".rot-product img").first();
-  const beforeColor = await productPreview.getAttribute("src");
+  const productPreview = page.locator(".rot-product image").first();
+  const beforeColor = await productPreview.getAttribute("href");
   await swatches.nth(1).evaluate((button) => button.click());
   await page.waitForTimeout(200);
-  const afterColor = await productPreview.getAttribute("src");
+  const afterColor = await productPreview.getAttribute("href");
   check("garment colour changes the rendered image", Boolean(beforeColor && afterColor && beforeColor !== afterColor));
   check("catalogue colour swatches are exposed", swatchCount >= 6, `${swatchCount} swatches`);
   const selectedSlug = await swatches.nth(1).getAttribute("data-color-slug");
   check("selected color is reflected in the URL", new URL(page.url()).searchParams.get("color") === selectedSlug, `${selectedSlug} -> ${new URL(page.url()).searchParams.get("color")}`);
   const mainImage = await photo.getAttribute("href");
-  const selectedTile = await page.locator(".rot-blank.is-active img").getAttribute("src");
+  const selectedTile = await page.locator(".rot-blank.is-active image").getAttribute("href");
   check("canvas, product preview, and active product tile use the same variant", mainImage === afterColor && afterColor === selectedTile);
   await page.reload({ waitUntil: "commit" });
   await photo.waitFor({ state: "attached", timeout: 60000 });
@@ -277,6 +277,7 @@ try {
       && await page.locator('.rot-canvas-svg g[role="button"][aria-label="Edit text"]').count() === 1
       && await page.getByRole("button", { name: "Hide controls to move artwork" }).count() === 1,
   );
+  await page.getByRole("button", { name: "Hide controls to move artwork" }).click();
   const templateArt = page.locator(".rot-canvas-svg image").nth(1);
   const templateArtBox = await templateArt.boundingBox();
   if (templateArtBox) await page.mouse.click(templateArtBox.x + templateArtBox.width / 2, templateArtBox.y + templateArtBox.height / 2);
@@ -302,6 +303,8 @@ try {
     timeout: 30000,
   });
   await page.locator("image.rot-shirt-photo").first().waitFor({ state: "attached", timeout: 60000 });
+  const resumeDialog = page.getByRole("dialog", { name: /continue your design/i });
+  if (await resumeDialog.isVisible()) await resumeDialog.getByRole("button", { name: /start a new design/i }).click();
   await tool("art").evaluate((button) => button.click());
   await page.locator(".rot-artgrid button").first().evaluate((button) => button.click());
   await page.locator('button[aria-label="Lock"]').click();

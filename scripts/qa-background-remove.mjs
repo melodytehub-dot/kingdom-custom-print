@@ -56,6 +56,7 @@ try {
       // covered against a real photo in qa-cutout-ai.mjs.
       if (!shouldRemove && !mobile) continue;
       const page = await context.newPage();
+      await page.addInitScript((key) => { localStorage.removeItem(key); }, DRAFT_KEY);
       page.setDefaultTimeout(30000);
       const errors = [];
       page.on("pageerror", (error) => errors.push(error.message));

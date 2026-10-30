@@ -29,3 +29,14 @@
 .account-orders small { color: #666; text-transform: capitalize; }
 .account-empty { padding: 20px 0; color: #555; }
 @media (max-width: 650px) { .account-page { padding-block: 34px 70px; } .account-content { grid-template-columns: 1fr; gap: 36px; } }
+.account-profile nav { display: grid; gap: 12px; }
+.account-section { margin-top: 38px; border-top: 1px solid #dedede; padding-top: 26px; }
+.account-section h2 { font-size: 20px; margin: 0 0 10px; }
+.account-section p { color: #555; }
+.account-section a { color: #a30020; text-decoration: underline; text-underline-offset: 3px; }
+.account-saved-list { list-style: none; padding: 0; margin: 16px 0 0; }
+.account-saved-list li { display: flex; justify-content: space-between; align-items: center; gap: 16px; padding: 15px 0; border-top: 1px solid #dedede; }
+.account-saved-list li span { display: grid; gap: 4px; }
+.account-saved-list small { color: #555; }
+.account-saved-list button { border: 0; padding: 8px; background: transparent; color: #a30020; font: inherit; cursor: pointer; }
+@media (max-width: 400px) { .account-saved-list li { align-items: flex-start; flex-direction: column; } }

@@ -164,6 +164,7 @@ const NN_FONT_SIZES: Record<NNSize, { name: number; number: number; sub: number 
 
 interface DraftState {
   colorCode: string;
+  editingCartId?: string | null;
   design: Design;
   designNotes?: string;
   lines: Record<string, number>;
@@ -239,7 +240,7 @@ export default function Customizer({
   initialLines: Record<string, number>;
   contactPhone: string;
 }) {
-  const { addItem, items } = useCart();
+  const { addItem, replaceItem, items } = useCart();
   const router = useRouter();
 
   const productMockups = useMemo(() => mockupsForProduct(product), [product]);
@@ -259,6 +260,7 @@ export default function Customizer({
   /** While on, canvas taps add to and remove from the selection. */
   const [multiSelect, setMultiSelect] = useState(false);
   const [drafts, setDrafts] = useState<SavedDraft[]>([]);
+  const [resumePrompt, setResumePrompt] = useState(false);
   const [notice, setNotice] = useState<{ tone: "ok" | "warn" | "error"; text: string } | null>(null);
   const [productSwitchPrompt, setProductSwitchPrompt] = useState<ProductSwitchPrompt | null>(null);
   const [busy, setBusy] = useState(false);
@@ -267,6 +269,7 @@ export default function Customizer({
   const [fxStatus, setFxStatus] = useState<string | null>(null);
   const [fxProgress, setFxProgress] = useState<number | null>(null);
   const [addedCount, setAddedCount] = useState(0);
+  const [editingCartId, setEditingCartId] = useState<string | null>(null);
   const [hist, setHist] = useState({ canUndo: false, canRedo: false });
   const [roster, setRoster] = useState<RosterEntry[]>([]);
   const [nn, setNn] = useState<NNSettings>(NN_DEFAULTS);
@@ -370,12 +373,41 @@ export default function Customizer({
         pendingProductHandoff = null;
       } else {
         if (handoff) pendingProductHandoff = null;
+        const query = new URLSearchParams(window.location.search);
+        const cartId = query.get("cartItem");
+        const savedId = query.get("savedDesign");
+        const cartItems = JSON.parse(window.localStorage.getItem("kcp.cart.v1") ?? "[]") as import("@/lib/types").CartItem[];
+        const cartEntry = cartId && Array.isArray(cartItems) ? cartItems.find((item) => item.id === cartId && item.productSlug === product.slug) : undefined;
+        const savedEntry = savedId ? loadDrafts().find((item) => item.id === savedId && item.productSlug === product.slug) : undefined;
+        if (cartEntry?.design?.front && cartEntry.design.back) {
+          setEditingCartId(cartEntry.id);
+          const editDraftRaw = window.localStorage.getItem(draftKey);
+          let editDraft: Partial<DraftState> | null = null;
+          try { if (editDraftRaw) editDraft = JSON.parse(editDraftRaw) as Partial<DraftState>; } catch { /* Use the cart item when a draft is invalid. */ }
+          const inProgress = editDraft?.editingCartId === cartEntry.id && editDraft.design?.front && editDraft.design.back ? editDraft : null;
+          restoredDesign = normalizeDesign(inProgress?.design ?? cartEntry.design);
+          setDesign(restoredDesign);
+          setDesignNotes(inProgress?.designNotes ?? cartEntry.designNotes ?? "");
+          setColorCode((colorForProduct(productMockups, inProgress?.colorCode ?? cartEntry.colorSlug) ?? closestProductColor(productMockups, cartEntry.colorHex)).code);
+          setLines(Object.fromEntries(product.sizes.map((size) => [size.label, inProgress?.lines?.[size.label] ?? cartEntry.lines.find((line) => line.label === size.label)?.qty ?? 0])));
+          setRoster(inProgress?.roster ?? cartEntry.roster ?? []);
+          if (inProgress?.nn) setNn({ ...NN_DEFAULTS, ...inProgress.nn });
+        } else if (savedEntry?.design?.front && savedEntry.design.back) {
+          restoredDesign = normalizeDesign(savedEntry.design);
+          setDesign(restoredDesign);
+          setDesignNotes(savedEntry.designNotes ?? "");
+          setColorCode((colorForProduct(productMockups, savedEntry.colorSlug) ?? closestProductColor(productMockups, savedEntry.colorHex)).code);
+          setLines(Object.fromEntries(product.sizes.map((size) => [size.label, savedEntry.lines?.[size.label] ?? 0])));
+          setRoster(savedEntry.roster ?? []);
+          if (savedEntry.nn) setNn({ ...NN_DEFAULTS, ...savedEntry.nn });
+        } else {
         const raw = window.localStorage.getItem(draftKey);
         if (raw) {
           const parsed = JSON.parse(raw) as Partial<DraftState>;
           if (parsed?.design?.front && parsed?.design?.back) {
             restoredDesign = normalizeDesign(parsed.design);
             setDesign(restoredDesign);
+            if ((restoredDesign.front.length || restoredDesign.back.length) && query.get("resume") !== "1") setResumePrompt(true);
           }
           setDesignNotes(parsed?.designNotes ?? "");
           const requestedColor = colorForProduct(productMockups, initialColor);
@@ -391,15 +423,18 @@ export default function Customizer({
             setLines(Object.fromEntries(product.sizes.map((size) => [size.label, initialLines[size.label] ?? 0])));
           }
         }
-        if (!colorForProduct(productMockups, initialColor)) {
+        if (!raw && !colorForProduct(productMockups, initialColor)) {
           const first = productMockups[0];
           if (first) setColorCode(first.code);
+        }
         }
       }
     } catch {
       // A corrupt draft should not block the editor; start clean.
     }
-    historyRef.current = [restoredDesign ?? emptyDesign()];
+    const initialDesign = restoredDesign ?? emptyDesign();
+    setDesign(initialDesign);
+    historyRef.current = [initialDesign];
     futureRef.current = [];
     setHist({ canUndo: false, canRedo: false });
     setPanel("none");
@@ -413,11 +448,15 @@ export default function Customizer({
     if (!ready || restoredSlug !== product.slug) return;
     const url = new URL(window.location.href);
     url.searchParams.set("color", mockup.slug);
+    if (editingCartId) url.searchParams.set("cartItem", editingCartId);
+    else url.searchParams.delete("cartItem");
+    url.searchParams.delete("savedDesign");
+    url.searchParams.delete("resume");
     const encodedSizes = sizeLines.filter((line) => line.qty > 0).map((line) => `${line.label}:${line.qty}`).join(",");
     if (encodedSizes) url.searchParams.set("sizes", encodedSizes);
     else url.searchParams.delete("sizes");
     window.history.replaceState(window.history.state, "", `${url.pathname}${url.search}${url.hash}`);
-  }, [ready, restoredSlug, product.slug, mockup.slug, sizeLines]);
+  }, [ready, restoredSlug, product.slug, mockup.slug, sizeLines, editingCartId]);
   /* eslint-enable react-hooks/set-state-in-effect */
 
   /* ---- autosave draft ---- */
@@ -426,15 +465,19 @@ export default function Customizer({
     try {
       window.localStorage.setItem(
         draftKey,
-        JSON.stringify({ colorCode, design, designNotes, lines, roster, nn } satisfies DraftState)
+        JSON.stringify({ colorCode, design, designNotes, lines, roster, nn, editingCartId } satisfies DraftState)
       );
+      if (design.front.length || design.back.length) {
+        window.localStorage.setItem("kcp.recent-design.v1", JSON.stringify({ slug: product.slug, name: product.name }));
+      }
     } catch {
       // Storage unavailable or full; the in-progress design still works.
     }
-  }, [ready, restoredSlug, product.slug, draftKey, colorCode, design, designNotes, lines, roster, nn]);
+  }, [ready, restoredSlug, product.slug, product.name, draftKey, colorCode, design, designNotes, lines, roster, nn, editingCartId]);
 
   /* Text entry is grouped; pointer gestures commit as one history step. */
   useEffect(() => {
+    if (!ready || restoredSlug !== product.slug) return;
     if (transforming) return;
     if (applyingHistory.current) {
       applyingHistory.current = false;
@@ -453,7 +496,7 @@ export default function Customizer({
       syncHist();
     }, 450);
     return () => clearTimeout(t);
-  }, [design, syncHist, transforming]);
+  }, [design, syncHist, transforming, ready, restoredSlug, product.slug]);
 
   useEffect(() => {
     if (!notice) return;
@@ -1346,7 +1389,7 @@ export default function Customizer({
     try {
       const cartDesign = stripForCart(design);
       const rendered = await drawPreview(mockup.front, mockup.back, cartDesign, product.printArea);
-      addItem({
+      const item = {
         productId: product.id,
         productSlug: product.slug,
         productName: product.name,
@@ -1365,9 +1408,12 @@ export default function Customizer({
         unitPrice: quote.unitBase,
         total: quote.total,
         quantity,
-      });
+      };
+      const updated = editingCartId ? replaceItem(editingCartId, item) : false;
+      if (!updated) addItem(item);
+      setEditingCartId(null);
       setAddedCount((n) => n + 1);
-      setNotice({ tone: "ok", text: "Added to cart." });
+      setNotice({ tone: "ok", text: updated ? "Cart item updated." : "Added to cart." });
       setLines(Object.fromEntries(product.sizes.map((s) => [s.label, 0])));
       setSelectedIds([]);
     } catch {
@@ -1849,6 +1895,21 @@ export default function Customizer({
       }}
       style={{ ["--step" as string]: stepIndex }}
     >
+      {resumePrompt ? <div className="rot-resume-backdrop">
+        <section className="rot-resume-dialog" role="dialog" aria-modal="true" aria-labelledby="resume-title">
+          <h2 id="resume-title">Continue your design?</h2>
+          <p>Your previous design for {product.name} is saved on this device.</p>
+          <div className="rot-resume-actions">
+            <button type="button" autoFocus onClick={() => setResumePrompt(false)}>Continue designing</button>
+            <button type="button" onClick={() => {
+              const blank = emptyDesign();
+              setDesign(blank); setDesignNotes(""); setRoster([]); setNn(NN_DEFAULTS);
+              setSelectedIds([]); historyRef.current = [blank]; futureRef.current = []; syncHist();
+              setResumePrompt(false);
+            }}>Start a new design</button>
+          </div>
+        </section>
+      </div> : null}
       {/* ---- App bar ---- */}
       <header className="rot-bar">
         <Link href="/" className="rot-logo" aria-label="Kingdom Custom Print — home">
@@ -1862,11 +1923,11 @@ export default function Customizer({
         </Link>
         <div className="rot-bar-actions">
           <button type="button" className="rot-barbtn rot-mobile-share" onClick={shareDesign} disabled={busy} aria-label="Share design preview" title="Share design preview"><ShareIcon size={22} /></button>
-          <Link href={callHref} className="rot-barbtn">
+          <Link href={callHref} className="rot-barbtn" aria-label={contactPhone ? "Call customer service" : "Contact customer service"}>
             <HeadsetIcon size={34} />
             <span>Call or Chat</span>
           </Link>
-          <button type="button" className="rot-barbtn rot-header-save" onClick={saveDraft}>
+          <button type="button" className="rot-barbtn rot-header-save" onClick={saveDraft} aria-label="Save design">
             <SaveIcon size={34} />
             <span>Save</span>
           </button>
@@ -1883,7 +1944,7 @@ export default function Customizer({
           </div>
           <button type="button" className="rot-next rot-header-next" onClick={goNext} disabled={busy}>
             {step === "review" ? <CartGlyph size={24} /> : <ChevronRightIcon size={24} />}
-            <span>{step === "review" ? (busy ? "Adding…" : addedCount ? "Add another" : "Add to Cart") : step === "quantity" ? "Review" : "Next"}</span>
+            <span>{step === "review" ? (busy ? "Saving…" : editingCartId ? "Update cart" : addedCount ? "Add another" : "Add to Cart") : step === "quantity" ? "Review" : "Next"}</span>
           </button>
         </div>
       </header>
@@ -2228,7 +2289,7 @@ export default function Customizer({
           <span>Save Design</span>
         </button>
         <button type="button" className="rot-footer-button is-primary" onClick={goNext} disabled={busy}>
-          <span>{step === "review" ? (addedCount ? "Add Another" : "Add to Cart") : step === "quantity" ? "Review" : "Next Step"}</span>
+          <span>{step === "review" ? (editingCartId ? "Update Cart" : addedCount ? "Add Another" : "Add to Cart") : step === "quantity" ? "Review" : "Next Step"}</span>
           {step === "review" ? <CartGlyph size={20} /> : <ChevronRightIcon size={20} />}
         </button>
       </footer>

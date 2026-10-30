@@ -52,10 +52,12 @@ try {
  await page.waitForFunction(()=>document.querySelector('button.swatch[title=Red]')?.getAttribute('aria-pressed')==='true');
  await page.getByRole('button',{name:'Customize this',exact:true}).click();
  await page.waitForURL(/\/customize\/crown-classic-tee\?color=red/,{timeout:60000});
-  await page.waitForFunction(()=>document.querySelector('image.rot-shirt-photo')?.getAttribute('href')?.includes('color=B2000C&view=front'));
+  await page.waitForFunction(()=>document.querySelector('image.rot-shirt-photo')?.getAttribute('href')?.includes('/crown-classic-tee/red.webp'));
+  const resume = page.getByRole('dialog', { name: /continue your design/i });
+  if (await resume.isVisible()) await resume.getByRole('button', { name: /continue designing/i }).click();
   await page.waitForFunction(()=>{const draft=JSON.parse(localStorage.getItem('kcp.draft.v3.crown-classic-tee')??'{}');return draft.colorCode==='red'&&draft.design?.front.some(l=>l.text==='Gallery regression art');});
   await page.getByRole('button',{name:'Back view',exact:true}).click();
- assert.match(await page.locator('image.rot-shirt-photo').getAttribute('href'),/view=back/);
+ assert.match(await page.locator('image.rot-shirt-photo').getAttribute('href'),/red-back\.webp/);
   await page.getByRole('button',{name:'Front view',exact:true}).click();
  assert.match(await page.locator('.rot-canvas-svg').getAttribute('aria-label'),/1 design element/);
   console.log('PASS URL color overrides saved draft color; artwork survives gallery/studio transitions and view switching');

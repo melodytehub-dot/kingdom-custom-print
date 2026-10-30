@@ -225,7 +225,7 @@ function CartRow({
         </ul>
 
         <div className="cart-actions">
-          <Link href={`/customize/${item.productSlug}`} className="link">
+          <Link href={`/customize/${item.productSlug}?cartItem=${encodeURIComponent(item.id)}`} className="link">
             Edit design
           </Link>
           <button type="button" className="cart-remove" onClick={onRemove}>

@@ -2,6 +2,7 @@ import Link from "next/link";
 import Image from "next/image";
 import HeroImageSlider from "@/components/HeroImageSlider";
 import HomeProducts from "@/components/HomeProducts";
+import ResumeDesignPrompt from "@/components/ResumeDesignPrompt";
 import ArrowRight from "@/components/icons/ArrowRight";
 import Truck from "@/components/icons/Truck";
 import Shield from "@/components/icons/Shield";
@@ -41,6 +42,7 @@ export default async function HomePage() {
 
   return (
     <div className="mm-home-wrapper">
+      <ResumeDesignPrompt />
       {/* ------------------------------------------------------------------
           1. HERO SECTION (Minimog POD Modern Slider)
           ------------------------------------------------------------------ */}
