@@ -33,7 +33,7 @@ export default function GuestOrderAccess({ reference }: { reference: string }) {
   }
 
   return (
-    <form className="track-form order-access-form" onSubmit={submit} noValidate>
+    <form className="track-form order-access-form" method="post" action="/api/order/access" onSubmit={submit} noValidate>
       <div className="field">
         <label className="label" htmlFor="order-access-email">
           Checkout email

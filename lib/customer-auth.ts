@@ -54,7 +54,7 @@ export async function customerFromToken(token: string | null): Promise<CustomerA
   const [account] = await sql<CustomerAccount[]>`
     SELECT a.id, a.email, a.name FROM customer_accounts a
     JOIN customer_sessions s ON s.account_id = a.id
-    WHERE s.token_hash = ${tokenHash(token)} AND s.expires_at > now()
+    WHERE s.token_hash = ${tokenHash(token)} AND s.expires_at > now() AND a.email_verified = true
     LIMIT 1`;
   return account ?? null;
 }

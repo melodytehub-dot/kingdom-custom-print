@@ -25,7 +25,7 @@ export default function AdminRefund({ reference, total, provider }: { reference:
     <h4 className="panel-heading">Refund payment</h4>
     <p className="hint">Return the remaining {gateway} payment to the original payment method. The order is marked refunded when {gateway} confirms it.</p>
     {!open ? <button type="button" className="btn btn-light btn-sm" onClick={() => setOpen(true)}>Refund order</button> :
-      <form onSubmit={submit} className="settings-form"><label className="label" htmlFor="refund-password">Confirm admin password</label><input id="refund-password" className="input" type="password" required autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} /><div className="form-actions"><button className="btn btn-sm" type="submit" disabled={pending}>{pending ? "Submitting…" : "Confirm refund"}</button><button className="btn btn-light btn-sm" type="button" disabled={pending} onClick={() => { setOpen(false); setPassword(""); }}>Cancel</button></div></form>}
+      <form method="post" action="/api/admin/refund" onSubmit={submit} className="settings-form"><label className="label" htmlFor="refund-password">Confirm admin password</label><input id="refund-password" className="input" type="password" required autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} /><div className="form-actions"><button className="btn btn-sm" type="submit" disabled={pending}>{pending ? "Submitting…" : "Confirm refund"}</button><button className="btn btn-light btn-sm" type="button" disabled={pending} onClick={() => { setOpen(false); setPassword(""); }}>Cancel</button></div></form>}
     {notice ? <p className="hint" role="status">{notice}</p> : null}
   </div>;
 }

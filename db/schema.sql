@@ -109,7 +109,15 @@ CREATE TABLE IF NOT EXISTS customer_accounts (
 );
 
 ALTER TABLE customer_accounts ADD COLUMN IF NOT EXISTS google_sub text;
+ALTER TABLE customer_accounts ADD COLUMN IF NOT EXISTS email_verified boolean NOT NULL DEFAULT true;
 CREATE UNIQUE INDEX IF NOT EXISTS customer_accounts_google_sub_idx ON customer_accounts (google_sub) WHERE google_sub IS NOT NULL;
+
+CREATE TABLE IF NOT EXISTS customer_email_verifications (
+  token_hash text PRIMARY KEY,
+  account_id int NOT NULL REFERENCES customer_accounts(id) ON DELETE CASCADE,
+  expires_at timestamptz NOT NULL
+);
+CREATE INDEX IF NOT EXISTS customer_email_verifications_account_idx ON customer_email_verifications (account_id);
 
 CREATE TABLE IF NOT EXISTS customer_sessions (
   token_hash text PRIMARY KEY,

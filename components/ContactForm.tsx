@@ -69,7 +69,7 @@ export default function ContactForm({
   }
 
   return (
-    <form className="contact-form" onSubmit={submit} noValidate>
+    <form className="contact-form" method="post" action="/api/contact" onSubmit={submit} noValidate>
       <p className={`banner-note${canSend ? "" : " is-error"}`} role="status">
         {canSend
           ? "Send us a message and we’ll reply by email."

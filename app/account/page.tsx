@@ -12,7 +12,7 @@ export const metadata = { title: "Your account", robots: { index: false, follow:
 
 type AccountOrder = { reference: string; status: string; total: unknown; created_at: Date };
 
-export default async function AccountPage({ searchParams }: { searchParams: Promise<{ google?: string }> }) {
+export default async function AccountPage({ searchParams }: { searchParams: Promise<{ google?: string; verification?: string }> }) {
   const params = await searchParams;
   const account = await customerFromCookies();
   const orders = account ? await sql<AccountOrder[]>`
@@ -26,6 +26,7 @@ export default async function AccountPage({ searchParams }: { searchParams: Prom
         <div><span className="mm-hero-tag">KINGDOM CUSTOM PRINT</span><h1>{account ? "Your account" : "Welcome back"}</h1></div>
         {account ? <AccountSignOut /> : null}
       </header>
+      {params.verification ? <p role="status">{params.verification === "success" ? "Email confirmed. You can sign in now." : params.verification === "invalid" ? "This confirmation link is invalid or expired. Sign in to receive a new link." : "We could not confirm your email. Please try again."}</p> : null}
       {account ? (
         <div className="account-content">
           <div className="account-profile"><h2>{account.name}</h2><p>{account.email}</p><nav aria-label="Account sections"><a href="#orders">Orders</a><a href="#wishlist">Wishlist</a><a href="#designs">Saved designs</a><Link href="/cart">Your cart</Link><Link href="/shop">Continue shopping</Link></nav></div>

@@ -159,7 +159,7 @@ export default function CheckoutForm({ settings, paymentsReady, paypalReady, acc
   }
 
   return (
-    <form className="wrap section-tight checkout" onSubmit={onSubmit} noValidate>
+    <form className="wrap section-tight checkout" method="post" action="/api/checkout" onSubmit={onSubmit} noValidate>
       <div className="checkout-main">
         <h1 className="h2">Checkout</h1>
         {!paymentsReady && !paypalReady ? <p className="banner-note" role="status">Online checkout is temporarily unavailable. Your design stays saved in your cart. Please check back soon.</p> : null}

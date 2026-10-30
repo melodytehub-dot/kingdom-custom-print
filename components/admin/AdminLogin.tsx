@@ -1,11 +1,16 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useSyncExternalStore } from "react";
+import { useRouter } from "next/navigation";
+
+function subscribeHydration() { return () => {}; }
 
 export default function AdminLogin({ configured }: { configured: boolean }) {
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const hydrated = useSyncExternalStore(subscribeHydration, () => true, () => false);
+  const router = useRouter();
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -25,7 +30,8 @@ export default function AdminLogin({ configured }: { configured: boolean }) {
         setError(json.error ?? "Could not sign in. Please try again.");
         return;
       }
-      window.location.assign("/admin");
+      router.push("/admin");
+      router.refresh();
     } catch {
       setError(controller.signal.aborted ? "Sign-in took too long. Please try again." : "Could not connect. Please try again.");
     } finally {
@@ -51,7 +57,7 @@ export default function AdminLogin({ configured }: { configured: boolean }) {
           </p>
         )}
 
-        <form onSubmit={submit}>
+        <form method="post" action="/api/admin/login" onSubmit={submit}>
           <div className="field">
             <label className="label" htmlFor="admin-password">
               Password
@@ -74,7 +80,7 @@ export default function AdminLogin({ configured }: { configured: boolean }) {
             ) : null}
           </div>
 
-          <button type="submit" className="btn btn-block" disabled={!configured || busy}>
+          <button type="submit" className="btn btn-block" disabled={!configured || busy || !hydrated}>
             {busy ? "Signing in…" : "Sign in"}
           </button>
         </form>

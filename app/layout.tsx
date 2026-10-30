@@ -33,6 +33,7 @@ import Footer from "@/components/Footer";
 import { WishlistProvider } from "@/lib/wishlist-context";
 import MobileTabBar from "@/components/MobileTabBar";
 import PageTransition from "@/components/PageTransition";
+import StorefrontChrome from "@/components/StorefrontChrome";
 
 const outfit = Outfit({
   subsets: ["latin"],
@@ -202,9 +203,9 @@ export default async function RootLayout({
         </a>
         <CartProvider>
           <WishlistProvider>
-          <Header categories={categories} announcement={settings.announcement} />
+          <StorefrontChrome><Header categories={categories} announcement={settings.announcement} /></StorefrontChrome>
           <main id="main"><PageTransition>{children}</PageTransition></main>
-          <Footer />
+          <StorefrontChrome><Footer /></StorefrontChrome>
           <MobileTabBar />
           </WishlistProvider>
         </CartProvider>

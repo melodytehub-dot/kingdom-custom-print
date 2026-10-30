@@ -15,7 +15,7 @@ function validate(raw: Record<string, unknown>): { value?: CategoryInput; error?
   const name = String(raw.name ?? "").trim().slice(0, 80);
   if (name.length < 2) return { error: "Give the category a name." };
   const slug = slugify(String(raw.slug || name));
-  if (!slug || !SLUG_RE.test(slug)) return { error: "The category slug is not valid." };
+  if (!slug || !SLUG_RE.test(slug)) return { error: "Use a category name containing letters or numbers." };
   const sortOrder = Math.max(0, Math.min(9999, Math.floor(Number(raw.sortOrder) || 0)));
   return {
     value: {
@@ -40,7 +40,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: true, id });
   }
   catch (err) {
-    return NextResponse.json({ error: err instanceof Error && err.message.includes("duplicate") ? "That category slug is already used." : "The category could not be saved." }, { status: 409 });
+    return NextResponse.json({ error: err instanceof Error && err.message.includes("duplicate") ? "A category with this name already exists." : "The category could not be saved." }, { status: 409 });
   }
 }
 
@@ -58,7 +58,7 @@ export async function PUT(req: Request) {
     if (ok) revalidatePath("/", "layout");
     return ok ? NextResponse.json({ ok: true }) : NextResponse.json({ error: "Category not found." }, { status: 404 });
   } catch (err) {
-    return NextResponse.json({ error: err instanceof Error && err.message.includes("duplicate") ? "That category slug is already used." : "The category could not be saved." }, { status: 409 });
+    return NextResponse.json({ error: err instanceof Error && err.message.includes("duplicate") ? "A category with this name already exists." : "The category could not be saved." }, { status: 409 });
   }
 }
 

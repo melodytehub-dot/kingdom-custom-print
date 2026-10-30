@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { sql } from "@/lib/db";
+import { sendAccountVerification } from "@/lib/account-verification";
 import {
   CUSTOMER_COOKIE,
   authAttemptAllowed,
@@ -50,17 +51,24 @@ export async function POST(request: Request) {
     let accountId: number;
     if (mode === "register") {
       const hash = await passwordHash(password);
-      const [account] = await sql<{ id: number }[]>`
-        INSERT INTO customer_accounts (email, name, password_hash)
-        VALUES (${email}, ${name}, ${hash})
-        ON CONFLICT (email) DO NOTHING RETURNING id`;
+      const [account] = await sql<{ id: number; email: string; name: string }[]>`
+        INSERT INTO customer_accounts (email, name, password_hash, email_verified)
+        VALUES (${email}, ${name}, ${hash}, false)
+        ON CONFLICT (email) DO NOTHING RETURNING id, email, name`;
       if (!account) return NextResponse.json({ error: "This email already has an account. Sign in instead." }, { status: 409 });
-      accountId = account.id;
+      try { await sendAccountVerification(account); } catch {
+        return NextResponse.json({ error: "We couldn't send the confirmation email. Sign in to request a new one." }, { status: 503 });
+      }
+      return NextResponse.json({ verificationRequired: true }, { headers: { "Cache-Control": "no-store" } });
     } else {
-      const [account] = await sql<{ id: number; password_hash: string }[]>`
-        SELECT id, password_hash FROM customer_accounts WHERE email = ${email} LIMIT 1`;
+      const [account] = await sql<{ id: number; email: string; name: string; email_verified: boolean; password_hash: string }[]>`
+        SELECT id, email, name, email_verified, password_hash FROM customer_accounts WHERE email = ${email} LIMIT 1`;
       if (!(await passwordValid(password, account?.password_hash ?? DUMMY_HASH)) || !account) {
         return NextResponse.json({ error: "Email or password is incorrect." }, { status: 401 });
+      }
+      if (!account.email_verified) {
+        await sendAccountVerification(account);
+        return NextResponse.json({ verificationRequired: true }, { headers: { "Cache-Control": "no-store" } });
       }
       accountId = account.id;
     }
