@@ -17,11 +17,11 @@ if ($LASTEXITCODE -ne 0) {
 
 Write-Host "✅ Authenticated with Cloudflare" -ForegroundColor Green
 
-# Build the project (skip local workerd since it crashes on Windows)
+# Build the Cloudflare Worker bundle (skip local workerd since it crashes on Windows)
 Write-Host "`n🔨 Building project..." -ForegroundColor Yellow
 Write-Host "Note: Building without local preview (Windows workerd issue)" -ForegroundColor Gray
 
-# Run Next.js build instead of Vite build to avoid workerd crash
+# npm run build produces the Cloudflare Build Output consumed by cf deploy.
 npm run build
 if ($LASTEXITCODE -ne 0) {
     Write-Host "❌ Build failed. Check errors above." -ForegroundColor Red

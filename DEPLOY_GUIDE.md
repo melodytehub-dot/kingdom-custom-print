@@ -13,13 +13,13 @@ Cloudflare Dashboard builds are failing. CLI access is needed to deploy directly
 
 That's it! This script will:
 1. Check if you're logged into Cloudflare (login if needed)
-2. Build the project using Next.js build
-3. Deploy directly to Cloudflare Workers
+2. Build the Cloudflare Worker bundle
+3. Deploy the generated Cloudflare Build Output
 4. Show you the live URL
 
 ---
 
-## Alternative: Manual Wrangler Commands
+## Alternative: Manual Cloudflare CLI Commands
 
 If you prefer manual control:
 
@@ -35,7 +35,7 @@ npm run build
 
 ### 3. Deploy
 ```powershell
-npx wrangler deploy
+npx cf deploy --prebuilt
 ```
 
 ---
@@ -66,18 +66,17 @@ This means the CLI is authenticated to a different Cloudflare account than where
 5. Use it: `npx wrangler login --api-token YOUR_TOKEN`
 
 ### Build Fails with "workerd" Error
-This is a Windows-specific crash. Use the deploy script which uses Next.js build instead.
+This is a Windows-specific local preview crash. The production build uses Vite/Vinext and runs in Cloudflare Workers Builds; the deploy script skips local preview and deploys the generated bundle.
 
 ### Dashboard Builds Keep Failing
-The FAQ page had a TypeScript error (now fixed in commit f37b5d4). The next dashboard build should succeed. But if not, use the deploy script to bypass the dashboard entirely.
+Confirm that the build command is `npm run build` and the deploy command is `npx cf deploy --prebuilt`. Do not use `next build` or `npx wrangler deploy`; this project uses Cloudflare Build Output from `cloudflare.config.ts`.
 
 ---
 
 ## What's Different About This Setup?
 
-- **Dashboard deployment**: Uses Vite/Vinext build system (crashes on Windows)
-- **CLI deployment**: Uses standard Next.js build (works everywhere)
-- Both produce the same result on Cloudflare's servers
+- **Cloudflare Workers Builds**: Uses `npm run build` (Vite/Vinext) and `npx cf deploy --prebuilt`
+- **Local Windows deployment**: Uses the same build and `deploy.ps1`, but skips local workerd preview
 
 ---
 

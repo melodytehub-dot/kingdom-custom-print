@@ -1,13 +1,13 @@
 # Deployment Status
 
 ## Current Setup
-- **Platform**: Cloudflare Pages
+- **Platform**: Cloudflare Workers Builds
 - **Repository**: https://github.com/melodytehub-dot/kingdom-custom-print.git
 - **Branch**: main
 - **Live URL**: https://kingdomcustomprint.com
 
 ## Vercel Removed
-✓ Vercel configuration has been completely removed to avoid conflicts
+Vercel is no longer part of the deployment path. GitHub `main` pushes build and deploy through Cloudflare Workers Builds.
 
 ## Recent Commits (Awaiting Deployment)
 1. `0e421f2` - fix: completely remove rectangle shape from control buttons
@@ -37,9 +37,8 @@ If the webhook is broken:
 
 ### 4. Check Build Settings
 Ensure these settings in Cloudflare:
-- **Framework preset**: Next.js
-- **Build command**: `npm run build` or `next build`
-- **Build output directory**: `.next`
+- **Build command**: `npm run build`
+- **Deploy command**: `npx cf deploy --prebuilt`
 - **Root directory**: `/` (or empty)
 - **Branch**: `main`
 
@@ -48,11 +47,11 @@ Ensure these settings in Cloudflare:
 If you need to deploy manually right now:
 
 ```powershell
-# Build the project
+# Build the Cloudflare Worker bundle
 npm run build
 
-# You would need to configure wrangler with your project first
-# Or use the Cloudflare Dashboard to manually upload/deploy
+# Deploy the generated Cloudflare Build Output
+npx cf deploy --prebuilt
 ```
 
 ## Verify Deployment
