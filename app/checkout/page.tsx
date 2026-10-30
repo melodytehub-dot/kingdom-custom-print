@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { paymentsConfigured } from "@/lib/stripe";
 import CheckoutForm from "@/components/CheckoutForm";
-import { getSettings } from "@/lib/catalog";
+import { getSettings, DEFAULT_SETTINGS } from "@/lib/catalog";
 import { customerFromCookies } from "@/lib/customer-auth";
 import { paypalConfigured } from "@/lib/paypal";
 
@@ -13,7 +13,7 @@ export const metadata: Metadata = {
 };
 
 export default async function CheckoutPage() {
-  const [settings, account] = await Promise.all([getSettings(), customerFromCookies()]);
+  const [settings, account] = await Promise.all([getSettings().catch(() => DEFAULT_SETTINGS), customerFromCookies()]);
 
   return (
     <>

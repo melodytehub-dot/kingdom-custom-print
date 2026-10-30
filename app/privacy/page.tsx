@@ -1,6 +1,6 @@
 import Link from "next/link";
 import type { Metadata } from "next";
-import { getSettings } from "@/lib/catalog";
+import { getSettings, DEFAULT_SETTINGS } from "@/lib/catalog";
 
 export const metadata: Metadata = {
   title: "Privacy policy",
@@ -8,7 +8,7 @@ export const metadata: Metadata = {
 };
 
 export default async function PrivacyPage() {
-  const settings = await getSettings();
+  const settings = await getSettings().catch(() => DEFAULT_SETTINGS);
   const updated = new Date().toLocaleDateString("en-US", {
     year: "numeric",
     month: "long",

@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import CartView from "@/components/CartView";
-import { getSettings } from "@/lib/catalog";
+import { getSettings, DEFAULT_SETTINGS } from "@/lib/catalog";
 
 export const dynamic = "force-dynamic";
 
@@ -15,7 +15,7 @@ export default async function CartPage({
 }: {
   searchParams: Promise<{ cancelled?: string }>;
 }) {
-  const [settings, params] = await Promise.all([getSettings(), searchParams]);
+  const [settings, params] = await Promise.all([getSettings().catch(() => DEFAULT_SETTINGS), searchParams]);
 
   return (
     <>

@@ -1,6 +1,6 @@
 import Link from "next/link";
 import type { Metadata } from "next";
-import { getSettings } from "@/lib/catalog";
+import { getSettings, DEFAULT_SETTINGS } from "@/lib/catalog";
 import { formatUSD } from "@/lib/pricing";
 
 export const metadata: Metadata = {
@@ -10,7 +10,7 @@ export const metadata: Metadata = {
 };
 
 export default async function ShippingPage() {
-  const settings = await getSettings();
+  const settings = await getSettings().catch(() => DEFAULT_SETTINGS);
 
   return (
     <>

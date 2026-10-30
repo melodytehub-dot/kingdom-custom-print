@@ -1,6 +1,6 @@
 import Link from "next/link";
 import type { Metadata } from "next";
-import { getSettings } from "@/lib/catalog";
+import { getSettings, DEFAULT_SETTINGS } from "@/lib/catalog";
 
 export const metadata: Metadata = {
   title: "Terms and conditions",
@@ -8,7 +8,7 @@ export const metadata: Metadata = {
 };
 
 export default async function TermsPage() {
-  const settings = await getSettings();
+  const settings = await getSettings().catch(() => DEFAULT_SETTINGS);
   const updated = "October 25, 2026";
 
   return (

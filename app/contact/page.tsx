@@ -1,7 +1,7 @@
 import Link from "next/link";
 import type { Metadata } from "next";
 import ContactForm from "@/components/ContactForm";
-import { getSettings } from "@/lib/catalog";
+import { getSettings, DEFAULT_SETTINGS } from "@/lib/catalog";
 import { emailConfigured } from "@/lib/email";
 
 export const metadata: Metadata = {
@@ -11,7 +11,7 @@ export const metadata: Metadata = {
 };
 
 export default async function ContactPage() {
-  const settings = await getSettings();
+  const settings = await getSettings().catch(() => DEFAULT_SETTINGS);
   const contactEmail = process.env.SUPPORT_EMAIL?.trim() || settings.contactEmail;
 
   return (
