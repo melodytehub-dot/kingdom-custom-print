@@ -1,0 +1,32 @@
+# Wrangler configuration for direct CLI deployment
+name = "kingdom-custom-print"
+main = ".cloudflare/output/v0/workers/default/index.js"
+compatibility_date = "2026-10-28"
+compatibility_flags = ["nodejs_compat"]
+assets = { directory = ".cloudflare/output/v0/workers/default/assets" }
+
+# KV namespace for Vinext cache
+[[kv_namespaces]]
+binding = "VINEXT_KV_CACHE"
+id = "b93c6df2d79f47f8ae6e5b0d560c35bc"
+
+# Hyperdrive database connection
+[[hyperdrive]]
+binding = "HYPERDRIVE"
+id = "1df73f5672d24cc79faee05423ca8c2c"
+
+# Custom routes
+[[routes]]
+pattern = "kingdomcustomprint.com/*"
+custom_domain = true
+
+[[routes]]
+pattern = "www.kingdomcustomprint.com/*"
+custom_domain = true
+
+# Observability
+[observability]
+enabled = true
+
+[observability.logs]
+enabled = true
