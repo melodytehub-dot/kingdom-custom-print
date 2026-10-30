@@ -6,6 +6,7 @@ import Link from "next/link";
 import ProductPhotography from "./ProductPhotography";
 import { brandForProduct } from "@/lib/product-brands";
 import ProductColorQuery from "./ProductColorQuery";
+import SizeChart from "./SizeChart";
 import { PRODUCT_VIEWS, type ProductView } from "@/lib/product-presentation";
 import ArrowRight from "@/components/icons/ArrowRight";
 import { formatUSD, lowestPrintedUnit, quoteProduct, resolveBreak } from "@/lib/pricing";
@@ -19,6 +20,7 @@ export default function ProductDetail({ product, initialColor = "" }: { product:
   const [colorSlug, setColorSlug] = useState(product.colors.find(c => c.slug === initialColor)?.slug ?? firstColor?.slug ?? "");
   const [view, setView] = useState<ProductView>("front");
   const colorSlugs = useMemo(() => product.colors.map(c => c.slug), [product.colors]);
+  const [showSizeChart, setShowSizeChart] = useState(false);
   const [lines, setLines] = useState<Record<string, number>>(() => {
     const seed: Record<string, number> = {};
     for (const s of product.sizes) seed[s.label] = 0;
@@ -154,6 +156,15 @@ export default function ProductDetail({ product, initialColor = "" }: { product:
             </span>
           </legend>
 
+          <button
+            type="button"
+            className="link"
+            onClick={() => setShowSizeChart(true)}
+            style={{ marginBottom: "12px", fontSize: "11px" }}
+          >
+            View size chart
+          </button>
+
           <div className="size-run">
             {product.sizes.map((s) => (
               <div
@@ -198,22 +209,22 @@ export default function ProductDetail({ product, initialColor = "" }: { product:
           </div>
 
           <div className="quick-sizes">
-            <span className="small muted">Quick fill:</span>
+            <span className="small muted">Quick add:</span>
             {["XS", "S", "M", "L", "XL", "2XL", "3XL"].map((label) => {
               const exists = product.sizes.some((s) => s.label === label);
               if (!exists) return null;
+              const currentQty = lines[label] || 0;
               return (
                 <button
                   key={label}
                   type="button"
                   className="quick-btn"
                   onClick={() => {
-                    const next: Record<string, number> = {};
-                    for (const s of product.sizes) next[s.label] = s.label === label ? totalQty || 1 : 0;
-                    setLines(next);
+                    setLines((prev) => ({ ...prev, [label]: currentQty + 1 }));
                   }}
+                  title={`Add one ${label}`}
                 >
-                  All {label}
+                  +{label}
                 </button>
               );
             })}
@@ -335,6 +346,14 @@ export default function ProductDetail({ product, initialColor = "" }: { product:
           </div>
         ) : null}
       </div>
+
+      {showSizeChart && (
+        <SizeChart
+          productKind={product.kind}
+          productName={product.name}
+          onClose={() => setShowSizeChart(false)}
+        />
+      )}
     </div>
   );
 }

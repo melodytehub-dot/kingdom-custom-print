@@ -1,14 +1,24 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 
 type Result = { url?: string; orderStatus?: string; captureStatus?: string | null; refundStatus?: string; error?: string };
 
 export default function PayPalTestPage() {
+  const router = useRouter();
   const [token, setToken] = useState("");
   const [result, setResult] = useState<Result>({});
   const [busy, setBusy] = useState(false);
-  useEffect(() => { setToken(new URLSearchParams(window.location.search).get("token") ?? ""); }, []);
+  
+  useEffect(() => {
+    // Hide in production
+    if (process.env.NODE_ENV === "production" && !window.location.hostname.includes("localhost")) {
+      router.push("/admin");
+      return;
+    }
+    setToken(new URLSearchParams(window.location.search).get("token") ?? "");
+  }, [router]);
 
   async function action(name: "start" | "capture" | "refund" | "status") {
     setBusy(true);

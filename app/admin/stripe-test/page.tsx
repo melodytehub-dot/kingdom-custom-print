@@ -1,13 +1,24 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+
 type Result = { url?: string; paymentStatus?: string; refundStatus?: string | null; error?: string };
 
 export default function StripeTestPage() {
+  const router = useRouter();
   const [session, setSession] = useState("");
   const [result, setResult] = useState<Result>({});
   const [busy, setBusy] = useState(false);
-  useEffect(() => { setSession(new URLSearchParams(window.location.search).get("session_id") ?? ""); }, []);
+  
+  useEffect(() => {
+    // Hide in production
+    if (process.env.NODE_ENV === "production" && !window.location.hostname.includes("localhost")) {
+      router.push("/admin");
+      return;
+    }
+    setSession(new URLSearchParams(window.location.search).get("session_id") ?? "");
+  }, [router]);
 
   async function action(name: "start" | "status" | "refund") {
     setBusy(true);

@@ -162,7 +162,13 @@ export default function CheckoutForm({ settings, paymentsReady, paypalReady, acc
     <form className="wrap section-tight checkout" method="post" action="/api/checkout" onSubmit={onSubmit} noValidate>
       <div className="checkout-main">
         <h1 className="h2">Checkout</h1>
-        {!paymentsReady && !paypalReady ? <p className="banner-note" role="status">Online checkout is temporarily unavailable. Your design stays saved in your cart. Please check back soon.</p> : null}
+        
+        {/* US shipping notice */}
+        <div className="banner-note" role="status" style={{ background: "var(--bone)", color: "var(--ink-2)", border: "1px solid var(--line)" }}>
+          <strong>US shipping only:</strong> Online checkout currently supports United States delivery. <Link href="/contact" style={{ textDecoration: "underline" }}>Contact us</Link> for international quotes.
+        </div>
+
+        {!paymentsReady && !paypalReady ? <p className="banner-note" role="alert">Online checkout is temporarily unavailable. Your design stays saved in your cart. Please check back soon.</p> : null}
 
         {formError ? (
           <p className="banner-note is-error" role="alert">
@@ -379,11 +385,14 @@ function TextField({
     <div className="field">
       <label className="label" htmlFor={id}>
         {label}
-        {required ? (
-          <span aria-hidden="true" className="req">
-            *
-          </span>
-        ) : null}
+        {required && (
+          <>
+            {" "}
+            <span className="req" aria-label="required">
+              *
+            </span>
+          </>
+        )}
       </label>
       <input
         id={id}
@@ -394,6 +403,7 @@ function TextField({
         autoComplete={autoComplete}
         aria-invalid={error ? "true" : undefined}
         aria-describedby={error ? `${id}-error` : undefined}
+        aria-required={required}
         onChange={(e) => onChange(e.target.value)}
         readOnly={readOnly}
       />

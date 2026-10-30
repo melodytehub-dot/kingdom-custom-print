@@ -73,7 +73,7 @@ const GROUPS: { title: string; items: { q: string; a: string }[] }[] = [
     items: [
       {
         q: "How long does production take?",
-        a: "PRODUCTION_PLACEHOLDER. See the shipping page for rates.",
+        a: settings.productionDays,
       },
       {
         q: "Can I get a rush order?",
@@ -111,8 +111,8 @@ export default async function FaqPage() {
             <dl className="faq">
               {group.items.map((item) => (
                 <div key={item.q} className="faq-item">
-                  <dt>{item.q.replace("PRODUCTION_PLACEHOLDER", settings.productionDays)}</dt>
-                  <dd>{item.a.replace("PRODUCTION_PLACEHOLDER", settings.productionDays)}</dd>
+                  <dt>{item.q}</dt>
+                  <dd>{item.a}</dd>
                 </div>
               ))}
             </dl>

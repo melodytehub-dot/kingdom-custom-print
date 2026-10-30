@@ -1,11 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 import Link from "next/link";
 import DesignPreviewImage from "@/components/DesignPreviewImage";
 import Trash from "@/components/icons/Trash";
 import ArrowRight from "@/components/icons/ArrowRight";
 import { useCart } from "@/lib/cart-context";
+import { useToast } from "@/lib/toast-context";
 import { describeDesign, type CartItem } from "@/lib/types";
 
 export default function CartView({
@@ -15,11 +16,34 @@ export default function CartView({
   shippingFlat: number;
   freeThreshold: number;
 }) {
-  const { items, hydrated, updateLine, removeItem, subtotal } = useCart();
+  const { items, hydrated, updateLine, removeItem, addItem, subtotal } = useCart();
+  const { showToast } = useToast();
   const [removing, setRemoving] = useState<string | null>(null);
+  const removedItemRef = useRef<CartItem | null>(null);
 
   const remaining = Math.max(0, freeThreshold - subtotal);
   const qualifies = remaining <= 0 && subtotal > 0;
+
+  const handleRemove = (item: CartItem) => {
+    setRemoving(item.id);
+    removedItemRef.current = item;
+    removeItem(item.id);
+    
+    showToast(
+      "Item removed from cart",
+      "info",
+      {
+        label: "Undo",
+        onClick: () => {
+          if (removedItemRef.current) {
+            addItem(removedItemRef.current);
+            showToast("Item restored to cart", "success", undefined, 3000);
+          }
+        },
+      },
+      5000
+    );
+  };
 
   if (!hydrated) {
     return (
@@ -81,10 +105,7 @@ export default function CartView({
               item={item}
               busy={removing === item.id}
               onQty={(label, qty) => updateLine(item.id, label, qty)}
-              onRemove={() => {
-                setRemoving(item.id);
-                removeItem(item.id);
-              }}
+              onRemove={() => handleRemove(item)}
             />
           ))}
         </ul>

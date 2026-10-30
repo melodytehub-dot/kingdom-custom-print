@@ -48,9 +48,14 @@ export default async function ShopPage({
     const words = query.toLowerCase().split(/\s+/);
     products = products.filter((p) => words.every((word) => `${p.name} ${p.styleCode} ${p.blurb} ${p.categoryName} ${p.material} ${brandForProduct(p)?.name ?? ""}`.toLowerCase().includes(word)));
   }
-  if (activeCategory) products = products.filter((p) => p.categorySlug === activeCategory);
-  if (activeKind) products = products.filter((p) => activeKind === "fleece" ? p.kind === "hoodie" || p.kind === "crew" : p.kind === activeKind);
-  if (activeBrand) products = products.filter((p) => brandForProduct(p)?.slug === activeBrand);
+  
+  const categoryFiltered = activeCategory ? products.filter((p) => p.categorySlug === activeCategory) : products;
+  const kindFiltered = activeKind ? products.filter((p) => activeKind === "fleece" ? p.kind === "hoodie" || p.kind === "crew" : p.kind === activeKind) : products;
+  const brandFiltered = activeBrand ? products.filter((p) => brandForProduct(p)?.slug === activeBrand) : products;
+
+  if (activeCategory) products = categoryFiltered;
+  if (activeKind) products = kindFiltered;
+  if (activeBrand) products = brandFiltered;
 
   const sort = params.sort ?? "featured";
   products = [...products].sort((a, b) => {
@@ -110,10 +115,11 @@ export default async function ShopPage({
               }}
               aria-current={!activeCategory && !activeKind ? "true" : undefined}
             >
-              All Blanks
+              All Blanks ({allProducts.length})
             </Link>
             {filterCategories.map((category) => {
               const active = activeCategory === category.slug && !activeKind;
+              const catCount = allProducts.filter((p) => p.categorySlug === category.slug).length;
               return (
                 <Link
                   key={category.slug}
@@ -131,12 +137,13 @@ export default async function ShopPage({
                   }}
                   aria-current={active ? "true" : undefined}
                 >
-                  {category.name}
+                  {category.name} ({catCount})
                 </Link>
               );
             })}
             {KIND_FILTERS.map((kind) => {
               const active = activeKind === kind.value && !activeCategory;
+              const kindCount = allProducts.filter((p) => kind.value === "fleece" ? p.kind === "hoodie" || p.kind === "crew" : p.kind === kind.value).length;
               return (
                 <Link
                   key={kind.value}
@@ -154,7 +161,7 @@ export default async function ShopPage({
                   }}
                   aria-current={active ? "true" : undefined}
                 >
-                  {kind.label}
+                  {kind.label} ({kindCount})
                 </Link>
               );
             })}
@@ -170,7 +177,7 @@ export default async function ShopPage({
         {PRODUCT_BRANDS.map((brand) => <Link key={brand.slug} href={buildHref({ brand: brand.slug })} aria-current={activeBrand === brand.slug ? "page" : undefined}>{brand.name}</Link>)}
       </nav>
 
-      {hasFilters ? (
+      {hasFilters && (activeCategory || activeKind || activeBrand) ? (
         <div className="minimog-container" style={{ marginBottom: "20px" }}>
           <Link href="/shop" style={{ fontSize: "13px", color: "var(--minimog-primary)", fontWeight: 600 }}>
             ✕ Clear all filters

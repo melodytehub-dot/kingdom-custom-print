@@ -21,6 +21,8 @@
   --minimog-bg-light: #F9F9FB;
   --minimog-border: #EEEEEE;
   --minimog-border-dark: #E0E0E0;
+  --minimog-text-grey: #5a5753;
+
 
   /* Typography */
   --font-display: var(--font-anton), "Anton", sans-serif;

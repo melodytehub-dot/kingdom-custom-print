@@ -1,5 +1,6 @@
 import Link from "next/link";
 import GuestOrderAccess from "@/components/GuestOrderAccess";
+import CopyButton from "@/components/CopyButton";
 import { customerFromCookies } from "@/lib/customer-auth";
 import { guestCanAccessOrderFromCookies } from "@/lib/order-access";
 import {
@@ -49,8 +50,8 @@ export default async function SuccessPage({
             <p className="lede">
               Reference <strong className="tnum">{publicOrder.reference}</strong>.{" "}
               {paymentConfirmed
-                ? "Payment is confirmed."
-                : "We are waiting for payment confirmation. Production begins only after payment is confirmed."}
+                ? "Payment is confirmed. We've sent a confirmation email with your order details."
+                : "We are waiting for payment confirmation. You'll receive an email once payment is confirmed and production begins."}
             </p>
             {order ? (
               <ul className="done-list">
@@ -71,8 +72,11 @@ export default async function SuccessPage({
               </div>
             )}
             <p className="small muted">
-              Keep your reference in case you need to contact us about your order.
+              Save your order reference for tracking and support inquiries.
             </p>
+            <div style={{ display: "flex", gap: "12px", flexWrap: "wrap", marginTop: "16px" }}>
+              <CopyButton text={publicOrder.reference} label="Copy reference" />
+            </div>
             <div className="state-actions">
               <Link href={`/order/${publicOrder.reference}`} className="btn">
                 View order

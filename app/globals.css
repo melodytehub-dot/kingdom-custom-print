@@ -16,7 +16,7 @@
   --sand: #e7e3da;
   --line: #e2ded5;
   --line-strong: #cbc6bb;
-  --muted: #6d6a64;
+  --muted: #5a5753;
   --ok: #1c6b45;
   --warn: #9a6410;
   --danger: #b3261e;
@@ -665,4 +665,385 @@ h1.display {
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
   }
+}
+
+
+/* --------------------------------------------------------------------------
+   Toast Notifications
+   -------------------------------------------------------------------------- */
+
+.toast-container {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  z-index: 9999;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-width: 420px;
+  pointer-events: none;
+}
+
+@media (max-width: 600px) {
+  .toast-container {
+    bottom: calc(var(--tabbar-h) + 16px);
+    left: 16px;
+    right: 16px;
+    max-width: none;
+  }
+}
+
+.toast {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 14px 16px;
+  background: var(--ink);
+  color: #fff;
+  border-radius: var(--r);
+  box-shadow: var(--shadow-lg);
+  pointer-events: auto;
+  animation: toastSlideIn 0.3s var(--ease) forwards;
+  min-width: 320px;
+}
+
+@media (max-width: 600px) {
+  .toast {
+    min-width: 0;
+  }
+}
+
+.toast-exit {
+  animation: toastSlideOut 0.3s var(--ease) forwards;
+}
+
+@keyframes toastSlideIn {
+  from {
+    transform: translateX(calc(100% + 20px));
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+@keyframes toastSlideOut {
+  from {
+    transform: translateX(0);
+    opacity: 1;
+  }
+  to {
+    transform: translateX(calc(100% + 20px));
+    opacity: 0;
+  }
+}
+
+.toast-success {
+  background: var(--ok);
+}
+
+.toast-error {
+  background: var(--danger);
+}
+
+.toast-warning {
+  background: var(--warn);
+}
+
+.toast-info {
+  background: var(--ink);
+}
+
+.toast-icon {
+  flex-shrink: 0;
+  width: 20px;
+  height: 20px;
+  margin-top: 1px;
+}
+
+.toast-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.toast-message {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.5;
+  font-weight: 500;
+}
+
+.toast-action {
+  flex-shrink: 0;
+  padding: 4px 12px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  background: rgba(255, 255, 255, 0.2);
+  color: #fff;
+  border-radius: 3px;
+  transition: background var(--dur) var(--ease);
+}
+
+.toast-action:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+.toast-close {
+  flex-shrink: 0;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  line-height: 1;
+  margin: -4px -4px 0 0;
+  opacity: 0.6;
+  transition: opacity var(--dur) var(--ease);
+  color: #fff;
+}
+
+.toast-close:hover {
+  opacity: 1;
+}
+
+
+/* --------------------------------------------------------------------------
+   Modal & Size Chart
+   -------------------------------------------------------------------------- */
+
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  background: rgba(17, 17, 16, 0.75);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  animation: fadeIn 0.2s var(--ease);
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.modal-content {
+  background: #fff;
+  border-radius: var(--r);
+  max-width: 680px;
+  width: 100%;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  box-shadow: var(--shadow-lg);
+  animation: modalSlideUp 0.3s var(--ease);
+}
+
+@keyframes modalSlideUp {
+  from {
+    transform: translateY(30px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 24px 24px 16px;
+  border-bottom: 1px solid var(--line);
+}
+
+.modal-header h2 {
+  margin: 0;
+}
+
+.modal-close {
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 28px;
+  line-height: 1;
+  opacity: 0.5;
+  transition: opacity var(--dur) var(--ease);
+  flex-shrink: 0;
+}
+
+.modal-close:hover {
+  opacity: 1;
+}
+
+.modal-body {
+  padding: 24px;
+  overflow-y: auto;
+}
+
+.size-chart-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.size-chart-table th,
+.size-chart-table td {
+  padding: 12px 16px;
+  text-align: left;
+  border-bottom: 1px solid var(--line);
+}
+
+.size-chart-table th {
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+  background: var(--bone);
+}
+
+.size-chart-table tbody tr:hover {
+  background: var(--bone);
+}
+
+.size-chart-table td {
+  font-size: 14px;
+}
+
+@media (max-width: 600px) {
+  .modal-content {
+    max-height: 95vh;
+    margin: auto 0;
+  }
+
+  .modal-header {
+    padding: 20px 16px 12px;
+  }
+
+  .modal-body {
+    padding: 16px;
+  }
+
+  .size-chart-table th,
+  .size-chart-table td {
+    padding: 10px 12px;
+    font-size: 13px;
+  }
+}
+
+
+/* --------------------------------------------------------------------------
+   Loading States
+   -------------------------------------------------------------------------- */
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.loading-spinner {
+  animation: spin 0.8s linear infinite;
+}
+
+.loading-page {
+  min-height: 60vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--muted);
+}
+
+.loading-page-content {
+  text-align: center;
+}
+
+.loading-page-content p {
+  margin-top: 16px;
+  font-size: 14px;
+}
+
+
+/* --------------------------------------------------------------------------
+   Touch Target Improvements (WCAG 2.5.5)
+   -------------------------------------------------------------------------- */
+
+/* Ensure all interactive elements meet 44x44px minimum on touch devices */
+@media (hover: none) and (pointer: coarse) {
+  button,
+  a.btn,
+  .link,
+  input[type="checkbox"],
+  input[type="radio"],
+  select {
+    min-height: 44px;
+  }
+
+  /* Increase tap area for small interactive elements */
+  .cart-remove,
+  .size-stepper button,
+  .toast-close,
+  .modal-close {
+    min-width: 44px;
+    min-height: 44px;
+  }
+
+  /* Increase spacing for easier tapping */
+  .state-actions {
+    gap: 16px;
+  }
+
+  button:not(:disabled):active {
+    transform: scale(0.98);
+  }
+}
+
+/* Enhanced focus visible states for keyboard navigation */
+*:focus-visible {
+  outline: 3px solid var(--red);
+  outline-offset: 2px;
+}
+
+/* Better link focus in text */
+a:focus-visible {
+  outline-color: var(--red);
+  border-radius: 2px;
+}
+
+
+/* --------------------------------------------------------------------------
+   Skip Link (Accessibility)
+   -------------------------------------------------------------------------- */
+
+.skip-link {
+  position: absolute;
+  top: -40px;
+  left: 0;
+  z-index: 100000;
+  padding: 12px 20px;
+  background: var(--ink);
+  color: #fff;
+  font-weight: 700;
+  font-size: 14px;
+  text-decoration: none;
+  border-radius: 0 0 var(--r) 0;
+  transition: top 0.2s var(--ease);
+}
+
+.skip-link:focus {
+  top: 0;
+  outline: 3px solid var(--red);
+  outline-offset: 2px;
 }
