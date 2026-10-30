@@ -50,7 +50,7 @@ export default async function SuccessPage({
             <p className="lede">
               Reference <strong className="tnum">{publicOrder.reference}</strong>.{" "}
               {paymentConfirmed
-                ? "Payment is confirmed. We've sent a confirmation email with your order details."
+                ? "Payment is confirmed. Our team will send you shipping updates via email as your order progresses."
                 : "We are waiting for payment confirmation. You'll receive an email once payment is confirmed and production begins."}
             </p>
             {order ? (

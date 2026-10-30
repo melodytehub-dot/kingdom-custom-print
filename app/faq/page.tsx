@@ -81,7 +81,11 @@ const GROUPS: { title: string; items: { q: string; a: string }[] }[] = [
       },
       {
         q: "What happens after I order?",
-        a: "After payment is confirmed, keep your order reference and contact us if you have any questions.",
+        a: "After payment is confirmed, keep your order reference. Our team will provide shipping updates via email and is available if you have questions.",
+      },
+      {
+        q: "How will I know when my order ships?",
+        a: "You'll receive an email with tracking information once your order ships. Our team handles all shipping personally.",
       },
       {
         q: "Can I change my order after placing it?",

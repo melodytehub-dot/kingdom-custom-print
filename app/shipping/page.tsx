@@ -27,30 +27,30 @@ export default async function ShippingPage() {
         <section>
           <h2 className="h3">Turnaround</h2>
           <p>
-            The current production estimate is {settings.productionDays}. Artwork review
-            happens first; an order that needs changes does not enter production until
-            those changes are resolved.
+            Current production estimate: {settings.productionDays}. Artwork review
+            happens first; orders requiring changes enter production after those changes are resolved.
           </p>
           <p>
-            If you have a hard deadline, mention it when you order or send us a message
-            first. Rush options can sometimes be accommodated; we will tell you honestly
-            whether it is possible.
+            Hard deadline? Contact us first. Rush options may be available; we'll tell you honestly
+            whether we can meet your timeline.
           </p>
         </section>
 
         <section>
-          <h2 className="h3">Rates</h2>
+          <h2 className="h3">Shipping</h2>
           <p>
-            Standard shipping is {formatUSD(settings.shippingFlat)} and is calculated at
+            Shipping is {formatUSD(settings.shippingFlat)} and calculated at
             checkout
             {settings.freeShippingThreshold > 0
               ? `. Orders over ${formatUSD(settings.freeShippingThreshold)} ship free.`
               : "."}
           </p>
           <p>
+            <strong>Tracking & updates:</strong> Our team handles shipping personally and provides updates directly. You'll receive your tracking information via email once your order ships.
+          </p>
+          <p>
             Online checkout currently supports United States delivery only. International
-            rates, duties, taxes, and delivery times are not built into this flat rate;
-            contact us for a quote before placing an international order.
+            shipping requires a custom quote — contact us before placing an international order.
           </p>
         </section>
 

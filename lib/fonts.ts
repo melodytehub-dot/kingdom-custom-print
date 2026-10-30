@@ -32,31 +32,102 @@ const BUILT_IN_FONTS: FontOption[] = [
   { value: "courier", label: "Courier New", cssVar: "", fallback: "'Courier New', Courier, monospace", scripts: ["latin", "greek", "hebrew"] },
 ];
 
-// Lumise's font picker advertises 800+ Google Fonts. Keep a useful print-focused
-// catalog here and fetch each font only when it is selected, so the editor does
-// not download dozens of unused font files when it opens.
+// Curated open-source fonts perfect for t-shirt printing (SIL OFL License).
+// Optimized for readability, print quality, and design versatility.
+// Each font loads on-demand to keep the editor fast.
 const GOOGLE_FONT_FAMILIES = [
-  "ABeeZee", "Abril Fatface", "Alegreya", "Alfa Slab One", "Amatic SC",
-  "Architects Daughter", "Arvo", "Barlow", "Barlow Condensed", "Bitter",
-  "Bodoni Moda", "Cabin", "Caveat", "Cinzel", "Comfortaa",
-  "Cormorant Garamond", "Crimson Text", "DM Sans", "DM Serif Display",
-  "Dancing Script", "Fira Sans", "Fjalla One", "Fredoka", "Great Vibes",
-  "IBM Plex Mono", "Inconsolata", "Josefin Sans", "Kanit", "Lato",
-  "League Spartan", "Libre Baskerville", "Lora", "Manrope", "Merriweather Sans",
-  "Mulish", "Nunito", "Open Sans", "Orbitron", "PT Sans", "Poppins",
-  "Quicksand", "Righteous", "Roboto", "Roboto Slab", "Rubik", "Satisfy",
-  "Space Grotesk", "Space Mono", "Special Elite", "Teko", "Ubuntu",
-  "Unbounded", "Work Sans", "Yeseva One", "Zilla Slab",
-  // Font families used by text layers in the imported Lumise templates.
-  "Aladin", "Arizonia", "Audiowide", "Baumans", "Berkshire Swash",
-  "Black Ops One", "Bungee Inline", "Bungee Shade", "Caveat Brush",
-  "Coda Caption", "Cookie", "Crete Round", "Damion", "Delius Swash Caps",
-  "Ewert", "Faster One", "Flamenco", "Fredericka the Great", "Frijole",
-  "Handlee", "Holtwood One SC", "Josefin Slab", "Keania One",
-  "Londrina Shadow", "Monoton", "Niconne", "Nosifer", "Oxygen",
-  "Patua One", "Racing Sans One", "Rubik Mono One", "Slabo 27px",
-  "Suez One", "Tangerine", "Titillium Web", "Vast Shadow", "Vinhan",
-  "Yellowtail", "Yesteryear", "Zilla Slab Highlight",
+  // === BOLD DISPLAY & STREETWEAR ===
+  "Bebas Neue",         // Classic streetwear, tight condensed
+  "Anton",              // Heavy impact font for bold statements
+  "Oswald",             // Semi-condensed, athletic feel
+  "Archivo Black",      // Ultra-bold sans for headlines
+  "Rubik",              // Rounded geometric with 9 weights
+  "Righteous",          // Retro-inspired display
+  "Bungee",             // Playful and chunky
+  "Fredoka",            // Soft rounded display
+  "Black Ops One",      // Military stencil style
+  "Alfa Slab One",      // Fat slab serif display
+  "Changa",             // Arabic-inspired geometric
+  "Exo 2",              // Futuristic tech aesthetic
+  
+  // === CONDENSED & NARROW ===
+  "Barlow Condensed",   // Clean condensed sans
+  "Fjalla One",         // Medium condensed display
+  "Teko",               // Ultra-condensed geometric
+  "Pathway Gothic One", // Narrow sans-serif
+  "Yanone Kaffeesatz",  // Thin condensed display
+  
+  // === VINTAGE & RETRO ===
+  "Abril Fatface",      // High-contrast display serif
+  "Bodoni Moda",        // Classic fashion serif
+  "Playfair Display",   // Elegant transitional serif
+  "Yeseva One",         // Old-school poster serif
+  "Ultra",              // Bold vintage serif
+  "Rye",                // Western slab serif
+  "Ranchers",           // Western slab display
+  
+  // === SCRIPTS & HANDWRITTEN ===
+  "Pacifico",           // Casual brush script
+  "Lobster",            // Retro script
+  "Dancing Script",     // Elegant cursive
+  "Great Vibes",        // Formal calligraphy
+  "Satisfy",            // Casual handwriting
+  "Caveat",             // Natural handwriting
+  "Amatic SC",          // Hand-drawn casual
+  "Permanent Marker",   // Bold marker style
+  "Kalam",              // Handwritten casual
+  "Shadows Into Light", // Playful handwriting
+  
+  // === CLEAN SANS-SERIF ===
+  "Roboto",             // Modern geometric (most popular)
+  "Open Sans",          // Friendly humanist sans
+  "Montserrat",         // Urban geometric sans
+  "Poppins",            // Geometric with Indian influence
+  "Raleway",            // Elegant thin geometric
+  "Lato",               // Warm humanist sans
+  "Nunito",             // Rounded terminal sans
+  "Work Sans",          // Workhorse grotesque
+  "Manrope",            // Modern low-contrast
+  "DM Sans",            // Geometric with character
+  "Space Grotesk",      // Proportional monospace
+  "Inter",              // Screen-optimized sans
+  
+  // === SLAB SERIF ===
+  "Roboto Slab",        // Friendly mechanical slab
+  "Zilla Slab",         // Contemporary slab
+  "Arvo",               // Geometric slab serif
+  "Bitter",             // Narrow slab serif
+  "Crete Round",        // Warm slab serif
+  
+  // === MONOSPACE & TECH ===
+  "Roboto Mono",        // Monospaced geometric
+  "Space Mono",         // Retro-futuristic mono
+  "IBM Plex Mono",      // Professional monospace
+  "Courier Prime",      // Typewriter style
+  "Source Code Pro",    // Clean code font
+  
+  // === DECORATIVE & SPECIALTY ===
+  "Bangers",            // Comic book style
+  "Passion One",        // Condensed impact
+  "Monoton",            // Art deco inline
+  "Cinzel",             // Roman capitals
+  "Audiowide",          // Sci-fi tech
+  "Bungee Shade",       // 3D shadow effect
+  "Russo One",          // Sans-serif with character
+  "Press Start 2P",     // 8-bit pixel font
+  "Orbitron",           // Geometric futuristic
+  "Staatliches",        // Condensed display
+  
+  // === EXISTING TEMPLATE FONTS ===
+  "Aladin", "Arizonia", "Baumans", "Berkshire Swash",
+  "Bungee Inline", "Caveat Brush", "Coda Caption", "Cookie",
+  "Damion", "Delius Swash Caps", "Ewert", "Faster One",
+  "Flamenco", "Fredericka the Great", "Frijole", "Handlee",
+  "Holtwood One SC", "Josefin Slab", "Keania One", "Londrina Shadow",
+  "Niconne", "Nosifer", "Patua One", "Racing Sans One",
+  "Rubik Mono One", "Slabo 27px", "Suez One", "Tangerine",
+  "Titillium Web", "Vast Shadow", "Vinhan", "Yellowtail",
+  "Yesteryear", "Zilla Slab Highlight",
 ] as const;
 
 const googleFonts: FontOption[] = GOOGLE_FONT_FAMILIES.map((family) => {
