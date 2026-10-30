@@ -1234,7 +1234,6 @@ function ControlButton({
       role="button"
       aria-label={label}
     >
-      <circle r={34} fill="#fff" stroke="#cfd3d9" strokeWidth={2} />
       {children}
     </g>
   );
@@ -1252,11 +1251,14 @@ function Icon({ children, transform }: { children: React.ReactNode; transform?: 
       viewBox="0 0 24 24"
       fill="none"
       stroke="#2c2b28"
-      strokeWidth={2}
+      strokeWidth={2.5}
       strokeLinecap="round"
       strokeLinejoin="round"
       transform={transform}
-      style={{ pointerEvents: "none" }}
+      style={{ 
+        pointerEvents: "none",
+        filter: "drop-shadow(0 2px 4px rgba(0,0,0,0.3))"
+      }}
     >
       {children}
     </svg>
