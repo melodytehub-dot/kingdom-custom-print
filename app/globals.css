@@ -253,7 +253,7 @@ h1.display {
 }
 
 .section-head h2 {
-  margin-top: 8px;
+  margin-top: 10px;
 }
 
 .rule {
@@ -557,7 +557,12 @@ h1.display {
 }
 
 .panel-pad {
-  padding: clamp(16px, 2.4vw, 24px);
+  padding: clamp(20px, 2.8vw, 28px);
+}
+
+.panel-pad > .h3,
+.panel-pad > h2.h3 {
+  margin-bottom: 16px;
 }
 
 .badge {
