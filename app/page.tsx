@@ -1,4 +1,4 @@
-import Link from "next/link";
+﻿import Link from "next/link";
 import Image from "next/image";
 import HeroImageSlider from "@/components/HeroImageSlider";
 import HomeProducts from "@/components/HomeProducts";
@@ -48,12 +48,12 @@ export default async function HomePage() {
               <div className="mm-hero-copy">
                 <span className="mm-hero-tag">PRINT ON DEMAND STUDIO</span>
                 <h1 className="mm-hero-title">
-                  YOUR IDEAS.
+                  CUSTOM PRINT.
                   <br />
-                  MADE TO WEAR.
+                  MADE TO ORDER.
                 </h1>
                 <p className="mm-hero-desc">
-                  Custom apparel for your everyday, your brand, or your team. Design it online. Make it yours.
+                  Upload your artwork or build a design online. We print it to order — shirts, hoodies, caps and more.
                 </p>
               </div>
               <div className="mm-hero-actions">
@@ -119,7 +119,7 @@ export default async function HomePage() {
               <Image src="/img/shop-printing.png" alt="Custom artwork being printed on a shirt in the studio" fill sizes="(max-width: 768px) 100vw, 620px" className="mm-banner-photo" />
               <div className="mm-banner-content">
                 <h3 className="mm-banner-title">PRINT ON DEMAND</h3>
-                <p className="mm-banner-sub">Your artwork, printed on the apparel you love.</p>
+                <p className="mm-banner-sub">Upload your file or design in the browser. We print and ship.</p>
                 <span className="mm-banner-cta">
                   SHOP NOW <ArrowRight size={14} />
                 </span>
@@ -177,7 +177,7 @@ export default async function HomePage() {
           <div className="mm-section-head">
             <h2 className="mm-section-title">HOW PRINT-ON-DEMAND WORKS</h2>
             <p className="mm-section-sub">
-              From idea to delivered shirt in four straightforward steps.
+              Pick a garment, add artwork in the browser, and we handle the rest.
             </p>
           </div>
 
@@ -297,10 +297,10 @@ export default async function HomePage() {
         <div className="minimog-container">
           <div className="mm-section-head" style={{ marginBottom: "20px" }}>
             <h2 className="mm-section-title" style={{ fontSize: "28px" }}>
-              COLOR YOUR NEXT PROJECT
+              BROWSE GARMENTS AND COLORS
             </h2>
             <p className="mm-section-sub">
-              Explore garment colors and build a look that feels like you.
+              30+ color options across our most popular blanks. Find the right fit before you design.
             </p>
           </div>
 
@@ -329,11 +329,11 @@ export default async function HomePage() {
       <section className="mm-newsletter-section">
         <div className="minimog-container">
           <div className="mm-newsletter-box">
-            <h2 className="mm-newsletter-title">LET’S MAKE SOMETHING GREAT</h2>
+            <h2 className="mm-newsletter-title">READY TO ORDER?</h2>
             <p className="mm-newsletter-sub">
-              Planning apparel for your business or team? Tell us about your project and we’ll help you get started.
+              Bulk order, team gear, or a one-off run — send us the details and we will give you a straight answer on timing and pricing.
             </p>
-            <Link href="/contact" className="mm-btn mm-btn-black">Talk to our team</Link>
+            <Link href="/contact" className="mm-btn mm-btn-black">Get in touch</Link>
           </div>
         </div>
       </section>
