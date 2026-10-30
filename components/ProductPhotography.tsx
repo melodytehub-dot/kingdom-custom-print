@@ -4,7 +4,7 @@ import AccessoryProfile from "./AccessoryProfile";
 import Garment from "./Garment";
 import { photographyFamily, type ProductView } from "@/lib/product-presentation";
 import { mockupsForProduct } from "@/lib/mockups";
-import { printedCatalogImage } from "@/lib/printed-catalog";
+import { productVariantImage } from "@/lib/product-variants";
 import type { Product, ProductColor } from "@/lib/types";
 
 export default function ProductPhotography({ product, color, view = "front", className = "", priority = false, decorative = false, isolated = false }: {
@@ -15,18 +15,22 @@ export default function ProductPhotography({ product, color, view = "front", cla
   const selected = color ?? product.colors[0];
   const label = `${product.name} in ${selected?.name ?? "White"}, ${view} view`;
   const index = { front: 0, back: 1, side: 2 }[view];
-  if (family && isolated) {
-    const src = `/api/garment-preview?family=${family}&color=${(selected?.hex ?? "#FFFFFF").replace("#", "")}&view=${view}`;
-    return <span className={`product-photography ${className}`} data-photo-color={selected?.slug} data-photo-view={view}><Image unoptimized src={src} alt={decorative ? "" : label} fill sizes="600px" style={{objectFit:"contain"}}/></span>;
-  }
-  const printed = !isolated && view === "front" && selected
-    ? printedCatalogImage(product.slug, selected.slug)
-    : null;
-  if (printed) {
-    return <span className={`product-photography ${className}`} data-photo-color={selected.slug} data-photo-view={view}>
-      <Image unoptimized src={printed} alt={decorative ? "" : `${product.name} blank in ${selected.name}`} fill
-        sizes="(max-width: 640px) 50vw, 600px" loading={priority ? "eager" : "lazy"} style={{ objectFit: "contain" }} />
+  const variant = selected && view !== "side" ? productVariantImage(product.slug, selected.slug, selected.hex, view) : null;
+  if (variant) {
+    return <span className={`product-photography ${className}`} data-photo-color={selected?.slug} data-photo-view={view}>
+      <Image unoptimized src={variant} alt={decorative ? "" : label} fill sizes="(max-width: 640px) 50vw, 600px" loading={priority ? "eager" : "lazy"} style={{ objectFit: "contain" }} />
     </span>;
+  }
+  if (selected && view !== "side") {
+    const mockup = mockupsForProduct(product).find((item) => item.slug === selected.slug);
+    const src = view === "back" ? mockup?.back : mockup?.front;
+    if (src) return <span className={`product-photography ${className}`} data-photo-color={selected.slug} data-photo-view={view}>
+      <Image unoptimized src={src} alt={decorative ? "" : label} fill sizes="(max-width: 640px) 50vw, 600px" style={{ objectFit: "contain" }} />
+    </span>;
+  }
+  if (family && isolated) {
+    const src = `/api/garment-preview?family=${family}&color=${(selected?.hex ?? "#FFFFFF").replace("#", "")}&view=${view}&v=2`;
+    return <span className={`product-photography ${className}`} data-photo-color={selected?.slug} data-photo-view={view}><Image unoptimized src={src} alt={decorative ? "" : label} fill sizes="600px" style={{objectFit:"contain"}}/></span>;
   }
   if (!family) {
     if (view === "side") return <span className={`product-photography ${className}`} data-photo-color={selected?.slug} data-photo-view={view}><AccessoryProfile kind={product.kind} color={selected?.hex ?? "#FFFFFF"} title={label}/></span>;

@@ -50,10 +50,21 @@ export async function GET(request: Request) {
   const imageBox = side === "side" ? 'x="-1448" width="2172" height="724"' : 'width="1024" height="1024"';
   const base = bases[key];
   if (!base) return new Response("Garment preview is unavailable", { status: 404 });
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="${viewBox}"><defs><filter id="fabric" color-interpolation-filters="sRGB"><feColorMatrix type="matrix" values="${matrix}"/></filter></defs><image ${imageBox} href="${base}" filter="url(#fabric)"/></svg>`;
+  // SVGs used as images cannot reliably load external images. Embed the
+  // known local source so canvas exports and thumbnails work across browsers.
+  const source = await fetch(new URL(base, request.url));
+  if (!source.ok) return new Response("Garment preview is unavailable", { status: 503 });
+  const bytes = new Uint8Array(await source.arrayBuffer());
+  let binary = "";
+  for (let offset = 0; offset < bytes.length; offset += 0x8000) {
+    binary += String.fromCharCode(...bytes.subarray(offset, offset + 0x8000));
+  }
+  const mime = base.endsWith(".png") ? "image/png" : "image/webp";
+  const embedded = `data:${mime};base64,${btoa(binary)}`;
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="${viewBox}"><defs><filter id="fabric" color-interpolation-filters="sRGB"><feColorMatrix type="matrix" values="${matrix}"/></filter></defs><image ${imageBox} href="${embedded}" filter="url(#fabric)"/></svg>`;
   return new Response(svg, { headers: {
     "Content-Type": "image/svg+xml",
     "Cache-Control": "public, max-age=86400, s-maxage=31536000",
-    "Content-Security-Policy": "default-src 'none'; img-src 'self'; sandbox",
+    "Content-Security-Policy": "default-src 'none'; img-src data:; sandbox",
   } });
 }

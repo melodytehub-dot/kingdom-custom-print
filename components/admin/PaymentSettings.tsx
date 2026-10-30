@@ -36,14 +36,14 @@ export default function PaymentSettings() {
       const result = await response.json();
       if (!response.ok) { setNotice(result.error || "Could not save payment settings."); return; }
       setConfigured(result.fields); setValues({}); setPassword("");
-      setNotice("Credentials saved securely. Webhooks and a payment test must still be verified.");
+      setNotice("Payment credentials saved. Check your payment connection before accepting orders.");
     } catch { setNotice("Connection error. Please try again."); } finally { setSaving(false); }
   }
 
   return <section aria-label="Payment settings" className="admin-subsection">
     <h2 className="h3">Payment credentials</h2>
     <p className="small muted">Enter credentials from the business account. Values are encrypted and cannot be viewed again. Leave a field blank to keep its current value.</p>
-    <p className="small muted">Saving credentials alone does not enable checkout. Payment availability also depends on the site's deployment settings.</p>
+    <p className="small muted">Payment methods must be enabled before customers can use them at checkout.</p>
     {loading ? <p>Loading payment settings…</p> : !available ? <p role="status">Secure credential storage needs to be configured before these fields can be used.</p> :
       <form className="settings-form" onSubmit={save} autoComplete="off">
         {(["STRIPE", "PAYPAL"] as const).map((provider) => <fieldset className="fieldset" key={provider}>

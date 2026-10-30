@@ -230,6 +230,7 @@ const { TextIdeasPanel } = load("components/customizer/panels.tsx", {
   "@/lib/design": { newTextLayer: values => ({ type: "text", ...values }) },
   "@/lib/sizes": {}, "@/lib/pricing": {}, "@/lib/mockups": {}, "@/lib/fonts": {},
   "./GarmentPreview": { GarmentPreview: () => null },
+  "@/components/DesignPreviewImage": { default: () => null },
   "./art": {}, "./editors": { PanelHeader: () => null }, "./templates": {},
   "./lumise-library": { useLumiseLibrary: () => ({ categories: [], items: [], loading: false, error: false }) },
   "./icons": { CheckGlyph: () => null },

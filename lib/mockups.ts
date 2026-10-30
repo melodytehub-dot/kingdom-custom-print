@@ -1,4 +1,5 @@
 import type { ProductKind } from "./types";
+import { productVariantImage } from "./product-variants";
 
 // RushOrderTees "Classic Tee" (RT2000) colourways as flat, body-free garment
 // mockups (ghost-mannequin shading composited from ROT's texture + mask, tinted
@@ -11,6 +12,7 @@ export interface TeeMockup {
   hex: string;
   front: string;
   back: string;
+  precolored?: boolean;
 }
 
 type ProductLike = {
@@ -189,7 +191,9 @@ export function mockupsForProduct(product: ProductLike): TeeMockup[] {
       name: color.name,
       hex: color.hex,
     };
-    const preview = (view: "front" | "back") => `/api/garment-preview?family=${family ?? "tee"}&color=${color.hex.replace("#", "")}&view=${view}`;
-    return { ...productColor, front: preview("front"), back: preview("back") };
+    const preview = (view: "front" | "back") => `/api/garment-preview?family=${family ?? "tee"}&color=${color.hex.replace("#", "")}&view=${view}&v=2`;
+    const front = productVariantImage(product.slug, color.slug, color.hex, "front");
+    const back = productVariantImage(product.slug, color.slug, color.hex, "back");
+    return { ...productColor, front: front ?? preview("front"), back: back ?? preview("back"), precolored: Boolean(front && back) };
   });
 }

@@ -27,12 +27,12 @@ const STAGES = [
   {
     step: "04",
     title: "We check the file",
-    body: "Before anything goes to press, production staff should compare both saved proof sides, placement and available source artwork. The original high-resolution file may still be required for a clean print.",
+    body: "For the best print, upload a clear, high-resolution image and review its placement before ordering.",
   },
   {
     step: "05",
     title: "Print and ship",
-    body: "Once artwork is approved and Stripe confirms payment, the order can enter production. The private order page shows Shipped after the production team records dispatch.",
+    body: "Once payment is confirmed, your order can enter production. Check your order page for updates.",
   },
 ];
 
@@ -68,8 +68,7 @@ export default async function AboutPage() {
           to the finished run
         </h1>
         <p className="lede">
-          We print custom apparel to order. Nothing is made until it is ordered, and
-          nothing is printed until the artwork is right. Production takes{" "}
+          Create custom apparel for your team, event, or everyday wear. Production takes{" "}
           {settings.productionDays}.
         </p>
       </div>

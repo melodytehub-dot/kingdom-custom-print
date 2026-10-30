@@ -71,7 +71,7 @@ export default async function SuccessPage({
               </div>
             )}
             <p className="small muted">
-              We proof your artwork before production. Keep your reference to follow
+              Keep your reference to follow
               progress on the order page.
             </p>
             <div className="state-actions">

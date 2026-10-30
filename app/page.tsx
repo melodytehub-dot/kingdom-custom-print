@@ -214,10 +214,10 @@ export default async function HomePage() {
                 03.
               </span>
               <h3 style={{ fontSize: "18px", marginBottom: "10px", fontFamily: "var(--font-body)", fontWeight: "600", textTransform: "none" }}>
-                Production Review
+                Review Your Design
               </h3>
               <p style={{ color: "#666", fontSize: "14px", lineHeight: "1.6", margin: 0 }}>
-                We review the saved proof and available source artwork before producing your garments to order.
+                Check your artwork, colors, and quantities before placing your order.
               </p>
             </div>
 

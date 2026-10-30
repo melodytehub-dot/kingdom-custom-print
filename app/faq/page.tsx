@@ -14,11 +14,11 @@ const GROUPS: { title: string; items: { q: string; a: string }[] }[] = [
     items: [
       {
         q: "What file types can I upload?",
-        a: "PNG, JPG, WebP, HEIC, AVIF, GIF and SVG. The browser optimizes raster uploads for an on-screen placement proof, so keep your original high-resolution file. SVG stays sharpest; production staff must verify source quality before printing.",
+        a: "You can upload PNG, JPG, WebP, HEIC, AVIF, GIF, or SVG. Keep your original high-resolution file for the best print quality.",
       },
       {
         q: "Why is there a dashed outline on the garment?",
-        a: "That marks the configured printable area for the side you are viewing. Keep artwork inside it. The screen is a placement proof; production staff must still verify the blank, dimensions and source file before printing.",
+        a: "It marks the printable area for the side you're viewing. Keep your artwork inside the outline.",
       },
       {
         q: "Can I print on the sleeves?",
@@ -26,7 +26,7 @@ const GROUPS: { title: string; items: { q: string; a: string }[] }[] = [
       },
       {
         q: "Will my design be exactly what I see?",
-        a: "The designer records side, position, scale and rotation for the customer proof. Screens, garment photography and print methods vary, so it is not a press-ready color or resolution guarantee. Production staff review the saved proof and source artwork before printing.",
+        a: "The preview shows your artwork's placement. Colors and detail may vary between your screen and the finished print.",
       },
     ],
   },
@@ -64,7 +64,7 @@ const GROUPS: { title: string; items: { q: string; a: string }[] }[] = [
       },
       {
         q: "Can I order a size run to keep?",
-        a: "The designer saves drafts on this device. Account orders remain visible while the account is available, but a one-click reorder workflow has not been added yet.",
+        a: "Your design drafts are saved on this device. Sign in to view your past orders.",
       },
     ],
   },
@@ -81,7 +81,7 @@ const GROUPS: { title: string; items: { q: string; a: string }[] }[] = [
       },
       {
         q: "What happens after I order?",
-        a: "We review your artwork, contact you if anything needs changing, print once you approve, then ship. Your order page shows where it is at each stage.",
+        a: "After payment is confirmed, you can check your order page for updates as it moves through production and shipping.",
       },
       {
         q: "Can I change my order after placing it?",

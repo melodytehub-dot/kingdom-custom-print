@@ -509,7 +509,11 @@ export default function Customizer({
     let live = true;
     drawPreview(mockup.front, mockup.back, stripForCart(design), product.printArea)
       .then((p) => live && setPreviews(p))
-      .catch(() => live && setPreviews({ front: null, back: null }));
+      .catch(() => {
+        if (!live) return;
+        setPreviews({ front: null, back: null });
+        setNotice({ tone: "error", text: "We could not load the garment or artwork for the preview. Please check your connection and try again." });
+      });
     return () => {
       live = false;
     };
@@ -1944,8 +1948,8 @@ export default function Customizer({
                     >
                       <GarmentPreview
                         className="rot-side-preview"
-                        src={mockupBaseForProduct(product, view)}
-                        color={mockup.hex}
+                        src={mockup.precolored ? (view === "front" ? mockup.front : mockup.back) : mockupBaseForProduct(product, view)}
+                        color={mockup.precolored ? undefined : mockup.hex}
                       />
                       <span>{view}</span>
                     </button>
@@ -2027,9 +2031,9 @@ export default function Customizer({
               >
                 <DesignCanvas
                   key={`${mockup.code}-${side}`}
-                  frontSrc={mockupBaseForProduct(product, "front")}
-                  backSrc={mockupBaseForProduct(product, "back")}
-                  fabricColor={mockup.hex}
+                  frontSrc={mockup.precolored ? mockup.front : mockupBaseForProduct(product, "front")}
+                  backSrc={mockup.precolored ? mockup.back : mockupBaseForProduct(product, "back")}
+                  fabricColor={mockup.precolored ? undefined : mockup.hex}
                   side={side}
                   printArea={product.printArea}
                   design={design}

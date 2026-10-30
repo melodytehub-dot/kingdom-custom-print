@@ -4,6 +4,7 @@ import { useCallback, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import Garment from "@/components/Garment";
+import DesignPreviewImage from "@/components/DesignPreviewImage";
 import ArrowRight from "@/components/icons/ArrowRight";
 import PaymentSettings from "./PaymentSettings";
 import AdminRefund from "./AdminRefund";
@@ -114,8 +115,7 @@ export default function AdminDashboard({
 
       {!data.paymentsLive ? (
         <p className="banner-note" role="status">
-          Card payments are not connected on this deployment. Checkout is disabled
-          until the Stripe keys and signed webhook are configured.
+          Card payments are unavailable. Check your payment settings before accepting card orders.
         </p>
       ) : null}
 
@@ -482,12 +482,7 @@ function OrderDetailPanel({
                     return (
                       <figure key={side} className="admin-proof">
                         <div className="admin-proof-image">
-                          {preview ? (
-                            // eslint-disable-next-line @next/next/no-img-element
-                            <img src={preview} alt={`${item.productName} ${side} customer proof`} />
-                          ) : (
-                            <Garment kind={item.productKind} color={item.colorHex} />
-                          )}
+                          <DesignPreviewImage src={preview} alt={`${item.productName} ${side} customer proof`} kind={item.productKind} color={item.colorHex} back={side === "back"} />
                         </div>
                         <figcaption>
                           <strong>{side === "front" ? "Front" : "Back"}</strong>
@@ -550,7 +545,7 @@ function OrderDetailPanel({
           </select>
           <p className="hint">
             {detail.status === "pending"
-              ? "Only Stripe can confirm payment. You may cancel this unpaid order."
+              ? "Payment is confirmed by the payment provider. You may cancel this unpaid order."
               : allowedStatuses.length
                 ? "Only the next valid fulfillment step is available."
                 : "This order has no further manual status changes."}

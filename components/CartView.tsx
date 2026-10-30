@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import Garment from "@/components/Garment";
+import DesignPreviewImage from "@/components/DesignPreviewImage";
 import Trash from "@/components/icons/Trash";
 import ArrowRight from "@/components/icons/ArrowRight";
 import { useCart } from "@/lib/cart-context";
@@ -173,12 +173,7 @@ function CartRow({
   return (
     <li className={`cart-row${busy ? " is-busy" : ""}`}>
       <div className="cart-thumb">
-        {preview ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={preview} alt={`${item.productName} in ${item.colorName} with your design`} />
-        ) : (
-          <Garment kind={item.productKind} color={item.colorHex} />
-        )}
+        <DesignPreviewImage src={preview} alt={`${item.productName} in ${item.colorName} with your design`} kind={item.productKind} color={item.colorHex} />
       </div>
 
       <div className="cart-info">

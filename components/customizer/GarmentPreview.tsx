@@ -17,12 +17,12 @@ export function GarmentPreview({
   label = "",
 }: {
   src: string;
-  color: string;
+  color?: string;
   className: string;
   label?: string;
 }) {
   const id = useId().replace(/:/g, "");
-  const matrix = colorMatrix(color);
+  const matrix = color ? colorMatrix(color) : null;
   const filterId = `${id}-fabric`;
 
   return (

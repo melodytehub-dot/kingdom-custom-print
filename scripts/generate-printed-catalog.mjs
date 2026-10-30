@@ -20,12 +20,12 @@ function familyFor(product) {
   })[product.slug] ?? product.kind;
 }
 
-async function baseFor(family) {
+async function baseFor(family, view) {
   const file = family === "tee"
-    ? "public/img/mockups/garment/WHT_fr.webp"
+    ? `public/img/mockups/garment/WHT_${view}.webp`
     : family === "polo"
-      ? "public/img/products/polo-front.png"
-      : `public/img/mockups/families/${family}/WHT_fr.webp`;
+      ? `public/img/products/polo-${view === "fr" ? "front" : "back"}.png`
+      : `public/img/mockups/families/${family}/WHT_${view}.webp`;
   const { data } = await sharp(path.join(root, file)).resize(size, size).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
   return data;
 }
@@ -59,6 +59,7 @@ try {
   `;
   const families = new Map();
   const manifest = {};
+  const variants = {};
   let count = 0;
   for (const row of rows) {
     if (!/^[a-z0-9-]+$/.test(row.product_slug) || !/^[a-z0-9-]+$/.test(row.color_slug) || !/^#[0-9a-f]{6}$/i.test(row.hex)) {
@@ -66,18 +67,23 @@ try {
     }
     const family = familyFor({ slug: row.product_slug, kind: row.kind });
     if (!supportedFamilies.has(family)) throw new Error(`Missing image source for ${family}`);
-    if (!families.has(family)) families.set(family, await baseFor(family));
     const directory = path.join(outputRoot, row.product_slug);
     await mkdir(directory, { recursive: true });
-    const file = path.join(directory, `${row.color_slug}.webp`);
-    const result = colorVariant(families.get(family), row.hex);
-    await sharp(result, { raw: { width: size, height: size, channels: 4 } })
-      .webp({ quality: 84, effort: 4 }).toFile(file);
+    for (const view of ["fr", "bk"]) {
+      const key = `${family}-${view}`;
+      if (!families.has(key)) families.set(key, await baseFor(family, view));
+      const file = path.join(directory, `${row.color_slug}${view === "bk" ? "-back" : ""}.webp`);
+      const result = colorVariant(families.get(key), row.hex);
+      await sharp(result, { raw: { width: size, height: size, channels: 4 } })
+        .webp({ quality: 84, effort: 4 }).toFile(file);
+    }
     (manifest[row.product_slug] ??= []).push(row.color_slug);
+    (variants[row.product_slug] ??= {})[row.color_slug] = row.hex.toLowerCase();
     count++;
   }
   await writeFile(path.join(root, "lib", "printed-catalog-manifest.json"), `${JSON.stringify(manifest, null, 2)}\n`);
-  console.log(`Generated ${count} blank previews for ${Object.keys(manifest).length} products.`);
+  await writeFile(path.join(root, "lib", "product-variant-manifest.json"), `${JSON.stringify(variants, null, 2)}\n`);
+  console.log(`Generated front and back images for ${count} color variants across ${Object.keys(manifest).length} products.`);
 } finally {
   await sql.end();
 }

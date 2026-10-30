@@ -11,6 +11,7 @@ import { PERSONALIZATION_FEE, formatUSD, lowestPrintedUnit, type PriceQuote } fr
 import { sizeSummary } from "@/lib/sizes";
 import { mockupBaseForProduct, TEE_MOCKUPS, type TeeMockup } from "@/lib/mockups";
 import { GarmentPreview } from "./GarmentPreview";
+import DesignPreviewImage from "@/components/DesignPreviewImage";
 import { ensureFontLoaded, FONTS, svgFontStack } from "@/lib/fonts";
 import { ART_CATEGORIES, ART_LIBRARY, type ArtItem } from "./art";
 import { DESIGN_TEMPLATES, TEMPLATE_CATEGORIES, type DesignTemplate } from "./templates";
@@ -76,7 +77,7 @@ export function ProductsPanel({
       />
 
       <div className="rot-product">
-        <GarmentPreview className="rot-product-preview" src={mockupBaseForProduct(product, "front")} color={mockup.hex} />
+        <GarmentPreview className="rot-product-preview" src={mockup.precolored ? mockup.front : mockupBaseForProduct(product, "front")} color={mockup.precolored ? undefined : mockup.hex} />
         <div>
           <p className="rot-product-name">{product.name}</p>
           {product.styleCode ? <p className="rot-muted">Style {product.styleCode}</p> : null}
@@ -142,7 +143,7 @@ export function ProductsPanel({
             }}
           >
             {p.id === product.id ? (
-              <GarmentPreview className="rot-blank-preview" src={mockupBaseForProduct(product, "front")} color={mockup.hex} />
+              <GarmentPreview className="rot-blank-preview" src={mockup.precolored ? mockup.front : mockupBaseForProduct(product, "front")} color={mockup.precolored ? undefined : mockup.hex} />
             ) : p.images[0] ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img src={p.images[0].url} alt="" />
@@ -1244,8 +1245,7 @@ export function ReviewPanel({
           ] as const
         ).map(([label, src]) => (
           <figure key={label}>
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={src} alt={`${label} of your design`} />
+            <DesignPreviewImage src={src} alt={`${label} of your design`} kind={product.kind} color={mockup.hex} back={label === "Back"} />
             <figcaption>{label}</figcaption>
           </figure>
         ))}

@@ -2,7 +2,7 @@
 
 import { useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import Garment from "@/components/Garment";
+import DesignPreviewImage from "@/components/DesignPreviewImage";
 import ArrowRight from "@/components/icons/ArrowRight";
 import { useCart } from "@/lib/cart-context";
 import { describeDesign } from "@/lib/types";
@@ -303,15 +303,7 @@ export default function CheckoutForm({ settings, paymentsReady, paypalReady, acc
             {items.map((item) => (
               <li key={item.id}>
                 <div className="co-thumb">
-                  {item.previewFront ?? item.previewBack ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
-                      src={(item.previewFront ?? item.previewBack) as string}
-                      alt={`${item.productName} in ${item.colorName}`}
-                    />
-                  ) : (
-                    <Garment kind={item.productKind} color={item.colorHex} />
-                  )}
+                  <DesignPreviewImage src={item.previewFront ?? item.previewBack} alt={`${item.productName} in ${item.colorName}`} kind={item.productKind} color={item.colorHex} />
                 </div>
                 <div className="grow">
                   <p className="wrap-anywhere co-name">{item.productName}</p>
@@ -354,7 +346,7 @@ export default function CheckoutForm({ settings, paymentsReady, paypalReady, acc
           </button>
 
           <p className="hint">
-            Payment is handled by Stripe. Artwork is proofed before anything is printed.
+            Review your order before continuing to payment.
           </p>
         </div>
       </aside>

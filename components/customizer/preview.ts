@@ -107,13 +107,8 @@ async function renderSide(
   if (!ctx) throw new Error("Canvas is not available in this browser.");
   ctx.imageSmoothingQuality = "high";
 
-  try {
-    const img = await loadImage(photo);
-    ctx.drawImage(img, 0, 0, SIZE, SIZE);
-  } catch {
-    ctx.fillStyle = "#f4f4f4";
-    ctx.fillRect(0, 0, SIZE, SIZE);
-  }
+  const garment = await loadImage(photo);
+  ctx.drawImage(garment, 0, 0, SIZE, SIZE);
 
   const configured = printArea ? areaFor(printArea, side) : null;
   const frac = configured
@@ -147,12 +142,8 @@ async function renderSide(
     );
 
     if (layer.type === "image") {
-      try {
-        const img = await loadImage(layer.src);
-        sctx.drawImage(img, -base.w / 2, -base.h / 2, base.w, base.h);
-      } catch {
-        // Skip artwork that cannot be decoded; the rest of the design still renders.
-      }
+      const img = await loadImage(layer.src);
+      sctx.drawImage(img, -base.w / 2, -base.h / 2, base.w, base.h);
     } else {
       drawText(sctx, layer, ah);
     }

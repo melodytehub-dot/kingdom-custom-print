@@ -1,4 +1,4 @@
-import Garment from "@/components/Garment";
+import DesignPreviewImage from "@/components/DesignPreviewImage";
 import { ORDER_STATUSES, describeDesign } from "@/lib/types";
 import type { OrderSummary } from "@/lib/orders";
 
@@ -49,15 +49,7 @@ export default function OrderDetail({ order }: { order: OrderSummary }) {
           {order.items.map((item, i) => (
             <li key={i} className="order-item">
               <div className="order-thumb">
-                {item.previewFront ?? item.previewBack ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    src={(item.previewFront ?? item.previewBack) as string}
-                    alt={`${item.productName} in ${item.colorName} with your design`}
-                  />
-                ) : (
-                  <Garment kind={item.productKind} color={item.colorHex} />
-                )}
+                <DesignPreviewImage src={item.previewFront ?? item.previewBack} alt={`${item.productName} in ${item.colorName} with your design`} kind={item.productKind} color={item.colorHex} />
               </div>
 
               <div className="grow">
@@ -116,7 +108,7 @@ export default function OrderDetail({ order }: { order: OrderSummary }) {
 
         {order.status === "pending" ? (
           <p className="hint">
-            Payment has not been confirmed. Production begins only after Stripe confirms
+            Payment has not been confirmed. Production begins only after we confirm
             a successful payment.
           </p>
         ) : null}
