@@ -1029,7 +1029,6 @@ function LayerOverlay({
                 y={-halfH - GAP}
                 label="Stretch vertically"
                 scale={handleScale}
-                shape="pill"
                 onActivate={(e) => onPointerDown(e, layer, "scale", "n")}
               >
                 <StretchIcon axis="v" />
@@ -1050,7 +1049,6 @@ function LayerOverlay({
                 y={0}
                 label="Stretch horizontally"
                 scale={handleScale}
-                shape="pill"
                 onActivate={(e) => onPointerDown(e, layer, "scale", "e")}
               >
                 <StretchIcon axis="h" />
@@ -1158,7 +1156,6 @@ function GroupFrame({
                 y={-halfH - GAP}
                 label="Stretch group vertically"
                 scale={handleScale}
-                shape="pill"
                 onActivate={(e) => onGesture(e, "scale", "n")}
               >
                 <StretchIcon axis="v" />
@@ -1179,7 +1176,6 @@ function GroupFrame({
                 y={0}
                 label="Stretch group horizontally"
                 scale={handleScale}
-                shape="pill"
                 onActivate={(e) => onGesture(e, "scale", "e")}
               >
                 <StretchIcon axis="h" />
