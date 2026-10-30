@@ -1023,7 +1023,6 @@ function LayerOverlay({
 
           {!layer.locked ? (
             <>
-              {!compact ? <>
               <ControlButton
                 x={0}
                 y={-halfH - GAP}
@@ -1036,16 +1035,6 @@ function LayerOverlay({
 
               <ControlButton
                 x={halfW + GAP}
-                y={-halfH - GAP}
-                label="Rotate"
-                scale={handleScale}
-                onActivate={(e) => onPointerDown(e, layer, "rotate")}
-              >
-                <RotateIcon />
-              </ControlButton>
-
-              <ControlButton
-                x={halfW + GAP}
                 y={0}
                 label="Stretch horizontally"
                 scale={handleScale}
@@ -1054,7 +1043,17 @@ function LayerOverlay({
                 <StretchIcon axis="h" />
               </ControlButton>
 
-              </> : null}
+              {!compact ? (
+                <ControlButton
+                  x={halfW + GAP}
+                  y={-halfH - GAP}
+                  label="Rotate"
+                  scale={handleScale}
+                  onActivate={(e) => onPointerDown(e, layer, "rotate")}
+                >
+                  <RotateIcon />
+                </ControlButton>
+              ) : null}
 
               <ControlButton
                 x={resizeX}
@@ -1149,38 +1148,36 @@ function GroupFrame({
 
       {!locked ? (
         <>
+          <ControlButton
+            x={0}
+            y={-halfH - GAP}
+            label="Stretch group vertically"
+            scale={handleScale}
+            onActivate={(e) => onGesture(e, "scale", "n")}
+          >
+            <StretchIcon axis="v" />
+          </ControlButton>
+
+          <ControlButton
+            x={halfW + GAP}
+            y={0}
+            label="Stretch group horizontally"
+            scale={handleScale}
+            onActivate={(e) => onGesture(e, "scale", "e")}
+          >
+            <StretchIcon axis="h" />
+          </ControlButton>
+
           {!compact ? (
-            <>
-              <ControlButton
-                x={0}
-                y={-halfH - GAP}
-                label="Stretch group vertically"
-                scale={handleScale}
-                onActivate={(e) => onGesture(e, "scale", "n")}
-              >
-                <StretchIcon axis="v" />
-              </ControlButton>
-
-              <ControlButton
-                x={halfW + GAP}
-                y={-halfH - GAP}
-                label="Rotate group"
-                scale={handleScale}
-                onActivate={(e) => onGesture(e, "rotate")}
-              >
-                <RotateIcon />
-              </ControlButton>
-
-              <ControlButton
-                x={halfW + GAP}
-                y={0}
-                label="Stretch group horizontally"
-                scale={handleScale}
-                onActivate={(e) => onGesture(e, "scale", "e")}
-              >
-                <StretchIcon axis="h" />
-              </ControlButton>
-            </>
+            <ControlButton
+              x={halfW + GAP}
+              y={-halfH - GAP}
+              label="Rotate group"
+              scale={handleScale}
+              onActivate={(e) => onGesture(e, "rotate")}
+            >
+              <RotateIcon />
+            </ControlButton>
           ) : null}
 
           <ControlButton
