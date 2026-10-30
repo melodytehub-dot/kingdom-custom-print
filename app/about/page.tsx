@@ -66,7 +66,7 @@ export default function AboutPage() {
         </h1>
         <p className="lede">
           Create custom apparel for your team, event, or everyday wear. Production takes{" "}
-          {settings.productionDays}.
+          7-10 business days.
         </p>
       </div>
 
