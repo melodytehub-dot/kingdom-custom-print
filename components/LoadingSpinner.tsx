@@ -1,3 +1,5 @@
+"use client";
+
 export default function LoadingSpinner({ size = 24, className = "" }: { size?: number; className?: string }) {
   return (
     <svg
