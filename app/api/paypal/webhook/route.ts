@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { paypalConfigured, paypalRequest } from "@/lib/paypal";
+import { paypalCredentialsConfigured, paypalRequest } from "@/lib/paypal";
 import { getPaymentCredential } from "@/lib/payment-credentials";
 import { capturePayPalOrder } from "@/lib/paypal-capture";
 import { recordPayPalCapture, markPayPalRefunded } from "@/lib/orders";
@@ -7,7 +7,7 @@ import { sendPaidOrderReceipt } from "@/lib/order-email";
 
 export const dynamic = "force-dynamic";
 export async function POST(request: Request) {
-  if (!(await paypalConfigured())) return NextResponse.json({ error: "PayPal is not configured." }, { status: 503 });
+  if (!(await paypalCredentialsConfigured())) return NextResponse.json({ error: "PayPal is not configured." }, { status: 503 });
   const raw = await request.text();
   if (raw.length > 1_000_000) return NextResponse.json({ error: "Event too large." }, { status: 413 });
   let event: { id?: string; event_type?: string; resource?: { id?: string; status?: string; amount?: { value?: string; currency_code?: string }; supplementary_data?: { related_ids?: { order_id?: string; capture_id?: string } } } };

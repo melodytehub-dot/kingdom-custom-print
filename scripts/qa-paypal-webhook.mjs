@@ -8,7 +8,7 @@ const code = ts.transpileModule(fs.readFileSync("app/api/paypal/webhook/route.ts
 let verified = false, marks = 0, receipts = 0, approved = 0, refundMarks = 0, verificationBody = "";
 const dependencies = {
   "next/server": { NextResponse },
-  "@/lib/paypal": { paypalConfigured: async () => true, paypalRequest: async (path, opts) => { if (path.includes("verify-webhook")) { verificationBody = opts.body; return { verification_status: verified ? "SUCCESS" : "FAILURE" }; } return { status: "REFUNDED" }; } },
+  "@/lib/paypal": { paypalCredentialsConfigured: async () => true, paypalRequest: async (path, opts) => { if (path.includes("verify-webhook")) { verificationBody = opts.body; return { verification_status: verified ? "SUCCESS" : "FAILURE" }; } return { status: "REFUNDED" }; } },
   "@/lib/payment-credentials": { getPaymentCredential: async () => "webhook-fixture" },
   "@/lib/paypal-capture": { capturePayPalOrder: async () => { approved++; } },
   "@/lib/orders": { recordPayPalCapture: async (_order, _capture, amount, currency) => { if (amount !== "10.00" || currency !== "USD") return null; marks++; return { reference: "KCP-ABC234" }; }, markPayPalRefunded: async () => { refundMarks++; } },

@@ -1,10 +1,12 @@
 import { getPaymentCredential } from "./payment-credentials";
 
-export async function paypalConfigured(): Promise<boolean> {
-  // Kept off until live credentials and webhook setup are verified.
-  if (process.env.PAYPAL_CHECKOUT_ENABLED !== "true") return false;
+export async function paypalCredentialsConfigured(): Promise<boolean> {
   const values = await Promise.all([getPaymentCredential("PAYPAL_CLIENT_ID"), getPaymentCredential("PAYPAL_CLIENT_SECRET"), getPaymentCredential("PAYPAL_WEBHOOK_ID")]);
   return values.every(Boolean);
+}
+
+export async function paypalConfigured(): Promise<boolean> {
+  return process.env.PAYPAL_CHECKOUT_ENABLED === "true" && await paypalCredentialsConfigured();
 }
 
 const PAYPAL_BASE = "https://api-m.paypal.com";

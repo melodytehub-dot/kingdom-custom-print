@@ -43,7 +43,7 @@ export default function PaymentSettings() {
   return <section aria-label="Payment settings" className="admin-subsection">
     <h2 className="h3">Payment credentials</h2>
     <p className="small muted">Enter credentials from the business account. Values are encrypted and cannot be viewed again. Leave a field blank to keep its current value.</p>
-    <p className="small muted">Both payment methods remain disabled until their checkout and webhook tests are completed. Saving credentials alone does not enable checkout.</p>
+    <p className="small muted">Saving credentials alone does not enable checkout. Payment availability also depends on the site's deployment settings.</p>
     {loading ? <p>Loading payment settings…</p> : !available ? <p role="status">Secure credential storage needs to be configured before these fields can be used.</p> :
       <form className="settings-form" onSubmit={save} autoComplete="off">
         {(["STRIPE", "PAYPAL"] as const).map((provider) => <fieldset className="fieldset" key={provider}>

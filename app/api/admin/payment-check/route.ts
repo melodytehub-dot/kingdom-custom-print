@@ -22,6 +22,15 @@ export async function GET(req: Request) {
     if (stripe) {
       await stripe.checkout.sessions.list({ limit: 1 });
       result.stripe = "connected";
+      try {
+        const endpoints = await stripe.webhookEndpoints.list({ limit: 100 });
+        const endpoint = endpoints.data.find((entry) => entry.url === "https://kingdomcustomprint.com/api/webhook" && entry.status === "enabled");
+        const required = ["checkout.session.completed", "checkout.session.async_payment_succeeded", "checkout.session.async_payment_failed", "checkout.session.expired", "charge.refunded"];
+        result.stripeWebhook = !endpoint ? "expected active endpoint not found" :
+          !endpoint.enabled_events.includes("*") && required.some((event) => !endpoint.enabled_events.includes(event as typeof endpoint.enabled_events[number])) ? "required events missing" : "configured (delivery unverified)";
+      } catch {
+        result.stripeWebhook = "cannot inspect with current key";
+      }
     }
   } catch {
     result.stripe = "authentication or checkout permission failed";
