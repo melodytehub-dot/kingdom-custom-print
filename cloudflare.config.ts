@@ -22,6 +22,7 @@ export default defineConfig({
       ASSETS: bindings.assets(),
       VINEXT_KV_CACHE: bindings.kv({ id: "b93c6df2d79f47f8ae6e5b0d560c35bc" }),
       HYPERDRIVE: bindings.hyperdrive({ id: "1df73f5672d24cc79faee05423ca8c2c" }),
+      SUPPORT_INBOUND_DOMAIN: bindings.text("untuulunue.resend.app"),
     },
   }),
 });
