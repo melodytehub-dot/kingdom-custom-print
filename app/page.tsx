@@ -87,6 +87,17 @@ export default async function HomePage() {
         ))}
       </nav>
 
+      <section className="mm-colour-intro minimog-container" aria-label="Make it yours">
+        <div className="mm-colour-intro-inner">
+          <div className="mm-colour-intro-copy">
+            <span className="mm-colour-kicker">MADE FOR YOUR IDEAS</span>
+            <h2>Your canvas.<br />Your creativity.</h2>
+            <p>From everyday tees to totes and caps, find your starting point and make it your own.</p>
+            <Link href="/shop" className="mm-colour-link">EXPLORE PRODUCTS <ArrowRight size={16} /></Link>
+          </div>
+        </div>
+      </section>
+
       {/* Featured products */}
       <section className="mm-section">
         <div className="minimog-container">

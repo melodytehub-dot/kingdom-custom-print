@@ -287,6 +287,35 @@ main#main { min-height: calc(100svh - var(--header-h)); }
   background-repeat: no-repeat;
 }
 .mm-category-link:hover { color: var(--red); }
+
+/* A brighter, apparel-led home page while keeping the existing store layout. */
+.mm-home-wrapper { background: #fffdfb; }
+.mm-home-wrapper .mm-hero-actions { background: #f9f2ee; }
+.mm-home-wrapper .mm-category-strip { gap: 14px; padding-block: 24px; }
+.mm-home-wrapper .mm-category-link { border-radius: 16px; background: #f7e9e3; transition: transform 180ms ease, background-color 180ms ease; }
+.mm-home-wrapper .mm-category-link:nth-child(3n + 2) { background: #e7f2f0; }
+.mm-home-wrapper .mm-category-link:nth-child(3n) { background: #edeaf6; }
+.mm-home-wrapper .mm-category-link:hover { transform: translateY(-3px); }
+.mm-home-wrapper .mm-collection-image { border-radius: 16px; }
+.mm-home-wrapper .mm-banner-box { border-radius: 16px; overflow: hidden; }
+.mm-colour-intro { padding-top: 10px; padding-bottom: 20px; }
+.mm-colour-intro-inner { min-height: 340px; display: flex; align-items: center; overflow: hidden; border-radius: 20px; background: #f1e4d6 url('/img/custom-apparel-editorial-v1.png') center / cover no-repeat; }
+.mm-colour-intro-copy { width: min(46%, 500px); padding: 44px clamp(24px, 5vw, 70px); color: #172b3b; }
+.mm-colour-kicker { color: #a83338; font-size: 11px; font-weight: 700; letter-spacing: .15em; }
+.mm-colour-intro-copy h2 { margin: 14px 0; font-size: clamp(32px, 3.6vw, 52px); line-height: 1.08; }
+.mm-colour-intro-copy p { max-width: 31ch; font-size: 16px; line-height: 1.55; }
+.mm-colour-link { display: inline-flex; align-items: center; gap: 12px; margin-top: 15px; padding: 13px 18px; border-radius: 7px; background: #194e82; color: white; font-size: 12px; font-weight: 700; text-decoration: none; }
+.mm-colour-link:hover { background: #123b65; color: white; }
+.mm-colour-link:focus-visible, .mm-category-link:focus-visible { outline: 3px solid #194e82; outline-offset: 3px; }
+@media (max-width: 600px) {
+  .mm-home-wrapper .mm-category-strip { gap: 8px; padding-block: 16px; }
+  .mm-home-wrapper .mm-category-link { border-radius: 12px; }
+  .mm-colour-intro-inner { min-height: 390px; align-items: flex-start; background-position: 61% center; }
+  .mm-colour-intro-copy { width: 100%; padding: 24px; background: linear-gradient(180deg, rgba(249,241,231,.96) 0%, rgba(249,241,231,.88) 65%, transparent 100%); }
+  .mm-colour-intro-copy h2 { font-size: 32px; margin: 8px 0; }
+  .mm-colour-intro-copy p { margin: 0; max-width: 29ch; font-size: 14px; }
+  .mm-colour-link { margin-top: 12px; }
+}
 .shop-brand-filter { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin-top: -14px; margin-bottom: 26px; font-size: 13px; }
 .shop-brand-filter > span { margin-right: 8px; font-weight: 700; }
 .shop-brand-filter a { padding: 8px 14px; background: #f2f2f2; color: #1a1a1a; text-decoration: none; }
