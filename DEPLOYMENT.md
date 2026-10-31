@@ -9,12 +9,11 @@
 ## Vercel Removed
 Vercel is no longer part of the deployment path. GitHub `main` pushes build and deploy through Cloudflare Workers Builds.
 
-## Recent Commits (Awaiting Deployment)
-1. `0e421f2` - fix: completely remove rectangle shape from control buttons
-2. `6ac17cc` - fix: show stretch controls on mobile and all viewports  
-3. `f1d6d09` - fix: remove white rectangle from customizer stretch controls
+## Check builds from the terminal
 
-## Why Deployments May Not Be Happening
+The Kiro deployment steering file `.kiro/steering/cloudflare-deployment.md` contains the Worker tag, build-log commands, and commit verification steps. Use those commands first; the dashboard is not required for normal troubleshooting.
+
+## Dashboard troubleshooting
 
 ### 1. Check Cloudflare Dashboard
 Visit: https://dash.cloudflare.com/
