@@ -1234,7 +1234,7 @@ function ControlButton({
       role="button"
       aria-label={label}
     >
-      <circle r={18} fill="#fff" fillOpacity={0.95} stroke="#2c2b28" strokeWidth={1.5} />
+      <circle r={14} fill="#fff" fillOpacity={0.95} stroke="#2c2b28" strokeWidth={1.5} />
       {children}
     </g>
   );
