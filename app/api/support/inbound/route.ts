@@ -34,7 +34,14 @@ export async function POST(request: Request) {
     const recipient = (mail.to ?? []).map(x => x.toLowerCase()).find(x => x.endsWith(`@${domain}`));
     const token = recipient?.match(/^kcp-([a-f0-9]{48})@/)?.[1];
     if (!token) return NextResponse.json({ ok: true });
-    const text = (mail.text ?? "").split(/\n(?:On .+ wrote:|>\s|--\s*$)/m)[0].trim().slice(0, 4000);
+    // Gmail may wrap its attribution across multiple lines, including the
+    // sender address. Stop there before displaying the quoted conversation.
+    // Only strip signatures with the standard delimiter: a name or initials
+    // without one may be an intentional part of the owner's reply.
+    const text = (mail.text ?? "")
+      .replace(/\r\n?/g, "\n")
+      .split(/(?:^|\n)(?:On [^\n]*(?:\n[^\n]*){0,3}?\s+wrote:\s*(?=\n|$)|[ \t]*>.*|--[ \t]+$)/im)[0]
+      .trim().slice(0, 4000);
     if (!text) return NextResponse.json({ ok: true });
     const tokenHash = createHash("sha256").update(token).digest("hex");
     await sql`INSERT INTO support_messages (conversation_id, sender, body, provider_event_id) SELECT t.conversation_id, 'business', ${text}, ${emailId} FROM support_reply_tokens t JOIN support_conversations c ON c.id = t.conversation_id WHERE t.token_hash = ${tokenHash} AND c.expires_at > now() ON CONFLICT (provider_event_id) DO NOTHING`;
