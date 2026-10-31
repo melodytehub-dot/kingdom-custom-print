@@ -1245,10 +1245,10 @@ function ControlButton({
 function Icon({ children, transform }: { children: React.ReactNode; transform?: string }) {
   return (
     <svg
-      x={-12}
-      y={-12}
-      width={24}
-      height={24}
+      x={-10}
+      y={-10}
+      width={20}
+      height={20}
       viewBox="0 0 24 24"
       fill="none"
       stroke="#2c2b28"
