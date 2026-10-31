@@ -25,8 +25,8 @@
 
 
   /* Typography */
-  --font-display: var(--font-anton), "Anton", sans-serif;
-  --font-body: var(--font-outfit), var(--font-inter), sans-serif;
+  --font-display: var(--font-figtree), sans-serif;
+  --font-body: var(--font-figtree), sans-serif;
 
   /* Layout */
   --container-max: 1280px;

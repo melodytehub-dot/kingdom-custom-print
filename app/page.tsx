@@ -99,6 +99,13 @@ export default async function HomePage() {
       </section>
 
       {/* Featured products */}
+      <section className="mm-start-section minimog-container" aria-label="Ways to get started">
+        <div className="mm-start-heading"><span>YOUR NEXT IDEA STARTS HERE</span><h2>Made for the moments that matter.</h2><p>Make something personal, or bring your whole team together.</p></div>
+        <div className="mm-start-links">
+          <Link href="/customize"><span>01</span><strong>Design it online</strong><small>Add your artwork and make it yours.</small><ArrowRight size={18} /></Link>
+          <Link href="/contact"><span>02</span><strong>Plan a group order</strong><small>Tell us what you have in mind.</small><ArrowRight size={18} /></Link>
+        </div>
+      </section>
       <section className="mm-section">
         <div className="minimog-container">
           <div className="mm-section-head">

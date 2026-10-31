@@ -12,6 +12,7 @@ import Image from "next/image";
 import { useRouter } from "next/navigation";
 import DesignCanvas, { printAreaView } from "./DesignCanvas";
 import { GarmentPreview } from "./GarmentPreview";
+import SupportPanel from "./SupportPanel";
 import { measureTextLayer } from "./textGeometry";
 import { fitStage } from "./stageGeometry";
 import {
@@ -45,7 +46,6 @@ import {
   DollarIcon,
   DuplicateIcon,
   GroupIcon,
-  HeadsetIcon,
   LayersIcon,
   LockIcon,
   PersonalizeIcon,
@@ -1542,7 +1542,6 @@ export default function Customizer({
                       : panel === "saved" ? "saved"
                         : panel === "ideas" ? "ideas" : "";
 
-  const callHref = contactPhone ? `tel:${contactPhone.replace(/[^\d+]/g, "")}` : "/contact";
 
   /* ---------------------------------------------------------------------
      Panel content
@@ -1923,10 +1922,7 @@ export default function Customizer({
         </Link>
         <div className="rot-bar-actions">
           <button type="button" className="rot-barbtn rot-mobile-share" onClick={shareDesign} disabled={busy} aria-label="Share design preview" title="Share design preview"><ShareIcon size={22} /></button>
-          <Link href={callHref} className="rot-barbtn" aria-label={contactPhone ? "Call customer service" : "Contact customer service"}>
-            <HeadsetIcon size={34} />
-            <span>Call or Chat</span>
-          </Link>
+          <SupportPanel phone={contactPhone} />
           <button type="button" className="rot-barbtn rot-header-save" onClick={saveDraft} aria-label="Save design">
             <SaveIcon size={34} />
             <span>Save</span>

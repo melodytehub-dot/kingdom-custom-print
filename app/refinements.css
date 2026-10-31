@@ -226,7 +226,7 @@ a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible
 .mm-footer-col a { overflow-wrap: anywhere; }
 
 main#main { min-height: calc(100svh - var(--header-h)); }
-.page-transition { animation: page-enter 160ms ease-out both; }
+.page-transition { animation: page-enter 240ms cubic-bezier(.22,.61,.36,1) both; }
 @keyframes page-enter {
   from { opacity: 0; }
   to { opacity: 1; }
@@ -290,6 +290,28 @@ main#main { min-height: calc(100svh - var(--header-h)); }
 
 /* A brighter, apparel-led home page while keeping the existing store layout. */
 .mm-home-wrapper { background: #fffdfb; }
+.mm-home-wrapper, .mm-footer { --font-display: var(--font-figtree), sans-serif; --font-body: var(--font-figtree), sans-serif; }
+.mm-home-wrapper h1, .mm-home-wrapper h2, .mm-home-wrapper h3 { font-weight: 750; letter-spacing: -.025em; }
+.mm-hero-slider::after { background: linear-gradient(0deg, rgba(12,15,20,.72), rgba(12,15,20,.35) 65%, rgba(12,15,20,.25)); }
+.mm-home-wrapper .mm-hero-actions { justify-content: center; }
+.mm-home-wrapper .mm-hero-slider-controls { backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); }
+.mm-home-wrapper .mm-section { padding-block: clamp(56px, 7vw, 96px); }
+.mm-home-wrapper .mm-section-head { max-width: 700px; margin-inline: auto; }
+.mm-home-wrapper .mm-collection-image { box-shadow: 0 12px 30px rgba(42,34,30,.08); }
+.mm-home-wrapper .mm-banner-box { transition: transform 220ms ease, box-shadow 220ms ease; }
+@media (hover: hover) { .mm-home-wrapper .mm-banner-box:hover { transform: translateY(-4px); box-shadow: 0 16px 36px rgba(42,34,30,.14); } }
+.mm-footer { background: #f3eee9; border-top: 1px solid #e6dcd4; padding-top: clamp(52px, 7vw, 86px); }
+.mm-footer-grid { gap: clamp(28px, 4vw, 58px); }
+.mm-footer-brand-info { max-width: 340px; }
+.mm-footer-col h2 { color: #9b343a; letter-spacing: .12em; }
+.mm-footer-col li a { transition: color 160ms ease; }
+.mm-footer-bottom { margin-top: 42px; border-top: 1px solid #d9ccc3; }
+.loading-mark { display: flex; justify-content: center; gap: 7px; }
+.loading-mark span { width: 9px; height: 9px; border-radius: 50%; background: #a83239; animation: kcp-loading 900ms ease-in-out infinite alternate; }
+.loading-mark span:nth-child(2) { animation-delay: 150ms; }
+.loading-mark span:nth-child(3) { animation-delay: 300ms; }
+@keyframes kcp-loading { from { transform: translateY(0); opacity: .45; } to { transform: translateY(-6px); opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .loading-mark span { animation: none; } .mm-home-wrapper .mm-banner-box { transition: none; } }
 .mm-home-wrapper .mm-hero-actions { background: #f9f2ee; }
 .mm-home-wrapper .mm-category-strip { gap: 14px; padding-block: 24px; }
 .mm-home-wrapper .mm-category-link { border-radius: 16px; background: #f7e9e3; transition: transform 180ms ease, background-color 180ms ease; }
@@ -299,6 +321,18 @@ main#main { min-height: calc(100svh - var(--header-h)); }
 .mm-home-wrapper .mm-collection-image { border-radius: 16px; }
 .mm-home-wrapper .mm-banner-box { border-radius: 16px; overflow: hidden; }
 .mm-colour-intro { padding-top: 10px; padding-bottom: 20px; }
+.mm-start-section { display: grid; grid-template-columns: 1fr 1.2fr; gap: clamp(28px, 6vw, 90px); align-items: center; padding-block: clamp(45px, 6vw, 80px); }
+.mm-start-heading > span { color: #a83338; font-size: 11px; font-weight: 700; letter-spacing: .14em; }
+.mm-start-heading h2 { font-size: clamp(28px, 3vw, 42px); line-height: 1.12; margin: 12px 0; }
+.mm-start-heading p { color: #57514c; line-height: 1.6; }
+.mm-start-links { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+.mm-start-links a { display: grid; grid-template-columns: 1fr auto; gap: 8px; padding: 24px; min-height: 180px; border-radius: 16px; background: #f5ece6; }
+.mm-start-links a + a { background: #e9f1ef; }
+.mm-start-links a > span { grid-column: 1 / -1; color: #a83338; font-weight: 700; font-size: 12px; }
+.mm-start-links strong, .mm-start-links small { grid-column: 1; }
+.mm-start-links small { color: #57514c; font-size: 13px; }
+.mm-start-links svg { grid-column: 2; grid-row: 2 / 4; align-self: center; }
+@media (max-width: 700px) { .mm-start-section { grid-template-columns: 1fr; gap: 24px; } .mm-start-links a { padding: 18px; min-height: 160px; } }
 .mm-colour-intro-inner { min-height: 340px; display: flex; align-items: center; overflow: hidden; border-radius: 20px; background: #f1e4d6 url('/img/custom-apparel-editorial-v1.png') center / cover no-repeat; }
 .mm-colour-intro-copy { width: min(46%, 500px); padding: 44px clamp(24px, 5vw, 70px); color: #172b3b; }
 .mm-colour-kicker { color: #a83338; font-size: 11px; font-weight: 700; letter-spacing: .15em; }

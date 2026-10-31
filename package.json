@@ -68,6 +68,7 @@
     "react-server-dom-webpack": "19.3.1",
     "sharp": "^0.35.5",
     "stripe": "^16.12.0",
+    "svix": "^2.9.1",
     "vinext": "1.3.1"
   },
   "devDependencies": {

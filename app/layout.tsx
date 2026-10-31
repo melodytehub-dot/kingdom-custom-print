@@ -3,6 +3,7 @@ import {
   Anton,
   Outfit,
   Inter,
+  Figtree,
 } from "next/font/google";
 import "./globals.css";
 import "./site.css";
@@ -47,10 +48,13 @@ const inter = Inter({
   variable: "--font-inter",
 });
 
+const figtree = Figtree({ subsets: ["latin"], display: "swap", variable: "--font-figtree" });
+
 const FONT_VARS = [
   anton.variable,
   outfit.variable,
   inter.variable,
+  figtree.variable,
 ].join(" ");
 
 const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || (process.env.NODE_ENV === "production" ? "https://kingdomcustomprint.com" : "http://localhost:3000");

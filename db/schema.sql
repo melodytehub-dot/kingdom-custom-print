@@ -185,6 +185,35 @@ CREATE TABLE IF NOT EXISTS order_email_receipts (
   sent_at timestamptz NOT NULL DEFAULT now()
 );
 
+CREATE TABLE IF NOT EXISTS order_business_notifications (
+  reference text PRIMARY KEY REFERENCES orders(reference) ON DELETE CASCADE,
+  provider_id text NOT NULL,
+  sent_at timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS support_conversations (
+  id bigserial PRIMARY KEY,
+  customer_token_hash text NOT NULL UNIQUE,
+  name text NOT NULL,
+  email text NOT NULL,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  expires_at timestamptz NOT NULL DEFAULT now() + interval '90 days'
+);
+CREATE TABLE IF NOT EXISTS support_reply_tokens (
+  token_hash text PRIMARY KEY,
+  conversation_id bigint NOT NULL REFERENCES support_conversations(id) ON DELETE CASCADE,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE TABLE IF NOT EXISTS support_messages (
+  id bigserial PRIMARY KEY,
+  conversation_id bigint NOT NULL REFERENCES support_conversations(id) ON DELETE CASCADE,
+  sender text NOT NULL CHECK (sender IN ('customer','business')),
+  body text NOT NULL,
+  provider_event_id text UNIQUE,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS support_messages_conversation_idx ON support_messages (conversation_id, id);
+
 -- Short-lived proof that a guest verified an order with its checkout email.
 -- Only a hash is stored; the raw token lives in an httpOnly browser cookie.
 CREATE TABLE IF NOT EXISTS order_access_sessions (
