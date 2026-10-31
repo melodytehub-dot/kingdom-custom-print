@@ -1282,7 +1282,7 @@ function EditIcon() {
 
 function StretchIcon({ axis }: { axis: "h" | "v" }) {
   return (
-    <Icon transform={axis === "h" ? "rotate(90 15 15)" : undefined}>
+    <Icon transform={axis === "h" ? "rotate(90)" : undefined}>
       <path d="M12 4v16" />
       <path d="M8 8l4-4 4 4" />
       <path d="M8 16l4 4 4-4" />
