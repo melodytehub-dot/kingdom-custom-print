@@ -14,8 +14,16 @@
 
 .filter-chips {
   display: flex;
-  gap: 7px;
+  gap: 8px;
   flex-wrap: wrap;
+  align-items: center;
+}
+
+.filter-chips .chip {
+  min-height: 44px;
+  border-radius: 999px !important;
+  font-size: 13px !important;
+  text-transform: none !important;
 }
 
 .chip {
@@ -141,7 +149,11 @@
     overflow-x: auto;
     scrollbar-width: none;
     -webkit-overflow-scrolling: touch;
+    overscroll-behavior-inline: contain;
+    padding-block: 4px;
   }
+
+  .filter-chips .chip { flex: 0 0 auto; }
 
   .filter-chips::-webkit-scrollbar {
     display: none;

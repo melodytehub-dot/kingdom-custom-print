@@ -7,6 +7,7 @@ import Garment from "@/components/Garment";
 import DesignPreviewImage from "@/components/DesignPreviewImage";
 import ArrowRight from "@/components/icons/ArrowRight";
 import AdminRefund from "./AdminRefund";
+import QuotesPanel from "./QuotesPanel";
 import { HERO_IMAGES } from "@/lib/hero-slides";
 import { formatUSD } from "@/lib/pricing";
 import { mockupsForProduct } from "@/lib/mockups";
@@ -25,13 +26,14 @@ import type {
   SiteSettings,
 } from "@/lib/catalog-types";
 
-type Tab = "overview" | "orders" | "products" | "customers" | "settings";
+type Tab = "overview" | "orders" | "products" | "customers" | "quotes" | "settings";
 
 const TABS: { id: Tab; label: string }[] = [
   { id: "overview", label: "Overview" },
   { id: "orders", label: "Orders" },
   { id: "products", label: "Products" },
   { id: "customers", label: "Customers" },
+  { id: "quotes", label: "Quotes & invoices" },
   { id: "settings", label: "Settings" },
 ];
 
@@ -147,6 +149,7 @@ export default function AdminDashboard({
       ) : null}
       {tab === "products" ? <ProductsPanel key={editingProduct} data={data} editingProduct={editingProduct} /> : null}
       {tab === "customers" ? <Customers data={data} /> : null}
+      {tab === "quotes" ? <QuotesPanel /> : null}
       {tab === "settings" ? <SettingsPanel settings={data.settings} categories={data.categories} /> : null}
     </div>
   );
@@ -429,6 +432,7 @@ function OrderDetailPanel({
             Placed {new Date(detail.createdAt).toLocaleString()}
             {detail.paidAt ? ` · paid ${new Date(detail.paidAt).toLocaleDateString()}` : ""}
           </p>
+          <Link className="link small" href={`/admin/invoice?ref=${encodeURIComponent(detail.reference)}`} target="_blank">Print order invoice</Link>
         </div>
         <button type="button" className="icon-btn" onClick={onClose} aria-label="Close order">
           <svg width="16" height="16" viewBox="0 0 18 18" aria-hidden="true">
@@ -470,6 +474,7 @@ function OrderDetailPanel({
             <br />
             {detail.country}
           </address>
+          {detail.addressLine1 ? <a className="link small" href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent([detail.addressLine1, detail.addressLine2, detail.city, detail.region, detail.postal, detail.country].filter(Boolean).join(", "))}`} target="_blank" rel="noopener noreferrer">Open address in maps</a> : null}
           {detail.notes ? (
             <>
               <h4 className="panel-heading">Notes</h4>
@@ -1511,6 +1516,13 @@ function SettingsPanel({
         <fieldset className="fieldset">
           <legend className="label">Homepage introduction</legend>
           <p className="hint">Edit the text shown over the homepage slideshow.</p>
+          <div className="admin-home-preview" style={{ backgroundImage: `linear-gradient(90deg, rgba(0,0,0,.78), rgba(0,0,0,.35)), url("${form.heroImage1}")` }}>
+            <label><span className="sr-only">Preview small heading</span><input className="admin-preview-label" value={form.heroLabel} maxLength={80} onChange={(e) => setForm({ ...form, heroLabel: e.target.value })} /></label>
+            <label><span className="sr-only">Preview headline first line</span><input className="admin-preview-heading" value={form.heroHeadlineTop} maxLength={100} onChange={(e) => setForm({ ...form, heroHeadlineTop: e.target.value })} /></label>
+            <label><span className="sr-only">Preview headline second line</span><input className="admin-preview-heading" value={form.heroHeadlineBottom} maxLength={100} onChange={(e) => setForm({ ...form, heroHeadlineBottom: e.target.value })} /></label>
+            <label><span className="sr-only">Preview description</span><textarea className="admin-preview-description" value={form.heroDescription} maxLength={350} rows={3} onChange={(e) => setForm({ ...form, heroDescription: e.target.value })} /></label>
+          </div>
+          <p className="hint">Edit text directly in the preview or use the fields below. Select Save settings to publish.</p>
           {([
             ["heroLabel", "Small heading"], ["heroHeadlineTop", "Headline, first line"],
             ["heroHeadlineBottom", "Headline, second line"], ["heroDescription", "Description"],

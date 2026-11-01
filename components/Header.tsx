@@ -11,6 +11,7 @@ const MAIN_NAV_LINKS = [
   { href: "/shop", label: "SHOP ALL" },
   { href: "/shop?kind=tee", label: "T-SHIRTS" },
   { href: "/shop?kind=polo", label: "POLO SHIRTS" },
+  { href: "/shop?kind=longsleeve", label: "LONG SLEEVES" },
   { href: "/shop?kind=hoodie", label: "HOODIES" },
   { href: "/customize", label: "DESIGN STUDIO", highlight: true },
   { href: "/contact", label: "CONTACT" },

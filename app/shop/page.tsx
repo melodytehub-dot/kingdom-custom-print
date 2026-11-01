@@ -49,13 +49,9 @@ export default async function ShopPage({
     products = products.filter((p) => words.every((word) => `${p.name} ${p.styleCode} ${p.blurb} ${p.categoryName} ${p.material} ${brandForProduct(p)?.name ?? ""}`.toLowerCase().includes(word)));
   }
   
-  const categoryFiltered = activeCategory ? products.filter((p) => p.categorySlug === activeCategory) : products;
-  const kindFiltered = activeKind ? products.filter((p) => activeKind === "fleece" ? p.kind === "hoodie" || p.kind === "crew" : p.kind === activeKind) : products;
-  const brandFiltered = activeBrand ? products.filter((p) => brandForProduct(p)?.slug === activeBrand) : products;
-
-  if (activeCategory) products = categoryFiltered;
-  if (activeKind) products = kindFiltered;
-  if (activeBrand) products = brandFiltered;
+  if (activeCategory) products = products.filter((p) => p.categorySlug === activeCategory);
+  if (activeKind) products = products.filter((p) => activeKind === "fleece" ? p.kind === "hoodie" || p.kind === "crew" : p.kind === activeKind);
+  if (activeBrand) products = products.filter((p) => brandForProduct(p)?.slug === activeBrand);
 
   const sort = params.sort ?? "featured";
   products = [...products].sort((a, b) => {
@@ -99,7 +95,7 @@ export default async function ShopPage({
 
       <div className="minimog-container" style={{ marginBottom: "30px" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "16px", paddingBottom: "20px", borderBottom: "1px solid var(--minimog-border)" }}>
-          <div className="filter-chips" role="group" aria-label="Filter by category or product type" style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+          <div className="filter-chips" role="group" aria-label="Filter by category or product type">
             <Link
               href={buildHref({ category: "", kind: "" })}
               className={`chip${!activeCategory && !activeKind ? " is-active" : ""}`}

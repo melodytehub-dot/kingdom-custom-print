@@ -160,8 +160,9 @@ a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible
   .mm-hero-actions { justify-content: flex-start; flex-wrap: nowrap; gap: 10px; }
   .mm-hero-actions .mm-btn { padding: 0 18px; font-size: 11px; flex: 1; white-space: nowrap; }
   .mm-hero-img-wrap { max-width: none; height: auto; aspect-ratio: 1.28; }
-  .mm-tabs-inner { gap: 0; }
-  .mm-tab-btn { padding-inline: 12px; }
+  .mm-tabs { justify-content: flex-start; overflow-x: auto; overscroll-behavior-inline: contain; -webkit-overflow-scrolling: touch; }
+  .mm-tabs-inner { flex-wrap: nowrap; justify-content: flex-start; gap: 4px; }
+  .mm-tab-btn { flex: 0 0 auto; padding-inline: 12px; white-space: nowrap; }
   .mm-product-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px 12px; }
   .mm-card-body { padding: 12px; gap: 8px; }
   .mm-card-title { font-size: 14px; min-height: 2.8em; }

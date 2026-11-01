@@ -97,6 +97,20 @@ CREATE TABLE IF NOT EXISTS customers (
   created_at timestamptz NOT NULL DEFAULT now()
 );
 
+-- Quotes are independent of storefront orders. Amounts are stored in cents.
+CREATE TABLE IF NOT EXISTS admin_quotes (
+  id bigserial PRIMARY KEY,
+  customer_name text NOT NULL,
+  customer_email text NOT NULL DEFAULT '',
+  notes text NOT NULL DEFAULT '',
+  lines jsonb NOT NULL,
+  shipping_cents integer NOT NULL DEFAULT 0 CHECK (shipping_cents >= 0),
+  status text NOT NULL DEFAULT 'quote' CHECK (status IN ('quote', 'invoice')),
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now(),
+  invoiced_at timestamptz
+);
+
 -- Storefront accounts are separate from guest checkout contacts. A matching
 -- email alone must not grant access to orders placed before registration.
 CREATE TABLE IF NOT EXISTS customer_accounts (

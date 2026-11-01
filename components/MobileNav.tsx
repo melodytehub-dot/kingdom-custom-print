@@ -148,6 +148,7 @@ export default function MobileNav({ categories }: { categories: Category[] }) {
               <div className="mobile-cats">
                 <p className="eyebrow">Shop by product</p>
                 <ul>
+                  <li><Link href="/shop?kind=longsleeve">Long sleeve shirts</Link></li>
                   {categories.map((c) => (
                     <li key={c.slug}>
                       <Link href={`/shop?category=${c.slug}`}>{c.name}</Link>
