@@ -8,7 +8,7 @@ export const dynamic = "force-dynamic";
 export async function GET(req: Request) {
   const denied = await requireAdmin(req); if (denied) return denied;
   try {
-    const rows = await sql`SELECT id::text, customer_name, customer_email, notes, lines, shipping_cents, status, created_at, invoiced_at FROM admin_quotes ORDER BY id DESC LIMIT 200`;
+    const rows = await sql`SELECT q.id::text, q.customer_name, q.customer_email, q.notes, q.lines, q.shipping_cents, q.status, q.created_at, q.invoiced_at, p.state AS payment_state, p.provider AS payment_provider FROM admin_quotes q LEFT JOIN LATERAL (SELECT state, provider FROM invoice_payment_attempts WHERE quote_id = q.id AND state IN ('creating', 'open', 'paid', 'refunded') ORDER BY created_at DESC LIMIT 1) p ON true ORDER BY q.id DESC LIMIT 200`;
     return NextResponse.json({ quotes: rows }, { headers: { "Cache-Control": "no-store" } });
   } catch { return NextResponse.json({ error: "Quotes are temporarily unavailable." }, { status: 503 }); }
 }

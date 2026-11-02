@@ -4,6 +4,8 @@ import { getPaymentCredential } from "@/lib/payment-credentials";
 import { capturePayPalOrder } from "@/lib/paypal-capture";
 import { recordPayPalCapture, markPayPalRefunded } from "@/lib/orders";
 import { sendPaidOrderReceipt } from "@/lib/order-email";
+import { capturePayPalInvoice } from "@/lib/invoice-payments";
+import { sql } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
 export async function POST(request: Request) {
@@ -20,8 +22,10 @@ export async function POST(request: Request) {
     const verification = await paypalRequest<{ verification_status?: string }>("/v1/notifications/verify-webhook-signature", { method: "POST", body: `${JSON.stringify(fields).slice(0, -1)},"webhook_event":${raw}}` });
     if (verification.verification_status !== "SUCCESS") return NextResponse.json({ error: "Invalid signature." }, { status: 400 });
     const resource = event.resource;
-    if (event.event_type === "CHECKOUT.ORDER.APPROVED" && resource?.id) await capturePayPalOrder(resource.id);
+    if (event.event_type === "CHECKOUT.ORDER.APPROVED" && resource?.id && !(await capturePayPalInvoice(resource.id))) await capturePayPalOrder(resource.id);
     if (event.event_type === "PAYMENT.CAPTURE.COMPLETED" && resource?.id && resource.amount?.value && resource.amount.currency_code && resource.supplementary_data?.related_ids?.order_id) {
+      const invoice = await capturePayPalInvoice(resource.supplementary_data.related_ids.order_id);
+      if (invoice) return NextResponse.json({ received: true });
       const paid = await recordPayPalCapture(resource.supplementary_data.related_ids.order_id, resource.id, resource.amount.value, resource.amount.currency_code, event.id);
       if (paid) await sendPaidOrderReceipt(paid.reference);
     }
@@ -29,7 +33,10 @@ export async function POST(request: Request) {
       const captureId = resource?.supplementary_data?.related_ids?.capture_id;
       if (captureId && /^[A-Z0-9]{1,20}$/.test(captureId)) {
         const capture = await paypalRequest<{ status?: string }>(`/v2/payments/captures/${captureId}`);
-        if (capture.status === "REFUNDED") await markPayPalRefunded(captureId, event.id);
+        if (capture.status === "REFUNDED") {
+          await sql`UPDATE invoice_payment_attempts SET state = 'refunded' WHERE provider = 'paypal' AND payment_id = ${captureId} AND state = 'paid'`;
+          await markPayPalRefunded(captureId, event.id);
+        }
       }
     }
     return NextResponse.json({ received: true });

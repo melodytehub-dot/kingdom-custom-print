@@ -7,6 +7,7 @@ try {
     await tx`CREATE TABLE IF NOT EXISTS order_business_notifications (reference text PRIMARY KEY REFERENCES orders(reference) ON DELETE CASCADE, provider_id text NOT NULL, sent_at timestamptz NOT NULL DEFAULT now())`;
     await tx`CREATE TABLE IF NOT EXISTS support_conversations (id bigserial PRIMARY KEY, customer_token_hash text NOT NULL UNIQUE, name text NOT NULL, email text NOT NULL, created_at timestamptz NOT NULL DEFAULT now(), expires_at timestamptz NOT NULL DEFAULT now() + interval '90 days')`;
     await tx`CREATE TABLE IF NOT EXISTS support_reply_tokens (token_hash text PRIMARY KEY, conversation_id bigint NOT NULL REFERENCES support_conversations(id) ON DELETE CASCADE, created_at timestamptz NOT NULL DEFAULT now())`;
+    await tx`ALTER TABLE support_reply_tokens ADD COLUMN IF NOT EXISTS audience text NOT NULL DEFAULT 'owner'`;
     await tx`CREATE TABLE IF NOT EXISTS support_messages (id bigserial PRIMARY KEY, conversation_id bigint NOT NULL REFERENCES support_conversations(id) ON DELETE CASCADE, sender text NOT NULL CHECK (sender IN ('customer','business')), body text NOT NULL, provider_event_id text UNIQUE, created_at timestamptz NOT NULL DEFAULT now())`;
     await tx`CREATE INDEX IF NOT EXISTS support_messages_conversation_idx ON support_messages (conversation_id, id)`;
   });

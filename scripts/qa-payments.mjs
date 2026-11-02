@@ -91,6 +91,8 @@ const webhook = load("app/api/webhook/route.ts", {
   "@/lib/stripe": { stripeClient: () => stripe },
   "@/lib/payment-credentials": { getPaymentCredential: async () => secret },
   "@/lib/order-email": { sendPaidOrderReceipt: async () => { receiptCalls++; if (receiptFails) throw new Error("mail unavailable"); } },
+  "@/lib/invoice-payments": { recordStripeInvoicePayment: async () => false, closeStripeInvoiceSession: async () => false },
+  "@/lib/db": { sql: async () => [] },
 });
 async function event(status, type = "checkout.session.completed", valid = true, object) {
   const body = JSON.stringify({ id: "evt_local", type, data: { object: object ?? { id: "cs_test_local", payment_status: status, payment_intent: "pi_local" } } });

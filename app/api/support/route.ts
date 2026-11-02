@@ -22,7 +22,7 @@ export async function GET(request: Request) {
     response.cookies.set(cookieName, "", { httpOnly: true, sameSite: "lax", secure: process.env.NODE_ENV === "production", path: "/", maxAge: 0 });
     return response;
   }
-  const messages = await sql<{ sender: string; body: string; created_at: Date }[]>`SELECT sender, body, created_at FROM support_messages WHERE conversation_id = ${conversation.id} ORDER BY id ASC LIMIT 200`;
+  const messages = await sql<{ sender: string; body: string; created_at: Date }[]>`SELECT sender, body, created_at FROM (SELECT id, sender, body, created_at FROM support_messages WHERE conversation_id = ${conversation.id} ORDER BY id DESC LIMIT 200) recent ORDER BY id ASC`;
   return NextResponse.json({ messages, available }, { headers: { "Cache-Control": "no-store" } });
 }
 

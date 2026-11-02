@@ -33,12 +33,17 @@ for (const width of [320, 375, 390, 430, 768, 901, 1440]) {
   }
 }
 assert.equal(fitStage(390, 632).size, 546);
-for (const width of [320, 375, 390, 430]) {
-  const fit = fitStage(width, 700, 1, { containWidth: true });
-  assert.ok(fit.left >= 0 && fit.left + fit.size <= width, "wide garments fit within the mobile viewport");
-  assert.equal(fit.left + fit.size / 2, width / 2);
+for (const width of [320, 375, 390, 430]) for (const bounds of [
+  { left: 95 / 700, right: 690 / 700, top: 22 / 700, bottom: 661 / 700 },
+  { left: 24 / 700, right: 615 / 700, top: 34 / 700, bottom: 662 / 700 },
+  { left: 76 / 700, right: 683 / 700, top: 33 / 700, bottom: 666 / 700 },
+  { left: 30 / 700, right: 623 / 700, top: 33 / 700, bottom: 671 / 700 },
+]) {
+  const fit = fitStage(width, 700, 1, { contentBounds: bounds });
+  assert.ok(fit.left + fit.size * bounds.left >= 7.9 && fit.left + fit.size * bounds.right <= width - 7.9, "garment edges fit within the mobile viewport");
+  assert.ok(Math.abs(fit.left + fit.size * (bounds.left + bounds.right) / 2 - width / 2) < 0.001);
+  assert.ok(fit.size > width, "transparent edges do not shrink the garment");
 }
-assert.equal(fitStage(1200, 800, 1, { containWidth: true }).size, fitStage(1200, 800).size);
 assert.equal(fitStage(320, 356).size, 332);
 assert.equal(fitStage(844, 390).size, 366);
 assert.equal(fitStage(0, 500).size, 0);

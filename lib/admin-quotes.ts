@@ -1,5 +1,5 @@
 export type QuoteLine = { description: string; quantity: number; unitCents: number };
-export type AdminQuote = { id: string; customer_name: string; customer_email: string; notes: string; lines: QuoteLine[]; shipping_cents: number; status: "quote" | "invoice"; created_at: string; invoiced_at: string | null };
+export type AdminQuote = { id: string; customer_name: string; customer_email: string; notes: string; lines: QuoteLine[]; shipping_cents: number; status: "quote" | "invoice"; created_at: string; invoiced_at: string | null; payment_state?: string | null; payment_provider?: "stripe" | "paypal" | null };
 
 export function validateQuote(input: unknown): { value?: { name: string; email: string; notes: string; lines: QuoteLine[]; shippingCents: number }; error?: string } {
   if (!input || typeof input !== "object") return { error: "Enter the quote details." };

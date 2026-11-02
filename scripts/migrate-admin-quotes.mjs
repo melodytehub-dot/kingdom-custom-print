@@ -12,5 +12,9 @@ try {
   )`;
   await db`CREATE TABLE IF NOT EXISTS invoice_share_tokens (token_hash text PRIMARY KEY, quote_id bigint NOT NULL REFERENCES admin_quotes(id) ON DELETE CASCADE, expires_at timestamptz NOT NULL, created_at timestamptz NOT NULL DEFAULT now())`;
   await db`CREATE INDEX IF NOT EXISTS invoice_share_tokens_quote_idx ON invoice_share_tokens (quote_id)`;
+  await db`CREATE TABLE IF NOT EXISTS quote_share_tokens (token_hash text PRIMARY KEY, quote_id bigint NOT NULL REFERENCES admin_quotes(id) ON DELETE CASCADE, snapshot jsonb NOT NULL, expires_at timestamptz NOT NULL, created_at timestamptz NOT NULL DEFAULT now())`;
+  await db`CREATE INDEX IF NOT EXISTS quote_share_tokens_quote_idx ON quote_share_tokens (quote_id)`;
+  await db`CREATE TABLE IF NOT EXISTS invoice_payment_attempts (id uuid PRIMARY KEY, quote_id bigint NOT NULL REFERENCES admin_quotes(id), provider text NOT NULL CHECK (provider IN ('stripe', 'paypal')), amount_cents bigint NOT NULL CHECK (amount_cents > 0), state text NOT NULL DEFAULT 'creating' CHECK (state IN ('creating', 'open', 'paid', 'closed', 'refunded')), provider_id text UNIQUE, payment_id text, checkout_url text, created_at timestamptz NOT NULL DEFAULT now(), paid_at timestamptz)`;
+  await db`CREATE UNIQUE INDEX IF NOT EXISTS invoice_payment_one_live ON invoice_payment_attempts (quote_id) WHERE state IN ('creating', 'open', 'paid', 'refunded')`;
   console.log("Quote table is ready.");
 } finally { await db.end(); }

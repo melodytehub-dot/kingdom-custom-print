@@ -33,7 +33,7 @@ export default {
         app.fetch(request, env, ctx)
       );
       const headers = new Headers(response.headers);
-      if (new URL(request.url).pathname.startsWith("/invoice/")) {
+      if (/^\/(?:invoice|quote)\//.test(new URL(request.url).pathname)) {
         headers.set("Cache-Control", "private, no-store");
         headers.set("Referrer-Policy", "no-referrer");
         headers.set("X-Robots-Tag", "noindex, nofollow");

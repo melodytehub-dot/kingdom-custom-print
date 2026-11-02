@@ -140,6 +140,28 @@ CREATE TABLE IF NOT EXISTS invoice_share_tokens (
   created_at timestamptz NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS invoice_share_tokens_quote_idx ON invoice_share_tokens (quote_id);
+CREATE TABLE IF NOT EXISTS quote_share_tokens (
+  token_hash text PRIMARY KEY,
+  quote_id bigint NOT NULL REFERENCES admin_quotes(id) ON DELETE CASCADE,
+  snapshot jsonb NOT NULL,
+  expires_at timestamptz NOT NULL,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS quote_share_tokens_quote_idx ON quote_share_tokens (quote_id);
+
+CREATE TABLE IF NOT EXISTS invoice_payment_attempts (
+  id uuid PRIMARY KEY,
+  quote_id bigint NOT NULL REFERENCES admin_quotes(id),
+  provider text NOT NULL CHECK (provider IN ('stripe', 'paypal')),
+  amount_cents bigint NOT NULL CHECK (amount_cents > 0),
+  state text NOT NULL DEFAULT 'creating' CHECK (state IN ('creating', 'open', 'paid', 'closed', 'refunded')),
+  provider_id text UNIQUE,
+  payment_id text,
+  checkout_url text,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  paid_at timestamptz
+);
+CREATE UNIQUE INDEX IF NOT EXISTS invoice_payment_one_live ON invoice_payment_attempts (quote_id) WHERE state IN ('creating', 'open', 'paid', 'refunded');
 
 -- Storefront accounts are separate from guest checkout contacts. A matching
 -- email alone must not grant access to orders placed before registration.
@@ -247,8 +269,10 @@ CREATE TABLE IF NOT EXISTS support_conversations (
 CREATE TABLE IF NOT EXISTS support_reply_tokens (
   token_hash text PRIMARY KEY,
   conversation_id bigint NOT NULL REFERENCES support_conversations(id) ON DELETE CASCADE,
+  audience text NOT NULL DEFAULT 'owner' CHECK (audience IN ('owner', 'customer')),
   created_at timestamptz NOT NULL DEFAULT now()
 );
+ALTER TABLE support_reply_tokens ADD COLUMN IF NOT EXISTS audience text NOT NULL DEFAULT 'owner';
 CREATE TABLE IF NOT EXISTS support_messages (
   id bigserial PRIMARY KEY,
   conversation_id bigint NOT NULL REFERENCES support_conversations(id) ON DELETE CASCADE,

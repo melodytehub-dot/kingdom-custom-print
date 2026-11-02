@@ -4,6 +4,8 @@ import { markOrderPaid } from "@/lib/orders";
 import { stripeClient } from "@/lib/stripe";
 import { sendPaidOrderReceipt } from "@/lib/order-email";
 import { getPaymentCredential } from "@/lib/payment-credentials";
+import { closeStripeInvoiceSession, recordStripeInvoicePayment } from "@/lib/invoice-payments";
+import { sql } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
 
@@ -39,6 +41,17 @@ export async function POST(req: Request) {
     case "checkout.session.async_payment_succeeded": {
       const session = event.data.object;
       if (session.payment_status !== "paid") break;
+      if (await recordStripeInvoicePayment(session)) {
+        // Stripe may deliver a refund event before this payment event.
+        const paymentId = typeof session.payment_intent === "string" ? session.payment_intent : session.payment_intent?.id;
+        if (!paymentId) throw new Error("Invoice payment has no payment intent");
+        const intent = await stripe.paymentIntents.retrieve(paymentId, { expand: ["latest_charge"] });
+        const charge = intent.latest_charge;
+        if (charge && typeof charge !== "string" && charge.amount > 0 && charge.amount_refunded >= charge.amount) {
+          await sql`UPDATE invoice_payment_attempts SET state = 'refunded' WHERE provider = 'stripe' AND payment_id = ${paymentId} AND state = 'paid'`;
+        }
+        break;
+      }
       const order = await markOrderPaid(
         session.id,
         typeof session.payment_intent === "string"
@@ -59,6 +72,7 @@ export async function POST(req: Request) {
     }
     case "checkout.session.expired": {
       const session = event.data.object;
+      if (await closeStripeInvoiceSession(session)) break;
       if (session.client_reference_id) {
         const { cancelOrder } = await import("@/lib/orders");
         await cancelOrder(session.client_reference_id, { eventId: event.id, providerClosed: true, stripeSessionId: session.id });
@@ -67,6 +81,7 @@ export async function POST(req: Request) {
     }
     case "checkout.session.async_payment_failed": {
       const session = event.data.object;
+      if (await closeStripeInvoiceSession(session)) break;
       if (session.client_reference_id) {
         const { cancelOrder } = await import("@/lib/orders");
         await cancelOrder(session.client_reference_id, {
@@ -85,6 +100,7 @@ export async function POST(req: Request) {
         ? charge.payment_intent
         : charge.payment_intent?.id;
       if (paymentIntentId) {
+        await sql`UPDATE invoice_payment_attempts SET state = 'refunded' WHERE provider = 'stripe' AND payment_id = ${paymentIntentId} AND state = 'paid'`;
         const { markOrderRefunded } = await import("@/lib/orders");
         await markOrderRefunded(paymentIntentId, event.id);
       }
