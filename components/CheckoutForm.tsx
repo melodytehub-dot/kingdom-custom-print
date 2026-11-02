@@ -7,6 +7,7 @@ import ArrowRight from "@/components/icons/ArrowRight";
 import { useCart } from "@/lib/cart-context";
 import { describeDesign } from "@/lib/types";
 import type { SiteSettings } from "@/lib/catalog";
+import { createCheckoutAttempt } from "@/lib/checkout-attempt";
 
 type Fields = {
   email: string;
@@ -60,7 +61,7 @@ export default function CheckoutForm({ settings, paymentsReady, paypalReady, acc
   const [errors, setErrors] = useState<Errors>({});
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
-  const checkoutAttempt = useRef(crypto.randomUUID());
+  const checkoutAttempt = useRef<string | null>(null);
 
   const shipping = useMemo(() => {
     if (subtotal <= 0) return 0;
@@ -90,6 +91,10 @@ export default function CheckoutForm({ settings, paymentsReady, paypalReady, acc
       setFormError("That payment method is temporarily unavailable. Your cart is saved.");
       return;
     }
+    if (items.some((item) => !item.design || !Array.isArray(item.design.front) || !Array.isArray(item.design.back))) {
+      setFormError("A design in your cart needs to be edited before checkout. Please return to your cart and review it.");
+      return;
+    }
 
     const found = validate(fields);
     setErrors(found);
@@ -99,6 +104,11 @@ export default function CheckoutForm({ settings, paymentsReady, paypalReady, acc
       return;
     }
 
+    checkoutAttempt.current ??= createCheckoutAttempt();
+    if (!checkoutAttempt.current) {
+      setFormError("Secure checkout is unavailable in this browser. Please try an updated browser or contact us.");
+      return;
+    }
     setSubmitting(true);
     try {
       const res = await fetch("/api/checkout", {
@@ -115,7 +125,7 @@ export default function CheckoutForm({ settings, paymentsReady, paypalReady, acc
       };
 
       if (!res.ok) {
-        checkoutAttempt.current = crypto.randomUUID();
+        checkoutAttempt.current = null;
         if (data.fieldErrors) setErrors(data.fieldErrors);
         setFormError(data.error ?? "We could not start checkout.");
         return;
@@ -343,8 +353,8 @@ export default function CheckoutForm({ settings, paymentsReady, paypalReady, acc
           </dl>
 
           <fieldset className="fieldset"><legend className="label">Payment method</legend>
-            {paymentsReady ? <label><input type="radio" name="paymentMethod" checked={paymentMethod === "stripe"} onChange={() => { setPaymentMethod("stripe"); checkoutAttempt.current = crypto.randomUUID(); }} /> Credit or debit card</label> : null}
-            {paypalReady ? <label><input type="radio" name="paymentMethod" checked={paymentMethod === "paypal"} onChange={() => { setPaymentMethod("paypal"); checkoutAttempt.current = crypto.randomUUID(); }} /> PayPal</label> : null}
+            {paymentsReady ? <label><input type="radio" name="paymentMethod" checked={paymentMethod === "stripe"} onChange={() => { setPaymentMethod("stripe"); checkoutAttempt.current = null; }} /> Credit or debit card (Stripe)</label> : null}
+            {paypalReady ? <label><input type="radio" name="paymentMethod" checked={paymentMethod === "paypal"} onChange={() => { setPaymentMethod("paypal"); checkoutAttempt.current = null; }} /> PayPal</label> : null}
           </fieldset>
           <button type="submit" className="btn btn-lg btn-block" disabled={submitting || !selectedReady}>
             {submitting ? "Starting checkout…" : !selectedReady ? "Checkout unavailable" : "Continue to payment"}

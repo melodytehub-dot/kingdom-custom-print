@@ -33,6 +33,12 @@ for (const width of [320, 375, 390, 430, 768, 901, 1440]) {
   }
 }
 assert.equal(fitStage(390, 632).size, 546);
+for (const width of [320, 375, 390, 430]) {
+  const fit = fitStage(width, 700, 1, { containWidth: true });
+  assert.ok(fit.left >= 0 && fit.left + fit.size <= width, "wide garments fit within the mobile viewport");
+  assert.equal(fit.left + fit.size / 2, width / 2);
+}
+assert.equal(fitStage(1200, 800, 1, { containWidth: true }).size, fitStage(1200, 800).size);
 assert.equal(fitStage(320, 356).size, 332);
 assert.equal(fitStage(844, 390).size, 366);
 assert.equal(fitStage(0, 500).size, 0);
@@ -230,6 +236,7 @@ const { TextIdeasPanel } = load("components/customizer/panels.tsx", {
   "@/lib/design": { newTextLayer: values => ({ type: "text", ...values }) },
   "@/lib/sizes": {}, "@/lib/pricing": {}, "@/lib/mockups": {}, "@/lib/fonts": {},
   "./GarmentPreview": { GarmentPreview: () => null },
+  "./SupportPanel": { default: () => null },
   "@/components/DesignPreviewImage": { default: () => null },
   "./art": {}, "./editors": { PanelHeader: () => null }, "./templates": {},
   "./lumise-library": { useLumiseLibrary: () => ({ categories: [], items: [], loading: false, error: false }) },
@@ -261,6 +268,7 @@ const { default: Customizer } = load("components/customizer/Customizer.tsx", {
   } },
   "react/jsx-runtime": jsx, "next/link": {}, "next/image": {}, "next/navigation": { useRouter: () => ({ push() {} }) }, "../ProductPhotography": {},
   "./GarmentPreview": { GarmentPreview: () => null },
+  "./SupportPanel": { default: () => null },
   "./textGeometry": {},
   "./DesignCanvas": { default: Canvas, printAreaView: () => ({ w: 360, h: 450, x: 90, y: 100 }) }, "./stageGeometry": { fitStage },
   "@/lib/fonts": {},

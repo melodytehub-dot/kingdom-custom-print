@@ -10,5 +10,7 @@ try {
     status text NOT NULL DEFAULT 'quote' CHECK (status IN ('quote', 'invoice')),
     created_at timestamptz NOT NULL DEFAULT now(), updated_at timestamptz NOT NULL DEFAULT now(), invoiced_at timestamptz
   )`;
+  await db`CREATE TABLE IF NOT EXISTS invoice_share_tokens (token_hash text PRIMARY KEY, quote_id bigint NOT NULL REFERENCES admin_quotes(id) ON DELETE CASCADE, expires_at timestamptz NOT NULL, created_at timestamptz NOT NULL DEFAULT now())`;
+  await db`CREATE INDEX IF NOT EXISTS invoice_share_tokens_quote_idx ON invoice_share_tokens (quote_id)`;
   console.log("Quote table is ready.");
 } finally { await db.end(); }

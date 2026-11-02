@@ -250,7 +250,8 @@ export const ADMIN_ORDER_TRANSITIONS: Partial<Record<OrderStatus, OrderStatus[]>
 };
 
 /** Brief text summary of a design, shown on order rows and in the cart. */
-export function describeDesign(design: Design): string {
+export function describeDesign(design: Design | null | undefined): string {
+  if (!design || !Array.isArray(design.front) || !Array.isArray(design.back)) return "Design details unavailable";
   const parts: string[] = [];
   for (const side of ["front", "back"] as const) {
     const layers = design[side] ?? [];

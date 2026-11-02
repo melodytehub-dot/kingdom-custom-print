@@ -21,6 +21,7 @@ try {
     "./catalog": { getSettings: async () => ({ shippingFlat: 6.95, freeShippingThreshold: 75 }) },
     "./pricing": { round2: value => Math.round((value + Number.EPSILON) * 100) / 100 },
     "./types": { ADMIN_ORDER_TRANSITIONS: {} },
+    "./inventory-reservations": { reserveInventory: async () => {}, consumeInventory: async () => {}, releaseInventory: async () => {} },
   };
   vm.runInNewContext(source, { exports, require: name => deps[name], crypto });
 

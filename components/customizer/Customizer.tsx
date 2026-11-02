@@ -1521,8 +1521,8 @@ export default function Customizer({
     return pa.y + ((selected?.y ?? 50) / 100) * pa.h;
   }, [overlayPanel, side, product.printArea, selected?.y]);
   const fit = useMemo(
-    () => fitStage(stageBox.w, stageBox.h, zoom, { visibleH: visibleStageH, focusY }),
-    [stageBox, zoom, visibleStageH, focusY]
+    () => fitStage(stageBox.w, stageBox.h, zoom, { visibleH: visibleStageH, focusY, containWidth: product.kind === "hoodie" || product.kind === "longsleeve" }),
+    [stageBox, zoom, visibleStageH, focusY, product.kind]
   );
 
   /* ---- what the rail highlights ---- */

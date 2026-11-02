@@ -109,9 +109,9 @@ export default async function HomePage() {
       <section className="mm-section">
         <div className="minimog-container">
           <div className="mm-section-head">
-            <h2 className="mm-section-title">MAKE IT YOURS</h2>
+            <h2 className="mm-section-title">{settings.homeProductsTitle}</h2>
             <p className="mm-section-sub">
-              Find your fit. Choose a color. Create something only you could make.
+              {settings.homeProductsDescription}
             </p>
 
           </div>
@@ -352,9 +352,9 @@ export default async function HomePage() {
       <section className="mm-newsletter-section">
         <div className="minimog-container">
           <div className="mm-newsletter-box">
-            <h2 className="mm-newsletter-title">READY TO ORDER?</h2>
+            <h2 className="mm-newsletter-title">{settings.homeContactTitle}</h2>
             <p className="mm-newsletter-sub">
-              Bulk order, team gear, or a one-off run — send us the details and we will give you a straight answer on timing and pricing.
+              {settings.homeContactDescription}
             </p>
             <Link href="/contact" className="mm-btn mm-btn-black">Get in touch</Link>
           </div>

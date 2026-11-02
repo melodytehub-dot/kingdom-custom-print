@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { randomUUID } from "node:crypto";
 import { createOrder, attachStripeSession, attachPayPalOrder, cancelOrder } from "@/lib/orders";
+import { InsufficientStockError } from "@/lib/inventory-reservations";
 import { paypalConfigured, paypalRequest } from "@/lib/paypal";
 import {
   createOrderAccessSession,
@@ -378,19 +379,24 @@ export async function POST(req: Request) {
     }
     return response;
   } catch (err) {
+    if (err instanceof InsufficientStockError) return NextResponse.json({ error: err.message }, { status: 409 });
     console.error("checkout error:", err);
+    let safeToCancel = !stripeSessionId;
     if (stripeSessionId && stripe) {
       try {
         await stripe.checkout.sessions.expire(stripeSessionId);
+        safeToCancel = true;
       } catch (expireError) {
         console.error("checkout session cleanup error:", expireError);
       }
     }
-    if (createdReference && createdOrderWasNew) {
+    if (createdReference && createdOrderWasNew && safeToCancel) {
       try {
         await cancelOrder(createdReference, {
           actor: "system",
           note: "Checkout setup failed before the customer could complete payment.",
+          providerClosed: Boolean(stripeSessionId),
+          stripeSessionId: stripeSessionId ?? undefined,
         });
       } catch (cleanupError) {
         console.error("checkout order cleanup error:", cleanupError);

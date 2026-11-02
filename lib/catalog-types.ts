@@ -9,6 +9,10 @@ export interface SiteSettings {
   heroImage1: string;
   heroImage2: string;
   heroImage3: string;
+  homeProductsTitle: string;
+  homeProductsDescription: string;
+  homeContactTitle: string;
+  homeContactDescription: string;
   announcement: string;
   shippingFlat: number;
   freeShippingThreshold: number;

@@ -61,7 +61,7 @@ export async function POST(req: Request) {
       const session = event.data.object;
       if (session.client_reference_id) {
         const { cancelOrder } = await import("@/lib/orders");
-        await cancelOrder(session.client_reference_id, { eventId: event.id });
+        await cancelOrder(session.client_reference_id, { eventId: event.id, providerClosed: true, stripeSessionId: session.id });
       }
       break;
     }
@@ -71,6 +71,8 @@ export async function POST(req: Request) {
         const { cancelOrder } = await import("@/lib/orders");
         await cancelOrder(session.client_reference_id, {
           eventId: event.id,
+          providerClosed: true,
+          stripeSessionId: session.id,
           note: "Stripe reported that the asynchronous payment failed.",
         });
       }

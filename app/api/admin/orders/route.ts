@@ -44,7 +44,7 @@ export async function PATCH(req: Request) {
   }
   if (!result.ok) {
     return NextResponse.json(
-      { error: "That status change is not allowed. Payment can only be confirmed by Stripe." },
+      { error: "That status change is not available. Orders holding stock must be resolved through the payment provider." },
       { status: 409 }
     );
   }

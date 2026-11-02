@@ -40,6 +40,10 @@ export async function PUT(req: Request) {
     heroImage1: image(body.heroImage1, current.heroImage1),
     heroImage2: image(body.heroImage2, current.heroImage2),
     heroImage3: image(body.heroImage3, current.heroImage3),
+    homeProductsTitle: str(body.homeProductsTitle ?? current.homeProductsTitle, 100),
+    homeProductsDescription: str(body.homeProductsDescription ?? current.homeProductsDescription, 350),
+    homeContactTitle: str(body.homeContactTitle ?? current.homeContactTitle, 100),
+    homeContactDescription: str(body.homeContactDescription ?? current.homeContactDescription, 350),
     announcement: str(body.announcement ?? current.announcement, 160),
     shippingFlat: numField(body.shippingFlat, current.shippingFlat, 999),
     freeShippingThreshold: numField(

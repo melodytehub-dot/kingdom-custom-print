@@ -1,4 +1,5 @@
 import { sql, num } from "./db";
+import { reserveInventory, consumeInventory, releaseInventory } from "./inventory-reservations";
 import { getSettings } from "./catalog";
 import { round2 } from "./pricing";
 import type {
@@ -139,6 +140,7 @@ export async function createOrder(input: CheckoutInput): Promise<{
       return { reference: existing.reference, reused: true };
     }
 
+    await reserveInventory(tx, order.id, input.items);
     for (const item of input.items) {
       await tx`
         INSERT INTO order_items (order_id, product_id, product_name, product_kind,
@@ -185,6 +187,7 @@ export async function recordPayPalCapture(paypalOrderId: string, captureId: stri
     if (row.paid_at) return row.paypal_capture_id === captureId ? { reference: row.reference } : null;
     if (row.status !== "pending") return null;
     await tx`UPDATE orders SET status = 'paid', paid_at = now(), paypal_capture_id = ${captureId}, updated_at = now() WHERE id = ${row.id}`;
+    await consumeInventory(tx, row.id);
     await tx`INSERT INTO order_status_events (order_id, from_status, to_status, actor, note, external_event_id) VALUES (${row.id}, 'pending', 'paid', 'system', 'Payment confirmed by PayPal.', ${eventId ?? null}) ON CONFLICT (external_event_id) WHERE external_event_id IS NOT NULL DO NOTHING`;
     return { reference: row.reference };
   });
@@ -220,6 +223,7 @@ export async function markOrderPaid(
         AND status = 'pending'
       RETURNING id, reference, status`;
     if (updated.length) {
+      await consumeInventory(tx, updated[0].id);
       await tx`INSERT INTO order_status_events
         (order_id, from_status, to_status, actor, note, external_event_id)
         VALUES (${updated[0].id}, 'pending', ${updated[0].status}, 'stripe',
@@ -268,6 +272,9 @@ export async function cancelOrder(
     actor?: "stripe" | "system";
     eventId?: string;
     note?: string;
+    providerClosed?: boolean;
+    stripeSessionId?: string;
+    paypalOrderId?: string;
   } = {}
 ): Promise<boolean> {
   const actor = options.actor ?? "stripe";
@@ -275,11 +282,23 @@ export async function cancelOrder(
     ? "Stripe Checkout session expired before payment."
     : "Checkout could not be started; the unpaid order was closed automatically.");
   return sql.begin(async (tx) => {
+    const [current] = await tx<{ id: number; status: OrderStatus; stripe_session_id: string | null; paypal_order_id: string | null }[]>`SELECT id, status, stripe_session_id, paypal_order_id FROM orders WHERE reference = ${reference} LIMIT 1 FOR UPDATE`;
+    if (!current) return false;
+    if (options.stripeSessionId && current.stripe_session_id && current.stripe_session_id !== options.stripeSessionId) return false;
+    if (options.paypalOrderId && current.paypal_order_id !== options.paypalOrderId) return false;
+    if ((current.stripe_session_id || current.paypal_order_id) && !options.providerClosed) return false;
+    if (current.status === "cancelled" && options.providerClosed) {
+      await tx`UPDATE orders SET inventory_provider_closed = true, updated_at = now() WHERE id = ${current.id}`;
+      await releaseInventory(tx, current.id);
+      return true;
+    }
+    if (current.status !== "pending") return false;
     const rows = await tx<{ id: number }[]>`
-      UPDATE orders SET status = 'cancelled', updated_at = now()
+      UPDATE orders SET status = 'cancelled', inventory_provider_closed = true, updated_at = now()
       WHERE reference = ${reference} AND status = 'pending'
       RETURNING id`;
     if (!rows.length) return false;
+    await releaseInventory(tx, rows[0].id);
     await tx`INSERT INTO order_status_events
       (order_id, from_status, to_status, actor, note, external_event_id)
       VALUES (${rows[0].id}, 'pending', 'cancelled', ${actor},
@@ -478,11 +497,16 @@ export async function updateOrderStatus(
   status: OrderStatus
 ): Promise<{ ok: boolean; reason?: "not-found" | "invalid-transition" }> {
   return sql.begin(async (tx) => {
-    const [current] = await tx<{ id: number; status: OrderStatus; paid_at: Date | null }[]>`
-      SELECT id, status, paid_at FROM orders WHERE reference = ${reference} LIMIT 1 FOR UPDATE`;
+    const [current] = await tx<{ id: number; status: OrderStatus; paid_at: Date | null; stripe_session_id: string | null; paypal_order_id: string | null }[]>`
+      SELECT id, status, paid_at, stripe_session_id, paypal_order_id FROM orders WHERE reference = ${reference} LIMIT 1 FOR UPDATE`;
     if (!current) return { ok: false, reason: "not-found" };
     if (!(ADMIN_ORDER_TRANSITIONS[current.status] ?? []).includes(status)) {
       return { ok: false, reason: "invalid-transition" };
+    }
+    if (status === "cancelled") {
+      if (current.stripe_session_id || current.paypal_order_id) return { ok: false, reason: "invalid-transition" };
+      const held = await tx`SELECT 1 FROM inventory_reservations WHERE order_id = ${current.id} LIMIT 1`;
+      if (held.length) return { ok: false, reason: "invalid-transition" };
     }
     if (status !== "cancelled" && !current.paid_at) {
       return { ok: false, reason: "invalid-transition" };

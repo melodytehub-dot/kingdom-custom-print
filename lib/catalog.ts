@@ -366,6 +366,10 @@ export interface SiteSettings {
   heroImage1: string;
   heroImage2: string;
   heroImage3: string;
+  homeProductsTitle: string;
+  homeProductsDescription: string;
+  homeContactTitle: string;
+  homeContactDescription: string;
   announcement: string;
   shippingFlat: number;
   freeShippingThreshold: number;
@@ -383,6 +387,10 @@ export const DEFAULT_SETTINGS: SiteSettings = {
   heroImage1: "/img/shop-studio.png",
   heroImage2: "/img/shop-printing.png",
   heroImage3: "/img/kingdom-team.webp",
+  homeProductsTitle: "MAKE IT YOURS",
+  homeProductsDescription: "Find your fit. Choose a color. Create something only you could make.",
+  homeContactTitle: "READY TO ORDER?",
+  homeContactDescription: "Bulk order, team gear, or a one-off run — send us the details and we will give you a straight answer on timing and pricing.",
   announcement: "Free US shipping on orders over $75",
   shippingFlat: 6.95,
   freeShippingThreshold: 75,
@@ -404,6 +412,10 @@ export async function getSettings(): Promise<SiteSettings> {
     heroImage1: String(map.get("hero_image_1") ?? DEFAULT_SETTINGS.heroImage1),
     heroImage2: String(map.get("hero_image_2") ?? DEFAULT_SETTINGS.heroImage2),
     heroImage3: String(map.get("hero_image_3") ?? DEFAULT_SETTINGS.heroImage3),
+    homeProductsTitle: String(map.get("home_products_title") ?? DEFAULT_SETTINGS.homeProductsTitle),
+    homeProductsDescription: String(map.get("home_products_description") ?? DEFAULT_SETTINGS.homeProductsDescription),
+    homeContactTitle: String(map.get("home_contact_title") ?? DEFAULT_SETTINGS.homeContactTitle),
+    homeContactDescription: String(map.get("home_contact_description") ?? DEFAULT_SETTINGS.homeContactDescription),
     announcement: String(map.get("announcement") ?? DEFAULT_SETTINGS.announcement),
     shippingFlat: num(map.get("shipping_flat") ?? DEFAULT_SETTINGS.shippingFlat),
     freeShippingThreshold: num(
@@ -426,6 +438,10 @@ export async function saveSettings(settings: SiteSettings): Promise<void> {
       ["hero_image_1", settings.heroImage1],
       ["hero_image_2", settings.heroImage2],
       ["hero_image_3", settings.heroImage3],
+      ["home_products_title", settings.homeProductsTitle],
+      ["home_products_description", settings.homeProductsDescription],
+      ["home_contact_title", settings.homeContactTitle],
+      ["home_contact_description", settings.homeContactDescription],
       ["announcement", settings.announcement],
       ["shipping_flat", settings.shippingFlat],
       ["free_shipping_threshold", settings.freeShippingThreshold],

@@ -2,6 +2,7 @@ import Link from "next/link";
 import { cookies } from "next/headers";
 import { ADMIN_COOKIE, adminConfigured, validateSession } from "@/lib/admin-auth";
 import { sql } from "@/lib/db";
+import { getSettings } from "@/lib/catalog";
 import type { AdminQuote } from "@/lib/admin-quotes";
 import { formatUSD } from "@/lib/pricing";
 import PrintInvoiceButton from "@/components/admin/PrintInvoiceButton";
@@ -16,9 +17,10 @@ export default async function QuotePage({ searchParams }: { searchParams: Promis
   if (!id || !/^[1-9][0-9]{0,15}$/.test(id)) return <main className="wrap"><h1>Document not found</h1><Link href="/admin?tab=quotes">Back to quotes</Link></main>;
   const [quote] = await sql<AdminQuote[]>`SELECT id::text, customer_name, customer_email, notes, lines, shipping_cents, status, created_at, invoiced_at FROM admin_quotes WHERE id = ${id}::bigint`;
   if (!quote) return <main className="wrap"><h1>Document not found</h1><Link href="/admin?tab=quotes">Back to quotes</Link></main>;
+  const settings = await getSettings();
   const subtotal = quote.lines.reduce((n, line) => n + line.quantity * line.unitCents, 0);
   return <main className="admin-invoice"><div className="admin-invoice-actions"><Link href="/admin?tab=quotes">Back to quotes</Link><PrintInvoiceButton /></div>
-    <header className="admin-invoice-head"><div><p>Kingdom Custom Print</p><h1>{quote.status === "invoice" ? "Invoice" : "Quote"}</h1><p>#{quote.id}</p></div><div><p><strong>Date:</strong> {new Date(quote.invoiced_at ?? quote.created_at).toLocaleDateString("en-US")}</p></div></header>
+    <header className="admin-invoice-head"><div><p>Kingdom Custom Print</p>{settings.businessAddress ? <p>{settings.businessAddress}</p> : null}{settings.contactEmail ? <p>{settings.contactEmail}</p> : null}{settings.contactPhone ? <p>{settings.contactPhone}</p> : null}<h1>{quote.status === "invoice" ? "Invoice" : "Quote"}</h1><p>#{quote.id}</p></div><div><p><strong>Date:</strong> {new Date(quote.invoiced_at ?? quote.created_at).toLocaleDateString("en-US")}</p></div></header>
     <section className="admin-invoice-customer"><h2>Prepared for</h2><p>{quote.customer_name}{quote.customer_email ? <><br />{quote.customer_email}</> : null}</p></section>
     <div className="admin-invoice-table-wrap"><table className="admin-invoice-table"><thead><tr><th>Item</th><th>Qty</th><th>Unit price</th><th>Amount</th></tr></thead><tbody>{quote.lines.map((line, index) => <tr key={index}><td>{line.description}</td><td>{line.quantity}</td><td>{formatUSD(line.unitCents / 100)}</td><td>{formatUSD(line.unitCents * line.quantity / 100)}</td></tr>)}</tbody></table></div>
     <dl className="admin-invoice-totals"><div><dt>Subtotal</dt><dd>{formatUSD(subtotal / 100)}</dd></div><div><dt>Shipping</dt><dd>{formatUSD(quote.shipping_cents / 100)}</dd></div><div><dt>Total</dt><dd>{formatUSD((subtotal + quote.shipping_cents) / 100)}</dd></div></dl>

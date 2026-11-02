@@ -2,9 +2,9 @@
  * Fits the garment box inside the stage without ever letting a panel move or
  * resize it.
  *
- * Portraits phones deliberately let the box overflow the stage width so the
- * printable area fills the screen; that is why the horizontal centre is pinned
- * even when the box is wider than the stage.
+ * Portrait phones can let the box overflow the stage width so the printable
+ * area fills the screen. Wide garments can instead opt into a contained fit.
+ * The horizontal centre remains pinned in both cases.
  *
  * `options.visibleH` narrows the strip the box must be centred in (used when a
  * mobile inspector floats over the lower part of the stage) and `options.focusY`
@@ -18,6 +18,8 @@ export interface StageFitOptions {
   focusY?: number | null;
   /** Margin in stage pixels kept around a focused element. */
   margin?: number;
+  /** Keep the entire garment visible at the default zoom on narrow screens. */
+  containWidth?: boolean;
 }
 
 export const STAGE_VIEW = 900;
@@ -26,7 +28,7 @@ export function fitStage(width: number, height: number, zoom = 1, options: Stage
   if (width <= 0 || height <= 0) return { size: 0, left: 0, ty: 0 };
   const portraitPhone = width <= 900 && height > width;
   const fit = portraitPhone
-    ? Math.min(width * 1.4, height - 24)
+    ? Math.min(width * (options.containWidth ? 1 : 1.4), height - 24)
     : Math.min(width - 24, height - 24);
   const size = Math.max(0, fit) * zoom;
   const left = (width - size) / 2;

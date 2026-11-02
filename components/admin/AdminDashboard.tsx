@@ -8,6 +8,7 @@ import DesignPreviewImage from "@/components/DesignPreviewImage";
 import ArrowRight from "@/components/icons/ArrowRight";
 import AdminRefund from "./AdminRefund";
 import QuotesPanel from "./QuotesPanel";
+import InventoryPanel from "./InventoryPanel";
 import { HERO_IMAGES } from "@/lib/hero-slides";
 import { formatUSD } from "@/lib/pricing";
 import { mockupsForProduct } from "@/lib/mockups";
@@ -26,12 +27,13 @@ import type {
   SiteSettings,
 } from "@/lib/catalog-types";
 
-type Tab = "overview" | "orders" | "products" | "customers" | "quotes" | "settings";
+type Tab = "overview" | "orders" | "products" | "inventory" | "customers" | "quotes" | "settings";
 
 const TABS: { id: Tab; label: string }[] = [
   { id: "overview", label: "Overview" },
   { id: "orders", label: "Orders" },
   { id: "products", label: "Products" },
+  { id: "inventory", label: "Inventory" },
   { id: "customers", label: "Customers" },
   { id: "quotes", label: "Quotes & invoices" },
   { id: "settings", label: "Settings" },
@@ -148,6 +150,7 @@ export default function AdminDashboard({
         <Orders data={data} detail={orderDetail} />
       ) : null}
       {tab === "products" ? <ProductsPanel key={editingProduct} data={data} editingProduct={editingProduct} /> : null}
+      {tab === "inventory" ? <InventoryPanel products={data.products} /> : null}
       {tab === "customers" ? <Customers data={data} /> : null}
       {tab === "quotes" ? <QuotesPanel /> : null}
       {tab === "settings" ? <SettingsPanel settings={data.settings} categories={data.categories} /> : null}
@@ -1534,6 +1537,22 @@ function SettingsPanel({
             <label className="label" htmlFor={`s-${key}`}>Slideshow image {index + 1}</label>
             <select id={`s-${key}`} className="select" value={form[key]} onChange={(e) => setForm({ ...form, [key]: e.target.value })}>{HERO_IMAGES.map((image) => <option key={image.src} value={image.src}>{image.name}</option>)}</select>
           </div>)}
+        </fieldset>
+        <fieldset className="fieldset">
+          <legend className="label">Homepage product section</legend>
+          <p className="hint">Edit the heading and introduction above the product tabs.</p>
+          <div className="admin-section-preview">
+            <label><span className="sr-only">Product section heading</span><input value={form.homeProductsTitle} maxLength={100} onChange={(e) => setForm({ ...form, homeProductsTitle: e.target.value })} /></label>
+            <label><span className="sr-only">Product section description</span><textarea rows={2} value={form.homeProductsDescription} maxLength={350} onChange={(e) => setForm({ ...form, homeProductsDescription: e.target.value })} /></label>
+          </div>
+        </fieldset>
+        <fieldset className="fieldset">
+          <legend className="label">Homepage contact section</legend>
+          <p className="hint">Edit the invitation above the contact button.</p>
+          <div className="admin-section-preview">
+            <label><span className="sr-only">Contact section heading</span><input value={form.homeContactTitle} maxLength={100} onChange={(e) => setForm({ ...form, homeContactTitle: e.target.value })} /></label>
+            <label><span className="sr-only">Contact section description</span><textarea rows={3} value={form.homeContactDescription} maxLength={350} onChange={(e) => setForm({ ...form, homeContactDescription: e.target.value })} /></label>
+          </div>
         </fieldset>
         <div className="field">
           <label className="label" htmlFor="s-announcement">

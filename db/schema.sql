@@ -64,6 +64,29 @@ CREATE TABLE IF NOT EXISTS product_sizes (
   UNIQUE (product_id, label)
 );
 
+-- Physical counts are keyed by the stable product and displayed variant names,
+-- so editing a product does not discard its inventory history.
+CREATE TABLE IF NOT EXISTS inventory_stock (
+  product_id int NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+  color_name text NOT NULL,
+  size_label text NOT NULL,
+  quantity int NOT NULL CHECK (quantity >= 0),
+  updated_at timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY (product_id, color_name, size_label)
+);
+
+CREATE TABLE IF NOT EXISTS inventory_adjustments (
+  id bigserial PRIMARY KEY,
+  product_id int REFERENCES products(id) ON DELETE SET NULL,
+  product_name text NOT NULL,
+  color_name text NOT NULL,
+  size_label text NOT NULL,
+  previous_quantity int,
+  new_quantity int NOT NULL CHECK (new_quantity >= 0),
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS inventory_adjustments_product_idx ON inventory_adjustments (product_id, id DESC);
+
 -- Quantity break tiers. Cheapest matching tier wins.
 CREATE TABLE IF NOT EXISTS price_breaks (
   id          serial PRIMARY KEY,
@@ -110,6 +133,13 @@ CREATE TABLE IF NOT EXISTS admin_quotes (
   updated_at timestamptz NOT NULL DEFAULT now(),
   invoiced_at timestamptz
 );
+CREATE TABLE IF NOT EXISTS invoice_share_tokens (
+  token_hash text PRIMARY KEY,
+  quote_id bigint NOT NULL REFERENCES admin_quotes(id) ON DELETE CASCADE,
+  expires_at timestamptz NOT NULL,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS invoice_share_tokens_quote_idx ON invoice_share_tokens (quote_id);
 
 -- Storefront accounts are separate from guest checkout contacts. A matching
 -- email alone must not grant access to orders placed before registration.
@@ -178,6 +208,7 @@ CREATE TABLE IF NOT EXISTS orders (
 ALTER TABLE orders ADD COLUMN IF NOT EXISTS account_id int REFERENCES customer_accounts(id) ON DELETE SET NULL;
 ALTER TABLE orders ADD COLUMN IF NOT EXISTS paypal_order_id text;
 ALTER TABLE orders ADD COLUMN IF NOT EXISTS paypal_capture_id text;
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS inventory_provider_closed boolean NOT NULL DEFAULT false;
 CREATE UNIQUE INDEX IF NOT EXISTS orders_paypal_order_idx ON orders (paypal_order_id) WHERE paypal_order_id IS NOT NULL;
 CREATE UNIQUE INDEX IF NOT EXISTS orders_paypal_capture_idx ON orders (paypal_capture_id) WHERE paypal_capture_id IS NOT NULL;
 ALTER TABLE orders DROP CONSTRAINT IF EXISTS orders_status_check;
@@ -288,6 +319,25 @@ CREATE TABLE IF NOT EXISTS order_items (
 ALTER TABLE order_items ADD COLUMN IF NOT EXISTS roster jsonb NOT NULL DEFAULT '[]'::jsonb;
 
 CREATE INDEX IF NOT EXISTS order_items_order_idx ON order_items (order_id);
+
+-- A reservation remains held until payment is confirmed or the payment
+-- provider confirms cancellation; time alone is not proof of cancellation.
+CREATE TABLE IF NOT EXISTS inventory_control (
+  id boolean PRIMARY KEY DEFAULT true CHECK (id),
+  enabled boolean NOT NULL DEFAULT false
+);
+INSERT INTO inventory_control (id, enabled) VALUES (true, false) ON CONFLICT (id) DO NOTHING;
+CREATE TABLE IF NOT EXISTS inventory_reservations (
+  order_id int NOT NULL REFERENCES orders(id) ON DELETE RESTRICT,
+  product_id int NOT NULL,
+  color_name text NOT NULL,
+  size_label text NOT NULL,
+  quantity int NOT NULL CHECK (quantity > 0),
+  created_at timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY (order_id, product_id, color_name, size_label),
+  FOREIGN KEY (product_id, color_name, size_label) REFERENCES inventory_stock (product_id, color_name, size_label) ON DELETE RESTRICT
+);
+CREATE INDEX IF NOT EXISTS inventory_reservations_variant_idx ON inventory_reservations (product_id, color_name, size_label);
 
 CREATE TABLE IF NOT EXISTS site_settings (
   key        text PRIMARY KEY,

@@ -13,12 +13,17 @@ export const metadata: Metadata = {
 };
 
 export default async function CheckoutPage() {
-  const [settings, account] = await Promise.all([getSettings().catch(() => DEFAULT_SETTINGS), customerFromCookies()]);
+  const [settings, account, cardReady, paypalReady] = await Promise.all([
+    getSettings().catch(() => DEFAULT_SETTINGS),
+    customerFromCookies().catch(() => null),
+    paymentsConfigured().catch(() => false),
+    paypalConfigured().catch(() => false),
+  ]);
 
   return (
     <>
 
-      <CheckoutForm settings={settings} paymentsReady={await paymentsConfigured()} paypalReady={await paypalConfigured()} account={account ? { email: account.email, name: account.name } : null} />
+      <CheckoutForm settings={settings} paymentsReady={cardReady} paypalReady={paypalReady} account={account ? { email: account.email, name: account.name } : null} />
     </>
   );
 }

@@ -32,10 +32,16 @@ export default {
       const response = await runWithDatabaseContext(databaseContext, () =>
         app.fetch(request, env, ctx)
       );
+      const headers = new Headers(response.headers);
+      if (new URL(request.url).pathname.startsWith("/invoice/")) {
+        headers.set("Cache-Control", "private, no-store");
+        headers.set("Referrer-Policy", "no-referrer");
+        headers.set("X-Robots-Tag", "noindex, nofollow");
+      }
 
       if (!response.body) {
         await closeDatabaseContext(databaseContext);
-        return response;
+        return new Response(null, { status: response.status, statusText: response.statusText, headers });
       }
 
       const reader = response.body.getReader();
@@ -69,7 +75,7 @@ export default {
       return new Response(body, {
         status: response.status,
         statusText: response.statusText,
-        headers: response.headers,
+        headers,
       });
     } catch (error) {
       await closeDatabaseContext(databaseContext);
