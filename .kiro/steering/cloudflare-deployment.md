@@ -6,6 +6,8 @@ inclusion: always
 
 This project deploys to **Cloudflare Workers Builds**, not Cloudflare Pages or Vercel. GitHub `main` pushes automatically build and deploy the production Worker `kingdom-custom-print` at https://kingdomcustomprint.com. The Worker script tag is `1be2fa27cd58458f8d67d690dbdf33c5`. A script tag is an immutable ID, not the Worker name.
 
+The shared Hyperdrive connection must have query caching disabled. It serves authentication, payments, inventory, support and admin reads that need current database state; cached SELECTs are not invalidated by writes. Check the connection's `caching.disabled` setting when reviewing infrastructure changes. Keep it disabled unless fresh-read traffic is first moved to a separate cache-disabled connection and tested.
+
 Use the terminal in this workspace to investigate without asking the user to visit a dashboard:
 
 ```powershell

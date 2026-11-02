@@ -4,6 +4,8 @@ const config = [
   {
     ignores: [
       ".next/**",
+      ".cloudflare/**",
+      "dist/**",
       "node_modules/**",
       "next-env.d.ts",
       "scripts/qa-*.mjs",

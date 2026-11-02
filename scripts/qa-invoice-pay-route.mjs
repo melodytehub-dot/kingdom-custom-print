@@ -12,6 +12,7 @@ const stripe = { checkout: { sessions: { create: async (params, options) => { cr
 const deps = {
   "node:crypto": { createHash }, "next/server": { NextResponse },
   "@/lib/customer-auth": { sameOrigin: () => true, authAttemptAllowed: async () => true },
+  "@/lib/limited-form-data": { limitedJson: (request) => request.json() },
   "@/lib/paypal": { paypalConfigured: async () => configured, paypalRequest: async (_path, options) => { requestOptions = options; return { id: "PAYPAL123", links: [{ rel: "approve", href: "https://www.paypal.com/checkoutnow?token=PAYPAL123" }] }; } },
   "@/lib/stripe": { paymentsConfigured: async () => configured, siteUrl: () => "https://example.test", stripeClient: async () => stripe },
   "@/lib/invoice-payments": { InvoicePaymentError, reserveInvoicePayment: async () => ({ invoice: { id: "42", customer_email: "buyer@example.test" }, attempt }), attachInvoiceCheckout: async () => ({ state: "open" }), closeStripeInvoiceSession: async () => {}, recordStripeInvoicePayment: async () => {} },

@@ -17,7 +17,7 @@ function load(file, dependencies, globals = {}) {
   return exports;
 }
 
-const { fitStage } = load("components/customizer/stageGeometry.ts", {});
+const { fitStage, garmentContentBounds } = load("components/customizer/stageGeometry.ts", {});
 for (const width of [320, 375, 390, 430, 768, 901, 1440]) {
   for (const height of [130, 180, 260, 500, 800]) {
     const fit = fitStage(width, height);
@@ -43,6 +43,15 @@ for (const width of [320, 375, 390, 430]) for (const bounds of [
   assert.ok(fit.left + fit.size * bounds.left >= 7.9 && fit.left + fit.size * bounds.right <= width - 7.9, "garment edges fit within the mobile viewport");
   assert.ok(Math.abs(fit.left + fit.size * (bounds.left + bounds.right) / 2 - width / 2) < 0.001);
   assert.ok(fit.size > width, "transparent edges do not shrink the garment");
+}
+for (const [kind, slug] of [["tee", "heavy-cotton-tee"], ["tee", "v-neck-tee"], ["tee", "womens-fitted-tee"], ["tee", "pocket-tee"], ["tee", "youth-classic-tee"], ["polo", "classic-pique-polo"], ["crew", "crew"], ["hoodie", "premium-pullover-hoodie"], ["longsleeve", "long-sleeve-tee"], ["cap", "cap"], ["mug", "mug"], ["tote", "tote"]]) {
+  for (const side of ["front", "back"]) {
+    const bounds = garmentContentBounds(kind, slug, side);
+    assert.ok(bounds, `${slug} ${side} has garment bounds`);
+    const fit = fitStage(320, 600, 1, { contentBounds: bounds });
+    assert.ok(fit.left + fit.size * bounds.left >= 7.9 && fit.left + fit.size * bounds.right <= 312.1, `${slug} ${side} fits horizontally`);
+    assert.ok(fit.ty + fit.size * bounds.top >= 11.9 && fit.ty + fit.size * bounds.bottom <= 588.1, `${slug} ${side} fits vertically`);
+  }
 }
 assert.equal(fitStage(320, 356).size, 332);
 assert.equal(fitStage(844, 390).size, 366);
@@ -275,7 +284,7 @@ const { default: Customizer } = load("components/customizer/Customizer.tsx", {
   "./GarmentPreview": { GarmentPreview: () => null },
   "./SupportPanel": { default: () => null },
   "./textGeometry": {},
-  "./DesignCanvas": { default: Canvas, printAreaView: () => ({ w: 360, h: 450, x: 90, y: 100 }) }, "./stageGeometry": { fitStage },
+  "./DesignCanvas": { default: Canvas, printAreaView: () => ({ w: 360, h: 450, x: 90, y: 100 }) }, "./stageGeometry": { fitStage, garmentContentBounds },
   "@/lib/fonts": {},
   "./panels": { NN_DEFAULTS: {}, LayersPanel: () => null }, "./editors": {}, "./icons": {}, "./art": { ART_LIBRARY: [] },
   "@/lib/design": {

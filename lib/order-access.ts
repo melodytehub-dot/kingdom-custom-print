@@ -65,7 +65,8 @@ export async function guestCanAccessOrderFromCookies(reference: string): Promise
 }
 
 export async function orderAccessAttemptAllowed(request: Request, reference: string): Promise<boolean> {
-  const ip = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "local";
+  const ip = request.headers.get("cf-connecting-ip")?.trim()
+    || request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "local";
   const key = createHash("sha256").update(`${ip}:${reference}`).digest("hex");
   const [row] = await sql<{ attempts: number }[]>`
     INSERT INTO order_access_attempts (key, attempts, reset_at)

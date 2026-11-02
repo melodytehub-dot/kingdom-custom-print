@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { sql } from "@/lib/db";
 import { sendAccountVerification } from "@/lib/account-verification";
+import { limitedJson } from "@/lib/limited-form-data";
 import {
   CUSTOMER_COOKIE,
   authAttemptAllowed,
@@ -25,10 +26,12 @@ export async function POST(request: Request) {
 
   let body: { mode?: string; email?: string; password?: string; name?: string };
   try {
-    body = await request.json();
-  } catch {
+    body = await limitedJson(request, 4096) as typeof body;
+  } catch (error) {
+    if (error instanceof RangeError) return NextResponse.json({ error: "Request is too large." }, { status: 413 });
     return NextResponse.json({ error: "Invalid request." }, { status: 400 });
   }
+  if (!body || typeof body !== "object" || Array.isArray(body)) return NextResponse.json({ error: "Invalid request." }, { status: 400 });
 
   const mode = body.mode;
   const email = normalizedEmail(String(body.email ?? ""));

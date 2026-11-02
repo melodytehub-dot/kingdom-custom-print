@@ -4,12 +4,14 @@ import { sameOrigin, authAttemptAllowed } from "@/lib/customer-auth";
 import { paypalConfigured, paypalRequest } from "@/lib/paypal";
 import { paymentsConfigured, siteUrl, stripeClient } from "@/lib/stripe";
 import { attachInvoiceCheckout, closeStripeInvoiceSession, InvoicePaymentError, recordStripeInvoicePayment, reserveInvoicePayment } from "@/lib/invoice-payments";
+import { limitedJson } from "@/lib/limited-form-data";
 
 export const dynamic = "force-dynamic";
 export async function POST(req: Request) {
   if (!sameOrigin(req)) return NextResponse.json({ error: "Invalid request." }, { status: 403 });
   if (!(await authAttemptAllowed(req, "__invoice_pay__"))) return NextResponse.json({ error: "Too many attempts. Please try again later." }, { status: 429 });
-  let body: { token?: unknown; provider?: unknown }; try { body = await req.json(); } catch { return NextResponse.json({ error: "Invalid request." }, { status: 400 }); }
+  let body: { token?: unknown; provider?: unknown }; try { body = await limitedJson(req, 4096) as typeof body; } catch (error) { return NextResponse.json({ error: error instanceof RangeError ? "Request is too large." : "Invalid request." }, { status: error instanceof RangeError ? 413 : 400 }); }
+  if (!body || typeof body !== "object" || Array.isArray(body)) return NextResponse.json({ error: "Invalid request." }, { status: 400 });
   const token = typeof body.token === "string" ? body.token : "";
   if (!/^[A-Za-z0-9_-]{43}$/.test(token) || (body.provider !== "stripe" && body.provider !== "paypal")) return NextResponse.json({ error: "Invalid request." }, { status: 400 });
   const provider = body.provider;

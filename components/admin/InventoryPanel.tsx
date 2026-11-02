@@ -18,7 +18,9 @@ export default function InventoryPanel({ products }: { products: Product[] }) {
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
   const [reload, setReload] = useState(0);
+  const [selectedColor, setSelectedColor] = useState("");
   const product = products.find((item) => item.id === productId);
+  const activeColor = product?.colors.find((color) => color.name === selectedColor) ?? product?.colors[0];
   const dirty = Object.entries(values).some(([key, value]) => value !== (baseline[key] === undefined ? "" : String(baseline[key])));
 
   useEffect(() => {
@@ -37,7 +39,7 @@ export default function InventoryPanel({ products }: { products: Product[] }) {
 
   function choose(value: string) {
     if (dirty && !window.confirm("Discard your unsaved stock count changes?")) return;
-    setLoading(true); setBaseline({}); setReserved({}); setHistory([]); setValues({}); setMessage(""); setProductId(Number(value));
+    setLoading(true); setBaseline({}); setReserved({}); setHistory([]); setValues({}); setMessage(""); setSelectedColor(""); setProductId(Number(value));
   }
   async function toggleProtection() {
     if (dirty) { setMessage("Save or discard the current stock changes before changing protection."); return; }
@@ -56,9 +58,12 @@ export default function InventoryPanel({ products }: { products: Product[] }) {
     const counts: { color: string; size: string; quantity: number; expected: number | null }[] = [];
     for (const color of product.colors) for (const size of product.sizes) {
       const key = keyFor(color.name, size.label), raw = values[key];
-      if (raw === undefined || raw === "") continue;
+      if (raw === undefined || raw === "") {
+        if (baseline[key] !== undefined) { setMessage(`Enter a count for ${color.name}, ${size.label}.`); setSelectedColor(color.name); return; }
+        continue;
+      }
       const quantity = Number(raw);
-      if (!/^\d+$/.test(raw) || !Number.isSafeInteger(quantity) || quantity > 1000000) { setMessage("Enter a whole number between 0 and 1,000,000 for each count."); return; }
+      if (!/^\d+$/.test(raw) || !Number.isSafeInteger(quantity) || quantity > 1000000 || quantity < (reserved[key] ?? 0)) { setMessage(`Check ${color.name}, ${size.label}: enter a whole number from ${reserved[key] ?? 0} to 1,000,000.`); setSelectedColor(color.name); return; }
       const expected = baseline[key] ?? null;
       if (expected !== quantity) counts.push({ color: color.name, size: size.label, quantity, expected });
     }
@@ -75,14 +80,14 @@ export default function InventoryPanel({ products }: { products: Product[] }) {
   return <section aria-label="Inventory"><div className="admin-block-head"><div><h2 className="h3">Inventory</h2><p className="small muted">Record the number of blank items you have in each color and size.</p></div></div>
     <div className="banner-note"><p>{enabled ? "Stock protection is on. Pending checkouts hold stock, and confirmed payments update counts." : "Stock protection is off. Counts do not limit checkout until you enable it."}</p><button type="button" className="btn btn-light btn-sm" disabled={saving || loading || !products.length} onClick={() => void toggleProtection()}>{enabled ? "Turn off stock protection" : "Enable stock protection"}</button></div>
     {message ? <p className="banner-note" role="status">{message}</p> : null}
-    <PaymentHolds onChanged={() => { setLoading(true); setReload((n) => n + 1); }} />
+    <PaymentHolds disabled={dirty} onChanged={() => { setLoading(true); setReload((n) => n + 1); }} />
     {!products.length ? <p>No products yet.</p> : <><label className="field admin-inventory-product">Product<select className="select" value={productId} disabled={saving} onChange={(event) => choose(event.target.value)}>{products.map((item) => <option key={item.id} value={item.id}>{item.name}{item.active ? "" : " (hidden)"}</option>)}</select></label>
-      {loading ? <p>Loading counts…</p> : product ? <><form onSubmit={save}><p className="hint">Enter the total you have on hand. Leave uncounted options blank; enter 0 for out of stock. Held stock is part of the total.</p>{product.colors.map((color) => <fieldset className="admin-inventory-color" key={color.id}><legend><span className="admin-inventory-swatch" style={{ backgroundColor: color.hex }} aria-hidden="true" />{color.name}</legend><div className="admin-inventory-grid">{product.sizes.map((size) => { const key = keyFor(color.name, size.label); return <label className="field" key={key}>{size.label}<input className="input" type="number" min={reserved[key] ?? 0} max="1000000" step="1" inputMode="numeric" required={baseline[key] !== undefined} disabled={saving} value={values[key] ?? ""} onChange={(event) => setValues((current) => ({ ...current, [key]: event.target.value }))} aria-label={`${color.name}, ${size.label} stock`} />{reserved[key] ? <span className="hint">{reserved[key]} held</span> : null}</label>; })}</div></fieldset>)}<button type="submit" className="btn" disabled={saving}>{saving ? "Saving…" : "Save counts"}</button></form><div className="admin-inventory-history"><h3 className="h3">Recent changes</h3>{history.length ? <ul>{history.map((entry, index) => <li key={index}>{entry.color_name} · {entry.size_label}: {entry.previous_quantity === null ? "not counted" : entry.previous_quantity} → {entry.new_quantity} <span className="muted">({new Date(entry.created_at).toLocaleString()})</span></li>)}</ul> : <p className="muted">No counts have been recorded for this product yet.</p>}</div></> : null}</>}
+      {loading ? <p>Loading counts…</p> : product ? <><form onSubmit={save}><p className="hint">Enter the total you have on hand. Leave uncounted options blank; enter 0 for out of stock. Held stock is part of the total.</p><label className="field admin-inventory-product">Color<select className="select" value={activeColor?.name ?? ""} disabled={saving} onChange={(event) => setSelectedColor(event.target.value)}>{product.colors.map((color) => <option key={color.id} value={color.name}>{color.name}</option>)}</select></label>{activeColor ? [activeColor].map((color) => <fieldset className="admin-inventory-color" key={color.id}><legend><span className="admin-inventory-swatch" style={{ backgroundColor: color.hex }} aria-hidden="true" />{color.name}</legend><div className="admin-inventory-grid">{product.sizes.map((size) => { const key = keyFor(color.name, size.label); return <label className="field" key={key}>{size.label}<input className="input" type="number" min={reserved[key] ?? 0} max="1000000" step="1" inputMode="numeric" required={baseline[key] !== undefined} disabled={saving} value={values[key] ?? ""} onChange={(event) => setValues((current) => ({ ...current, [key]: event.target.value }))} aria-label={`${color.name}, ${size.label} stock`} />{reserved[key] ? <span className="hint">{reserved[key]} held</span> : null}</label>; })}</div></fieldset>) : <p>No colors are available for this product.</p>}<button type="submit" className="btn" disabled={saving}>{saving ? "Saving…" : "Save counts"}</button></form><div className="admin-inventory-history"><h3 className="h3">Recent changes</h3>{history.length ? <ul>{history.map((entry, index) => <li key={index}>{entry.color_name} · {entry.size_label}: {entry.previous_quantity === null ? "not counted" : entry.previous_quantity} → {entry.new_quantity} <span className="muted">({new Date(entry.created_at).toLocaleString()})</span></li>)}</ul> : <p className="muted">No counts have been recorded for this product yet.</p>}</div></> : null}</>}
   </section>;
 }
 
 type HeldOrder = { reference: string; status: string; created_at: string; provider: string };
-function PaymentHolds({ onChanged }: { onChanged: () => void }) {
+function PaymentHolds({ onChanged, disabled }: { onChanged: () => void; disabled: boolean }) {
   const [orders, setOrders] = useState<HeldOrder[]>([]);
   const [refresh, setRefresh] = useState(0);
   const [checking, setChecking] = useState("");
@@ -106,6 +111,6 @@ function PaymentHolds({ onChanged }: { onChanged: () => void }) {
     } catch (error) { setMessage(error instanceof Error ? error.message : "Could not check the payment."); }
     finally { setChecking(""); }
   }
-  return <div className="admin-inventory-history"><h3 className="h3">Payment holds</h3><p className="hint">Pending payments keep stock reserved. A hold is released only after the payment provider confirms checkout is closed.</p>{message ? <p role="status" className="banner-note">{message}</p> : null}{loading ? <p className="muted">Loading payment holds…</p> : failed ? null : orders.length ? <ul>{orders.map((order) => <li key={order.reference}><strong>{order.reference}</strong> · {order.provider === "stripe" ? "Card" : order.provider === "paypal" ? "PayPal" : "Payment"} · {new Date(order.created_at).toLocaleDateString()} <button className="link" type="button" disabled={Boolean(checking)} onClick={() => void check(order.reference)}>{checking === order.reference ? "Checking…" : "Check payment"}</button></li>)}</ul> : <p className="muted">No payment holds need attention.</p>}</div>;
+  return <div className="admin-inventory-history"><h3 className="h3">Payment holds</h3><p className="hint">Pending payments keep stock reserved. A hold is released only after the payment provider confirms checkout is closed.</p>{message ? <p role="status" className="banner-note">{message}</p> : null}{loading ? <p className="muted">Loading payment holds…</p> : failed ? null : orders.length ? <ul>{orders.map((order) => <li key={order.reference}><strong>{order.reference}</strong> · {order.provider === "stripe" ? "Card" : order.provider === "paypal" ? "PayPal" : "Payment"} · {new Date(order.created_at).toLocaleDateString()} <button className="link" type="button" disabled={disabled || Boolean(checking)} onClick={() => void check(order.reference)}>{checking === order.reference ? "Checking…" : "Check payment"}</button></li>)}</ul> : <p className="muted">No payment holds need attention.</p>}</div>;
 }
 

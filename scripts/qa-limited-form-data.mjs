@@ -1,0 +1,20 @@
+import assert from "node:assert/strict";
+import fs from "node:fs";
+import vm from "node:vm";
+import ts from "typescript";
+
+const exports = {};
+const code = ts.transpileModule(fs.readFileSync("lib/limited-form-data.ts", "utf8"), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
+vm.runInNewContext(code, { exports, Request, Headers, Blob, Uint8Array, Number, RangeError });
+const form = new FormData(); form.append("image", new File(["fixture"], "image.png", { type: "image/png" }));
+const valid = new Request("https://example.test/upload", { method: "POST", body: form });
+const parsed = await exports.limitedFormData(valid, 1024);
+assert.equal(await parsed.get("image").text(), "fixture");
+const json = new Request("https://example.test/upload", { method: "POST", body: '{"message":"hello"}' });
+assert.equal((await exports.limitedJson(json, 100)).message, "hello");
+const declared = new Request("https://example.test/upload", { method: "POST", headers: { "content-length": "9999" }, body: "a" });
+await assert.rejects(() => exports.limitedFormData(declared, 100), RangeError);
+const stream = new ReadableStream({ start(controller) { controller.enqueue(new Uint8Array(60)); controller.enqueue(new Uint8Array(60)); controller.close(); } });
+const chunked = new Request("https://example.test/upload", { method: "POST", body: stream, duplex: "half" });
+await assert.rejects(() => exports.limitedFormData(chunked, 100), RangeError);
+console.log("PASS: upload parsing accepts valid multipart and limits declared and streamed request sizes");

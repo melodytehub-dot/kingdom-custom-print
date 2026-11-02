@@ -24,6 +24,31 @@ export interface StageFitOptions {
 
 export const STAGE_VIEW = 900;
 
+/** Visible image bounds for the studio's registered garment families. */
+export function garmentContentBounds(kind: string, slug: string, side: "front" | "back") {
+  const special: Record<string, string> = { "v-neck-tee": "vneck", "womens-fitted-tee": "fitted", "pocket-tee": "pocket", "youth-classic-tee": "youth", "long-sleeve-tee": "longsleeve" };
+  const family = special[slug] ?? kind;
+  const values: Record<string, [number, number, number, number, number, number, number, number, number]> = {
+    tee: [1000, 58, 942, 48, 956, 59, 941, 48, 956],
+    polo: [1254, 69, 1186, 17, 1238, 86, 1168, 18, 1236],
+    hoodie: [700, 95, 690, 22, 661, 24, 615, 34, 662],
+    longsleeve: [700, 76, 683, 33, 666, 30, 623, 33, 671],
+    vneck: [700, 180, 525, 129, 557, 175, 519, 132, 556],
+    fitted: [700, 137, 608, 97, 616, 98, 565, 99, 613],
+    pocket: [700, 27, 690, 41, 659, 20, 674, 41, 659],
+    youth: [700, 50, 680, 48, 650, 31, 651, 48, 650],
+    crew: [700, 66, 679, 60, 643, 39, 650, 63, 647],
+    cap: [700, 75, 662, 108, 595, 28, 646, 126, 577],
+    mug: [700, 98, 686, 105, 612, 21, 610, 104, 612],
+    tote: [700, 211, 634, 9, 689, 67, 491, 9, 688],
+  };
+  const row = values[family];
+  if (!row) return undefined;
+  const [size, ...bounds] = row;
+  const offset = side === "front" ? 0 : 4;
+  return { left: bounds[offset] / size, right: bounds[offset + 1] / size, top: bounds[offset + 2] / size, bottom: bounds[offset + 3] / size };
+}
+
 export function fitStage(width: number, height: number, zoom = 1, options: StageFitOptions = {}) {
   if (width <= 0 || height <= 0) return { size: 0, left: 0, ty: 0 };
   const portraitPhone = width <= 900 && height > width;

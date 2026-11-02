@@ -81,7 +81,7 @@ export async function endCustomerSession(request: Request): Promise<void> {
   }
 }
 
-export async function authAttemptAllowed(request: Request, email: string): Promise<boolean> {
+export async function authAttemptAllowed(request: Request, email: string, maxAttempts = 10): Promise<boolean> {
   const ip = request.headers.get("cf-connecting-ip")?.trim()
     || request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "local";
   const key = createHash("sha256").update(`${ip}:${email}`).digest("hex");
@@ -92,7 +92,7 @@ export async function authAttemptAllowed(request: Request, email: string): Promi
       attempts = CASE WHEN customer_auth_attempts.reset_at < now() THEN 1 ELSE customer_auth_attempts.attempts + 1 END,
       reset_at = CASE WHEN customer_auth_attempts.reset_at < now() THEN now() + interval '15 minutes' ELSE customer_auth_attempts.reset_at END
     RETURNING attempts`;
-  return row.attempts <= 10;
+  return row.attempts <= maxAttempts;
 }
 
 export function sameOrigin(request: Request): boolean {

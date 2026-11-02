@@ -31,7 +31,7 @@ export default async function ShippingPage() {
             happens first; orders requiring changes enter production after those changes are resolved.
           </p>
           <p>
-            Hard deadline? Contact us first. Rush options may be available; we'll tell you honestly
+            Hard deadline? Contact us first. Rush options may be available; we&apos;ll tell you honestly
             whether we can meet your timeline.
           </p>
         </section>
@@ -46,7 +46,7 @@ export default async function ShippingPage() {
               : "."}
           </p>
           <p>
-            <strong>Tracking & updates:</strong> Our team handles shipping personally and provides updates directly. You'll receive your tracking information via email once your order ships.
+            <strong>Shipping updates:</strong> Our team handles shipping personally. Contact us if you have questions about your order.
           </p>
           <p>
             Online checkout currently supports United States delivery only. International

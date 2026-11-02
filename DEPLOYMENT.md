@@ -9,6 +9,8 @@
 ## Vercel Removed
 Vercel is no longer part of the deployment path. GitHub `main` pushes build and deploy through Cloudflare Workers Builds.
 
+The shared Hyperdrive connection uses query caching disabled. Authentication, payment, inventory and admin reads require current data; Hyperdrive does not invalidate cached query results on writes. Keep this setting disabled unless these reads are moved to a separate fresh-data connection.
+
 ## Check builds from the terminal
 
 The Kiro deployment steering file `.kiro/steering/cloudflare-deployment.md` contains the Worker tag, build-log commands, and commit verification steps. Use those commands first; the dashboard is not required for normal troubleshooting.

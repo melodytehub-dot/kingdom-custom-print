@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { authAttemptAllowed, sameOrigin } from "@/lib/customer-auth";
 import { emailConfigured, sendEmail } from "@/lib/email";
 import { sql } from "@/lib/db";
+import { limitedJson } from "@/lib/limited-form-data";
 
 export const dynamic = "force-dynamic";
 const cookieName = "kcp_support";
@@ -33,7 +34,7 @@ export async function POST(request: Request) {
   if (!destination || !inboundDomain || !/^[a-z0-9.-]+$/.test(inboundDomain) || !process.env.RESEND_INBOUND_API_KEY || !process.env.RESEND_WEBHOOK_SECRET || !emailConfigured()) return NextResponse.json({ error: "Messaging is temporarily unavailable." }, { status: 503 });
   if (Number(request.headers.get("content-length") || 0) > 16000) return NextResponse.json({ error: "Message is too long." }, { status: 413 });
   let input: { name?: unknown; email?: unknown; message?: unknown };
-  try { input = await request.json(); } catch { return NextResponse.json({ error: "Invalid request." }, { status: 400 }); }
+  try { input = await limitedJson(request, 16_000) as typeof input; } catch (error) { return NextResponse.json({ error: error instanceof RangeError ? "Message is too long." : "Invalid request." }, { status: error instanceof RangeError ? 413 : 400 }); }
   if (!input || typeof input !== "object" || Array.isArray(input)) return NextResponse.json({ error: "Invalid request." }, { status: 400 });
   const name = String(input.name ?? "").trim();
   const email = String(input.email ?? "").trim().toLowerCase();

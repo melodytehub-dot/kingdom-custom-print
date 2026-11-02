@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+import { authAttemptAllowed, sameOrigin } from "@/lib/customer-auth";
+import { limitedFormData } from "@/lib/limited-form-data";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -18,6 +20,7 @@ const CONTENT_TYPES = new Set(["image/jpeg", "image/png", "image/webp", "image/h
 const UPSTREAM_TIMEOUT_MS = 55_000;
 
 export async function POST(request: Request) {
+  if (!sameOrigin(request)) return NextResponse.json({ error: "Invalid request." }, { status: 403 });
   const key = (process.env.PHOTOROOM_API_KEY ?? "").trim();
   if (!key) {
     return NextResponse.json(
@@ -26,10 +29,15 @@ export async function POST(request: Request) {
     );
   }
 
+  try {
+    if (!(await authAttemptAllowed(request, "__photoroom_cutout__", 30))) return NextResponse.json({ error: "Too many requests. Please try again later." }, { status: 429 });
+  } catch { return NextResponse.json({ error: "Background removal is temporarily unavailable." }, { status: 503 }); }
+
   let form: FormData;
   try {
-    form = await request.formData();
-  } catch {
+    form = await limitedFormData(request, MAX_BYTES + 65_536);
+  } catch (error) {
+    if (error instanceof RangeError) return NextResponse.json({ error: "That photo is too large." }, { status: 413 });
     return NextResponse.json({ error: "Send the photo as form data." }, { status: 400 });
   }
 

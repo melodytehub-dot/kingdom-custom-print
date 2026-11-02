@@ -19,7 +19,7 @@ try {
     let sent, ownerReplyAddress;
     const NextResponse = { json(body, opts = {}) { return { body, status: opts.status ?? 200, cookies: { set(name, value) { this.name = name; this.value = value; } } }; } };
     const env = { NODE_ENV: "test", SUPPORT_EMAIL: "owner@example.test", SUPPORT_INBOUND_DOMAIN: "inbound.example.test", RESEND_INBOUND_API_KEY: "fixture", RESEND_WEBHOOK_SECRET: secret };
-    const deps = { "node:crypto": crypto, "next/server": { NextResponse }, "@/lib/customer-auth": { sameOrigin: () => true, authAttemptAllowed: async () => true }, "@/lib/email": { emailConfigured: () => true, sendEmail: async (message) => { sent = message; return "fixture"; } }, "@/lib/db": { sql: tx }, svix: { Webhook } };
+    const deps = { "node:crypto": crypto, "next/server": { NextResponse }, "@/lib/customer-auth": { sameOrigin: () => true, authAttemptAllowed: async () => true }, "@/lib/limited-form-data": { limitedJson: (request) => request.json() }, "@/lib/email": { emailConfigured: () => true, sendEmail: async (message) => { sent = message; return "fixture"; } }, "@/lib/db": { sql: tx }, svix: { Webhook } };
     const compile = file => {
       const exports = {};
       const source = ts.transpileModule(fs.readFileSync(file, "utf8"), { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS } }).outputText;

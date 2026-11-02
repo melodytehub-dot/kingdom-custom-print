@@ -109,6 +109,8 @@ export function ToastContainer({ toasts, removeToast }: ToastContainerProps) {
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
+    // The portal target exists only after the client has mounted.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setMounted(true);
   }, []);
 

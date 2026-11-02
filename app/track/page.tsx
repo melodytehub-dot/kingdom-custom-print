@@ -22,13 +22,13 @@ export default async function TrackPage() {
         <div className="panel panel-pad" style={{ maxWidth: "600px", margin: "0 auto" }}>
           <h2 className="h3">Get order updates</h2>
           <p style={{ marginBottom: "24px" }}>
-            Our team provides personalized shipping updates and order status. Reach out with your order reference and we'll get you the latest information.
+            Our team provides personalized shipping updates and order status. Reach out with your order reference and we&apos;ll get you the latest information.
           </p>
 
           <div style={{ marginTop: "32px", paddingTop: "24px", borderTop: "1px solid var(--line)" }}>
             <h3 className="h3" style={{ fontSize: "16px", marginBottom: "12px" }}>Contact our team</h3>
             <p className="small muted" style={{ marginBottom: "16px" }}>
-              Questions about production timeline, shipping, or your custom design? We're here to help.
+              Questions about production timeline, shipping, or your custom design? We&apos;re here to help.
             </p>
             <Link href="/contact" className="btn btn-lg">Contact us</Link>
           </div>

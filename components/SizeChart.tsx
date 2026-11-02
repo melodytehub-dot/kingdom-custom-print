@@ -78,10 +78,12 @@ const SIZE_CHARTS = {
   },
 };
 
-export default function SizeChart({ productKind, productName, onClose }: SizeChartProps) {
+export default function SizeChart({ productKind, onClose }: SizeChartProps) {
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
+    // The portal target exists only after the client has mounted.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setMounted(true);
     document.body.style.overflow = "hidden";
     return () => {
@@ -132,9 +134,9 @@ export default function SizeChart({ productKind, productName, onClose }: SizeCha
                 {chart.sizes.map((row) => (
                   <tr key={row.size}>
                     <td><strong>{row.size}</strong></td>
-                    <td>{row.chest}"</td>
-                    <td>{row.length}"</td>
-                    {hasSleeveColumn && <td>{(row as any).sleeve}"</td>}
+                    <td>{row.chest}&quot;</td>
+                    <td>{row.length}&quot;</td>
+                    {hasSleeveColumn && <td>{(row as any).sleeve}&quot;</td>}
                   </tr>
                 ))}
               </tbody>
@@ -142,7 +144,7 @@ export default function SizeChart({ productKind, productName, onClose }: SizeCha
           </div>
 
           <div style={{ marginTop: "24px", padding: "16px", background: "var(--bone)", borderRadius: "var(--r)" }}>
-            <p className="small"><strong>Sizing tip:</strong> Cotton garments may shrink slightly after washing. If you're between sizes, we recommend sizing up for a more comfortable fit.</p>
+            <p className="small"><strong>Sizing tip:</strong> Cotton garments may shrink slightly after washing. If you&apos;re between sizes, we recommend sizing up for a more comfortable fit.</p>
           </div>
 
           <div style={{ marginTop: "24px", textAlign: "center" }}>

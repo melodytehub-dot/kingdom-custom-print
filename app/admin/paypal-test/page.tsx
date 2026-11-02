@@ -17,6 +17,8 @@ export default function PayPalTestPage() {
       router.push("/admin");
       return;
     }
+    // The returned token is read from the browser after hydration.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setToken(new URLSearchParams(window.location.search).get("token") ?? "");
   }, [router]);
 

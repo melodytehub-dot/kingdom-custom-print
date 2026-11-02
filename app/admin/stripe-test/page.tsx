@@ -17,6 +17,8 @@ export default function StripeTestPage() {
       router.push("/admin");
       return;
     }
+    // The returned session is read from the browser after hydration.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setSession(new URLSearchParams(window.location.search).get("session_id") ?? "");
   }, [router]);
 

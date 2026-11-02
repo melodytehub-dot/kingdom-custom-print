@@ -14,7 +14,7 @@ import DesignCanvas, { printAreaView } from "./DesignCanvas";
 import { GarmentPreview } from "./GarmentPreview";
 import SupportPanel from "./SupportPanel";
 import { measureTextLayer } from "./textGeometry";
-import { fitStage } from "./stageGeometry";
+import { fitStage, garmentContentBounds } from "./stageGeometry";
 import {
   ArtPanel,
   AddTextPanel,
@@ -1521,8 +1521,8 @@ export default function Customizer({
     return pa.y + ((selected?.y ?? 50) / 100) * pa.h;
   }, [overlayPanel, side, product.printArea, selected?.y]);
   const fit = useMemo(
-    () => fitStage(stageBox.w, stageBox.h, zoom, { visibleH: visibleStageH, focusY, contentBounds: product.kind === "hoodie" ? (side === "front" ? { left: 95 / 700, right: 690 / 700, top: 22 / 700, bottom: 661 / 700 } : { left: 24 / 700, right: 615 / 700, top: 34 / 700, bottom: 662 / 700 }) : product.kind === "longsleeve" ? (side === "front" ? { left: 76 / 700, right: 683 / 700, top: 33 / 700, bottom: 666 / 700 } : { left: 30 / 700, right: 623 / 700, top: 33 / 700, bottom: 671 / 700 }) : undefined }),
-    [stageBox, zoom, visibleStageH, focusY, product.kind, side]
+    () => fitStage(stageBox.w, stageBox.h, zoom, { visibleH: visibleStageH, focusY, contentBounds: garmentContentBounds(product.kind, product.slug, side) }),
+    [stageBox, zoom, visibleStageH, focusY, product.kind, product.slug, side]
   );
 
   /* ---- what the rail highlights ---- */

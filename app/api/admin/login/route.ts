@@ -6,24 +6,13 @@ import {
   passwordMatches,
   pruneSessions,
 } from "@/lib/admin-auth";
+import { authAttemptAllowed, sameOrigin } from "@/lib/customer-auth";
+import { limitedJson } from "@/lib/limited-form-data";
 
 export const dynamic = "force-dynamic";
 
-/** Simple in-memory throttle keyed by IP to slow credential guessing. */
-const attempts = new Map<string, { count: number; resetAt: number }>();
-
-function throttled(ip: string): boolean {
-  const now = Date.now();
-  const entry = attempts.get(ip);
-  if (!entry || entry.resetAt < now) {
-    attempts.set(ip, { count: 1, resetAt: now + 10 * 60 * 1000 });
-    return false;
-  }
-  entry.count += 1;
-  return entry.count > 8;
-}
-
 export async function POST(req: Request) {
+  if (!sameOrigin(req)) return NextResponse.json({ error: "Invalid request." }, { status: 403 });
   if (!adminConfigured()) {
     return NextResponse.json(
       { error: "Admin access is not set up on this deployment." },
@@ -31,9 +20,10 @@ export async function POST(req: Request) {
     );
   }
 
-  const ip =
-    req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "local";
-  if (throttled(ip)) {
+  let allowed: boolean;
+  try { allowed = await authAttemptAllowed(req, "__admin_login__"); }
+  catch { return NextResponse.json({ error: "Sign-in is temporarily unavailable. Please try again." }, { status: 503 }); }
+  if (!allowed) {
     return NextResponse.json(
       { error: "Too many attempts. Try again in a few minutes." },
       { status: 429 }
@@ -42,9 +32,10 @@ export async function POST(req: Request) {
 
   let password = "";
   try {
-    const body = (await req.json()) as { password?: string };
+    const body = (await limitedJson(req, 4096)) as { password?: string };
     password = String(body.password ?? "");
-  } catch {
+  } catch (error) {
+    if (error instanceof RangeError) return NextResponse.json({ error: "Request is too large." }, { status: 413 });
     return NextResponse.json({ error: "Invalid request." }, { status: 400 });
   }
 
