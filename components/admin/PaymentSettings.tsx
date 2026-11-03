@@ -1,4 +1,5 @@
 "use client";
+import { InlineSkeleton } from "@/components/PageSkeleton";
 
 import { useEffect, useState } from "react";
 
@@ -44,7 +45,7 @@ export default function PaymentSettings() {
     <h2 className="h3">Payment credentials</h2>
     <p className="small muted">Enter credentials from the business account. Values are encrypted and cannot be viewed again. Leave a field blank to keep its current value.</p>
     <p className="small muted">Payment methods must be enabled before customers can use them at checkout.</p>
-    {loading ? <p>Loading payment settings…</p> : !available ? <p role="status">Secure credential storage needs to be configured before these fields can be used.</p> :
+    {loading ? <InlineSkeleton label="Loading payment settings" /> : !available ? <p role="status">Secure credential storage needs to be configured before these fields can be used.</p> :
       <form className="settings-form" onSubmit={save} autoComplete="off">
         {(["STRIPE", "PAYPAL"] as const).map((provider) => <fieldset className="fieldset" key={provider}>
           <legend className="label">{provider === "STRIPE" ? "Stripe" : "PayPal"}</legend>

@@ -1,0 +1,60 @@
+/* Layout-shaped placeholders are shown only while real content is loading. */
+.sk-page { min-height: 60vh; padding: clamp(24px, 4vw, 64px) 0 80px; }
+.sk-layout { width: min(100% - 32px, 1320px); margin: auto; }
+.sk-block { display: block; background: #ecebed; border-radius: 8px; overflow: hidden; position: relative; }
+.sk-block::after { content: ""; position: absolute; inset: 0; transform: translateX(-100%); background: linear-gradient(90deg, transparent, rgba(255,255,255,.64), transparent); animation: sk-shimmer 1.7s ease-in-out infinite; }
+@keyframes sk-shimmer { to { transform: translateX(100%); } }
+.sk-kicker { width: 128px; height: 12px; margin-bottom: 18px; }
+.sk-title { width: min(440px, 85%); height: clamp(32px, 4vw, 50px); margin-bottom: 24px; }
+.sk-heading { width: min(240px, 70%); height: 25px; margin-bottom: 24px; }
+.sk-lines { display: grid; gap: 12px; width: 100%; max-width: 480px; }
+.sk-line { height: 13px; width: 100%; }
+.sk-line:nth-child(2n) { width: 80%; }
+.sk-line:last-child { width: 62%; }
+.sk-button { width: 150px; height: 48px; margin-top: 28px; }
+.sk-home-hero { min-height: clamp(330px, 42vw, 570px); padding: clamp(30px, 6vw, 90px); display: flex; flex-direction: column; justify-content: center; border-radius: 16px; background: #f4f1f0; }
+.sk-section { padding-top: 64px; }
+.sk-cards { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: clamp(14px, 2vw, 28px); }
+.sk-card-image { aspect-ratio: 1 / 1.1; margin-bottom: 18px; }
+.sk-card .sk-line { height: 12px; }
+.sk-pills { display: flex; flex-wrap: wrap; gap: 10px; margin: 28px 0; }
+.sk-pills .sk-block { width: 90px; height: 36px; border-radius: 20px; }
+.sk-columns { display: grid; grid-template-columns: 1fr 1fr; gap: clamp(28px, 4vw, 64px); }
+.sk-product-image { aspect-ratio: 1; }
+.sk-details { padding-top: 20px; }
+.sk-order-columns { grid-template-columns: minmax(0, 1.5fr) minmax(230px, .7fr); }
+.sk-order-item { display: flex; gap: 22px; align-items: center; margin-bottom: 20px; }
+.sk-order-image { width: 120px; aspect-ratio: 1; flex: none; }
+.sk-summary, .sk-content { padding: 28px; background: #f8f7f7; border-radius: 12px; }
+.sk-content { max-width: 650px; margin-top: 30px; }
+.sk-studio { padding: 0 0 30px; }
+.sk-studio .sk-layout { width: 100%; }
+.sk-studio-header { height: 68px; padding: 12px 24px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #e5e5e5; }
+.sk-studio-header .sk-button { margin: 0; width: 90px; height: 42px; }
+.sk-logo { width: 105px; height: 35px; }
+.sk-studio-body { display: flex; min-height: min(72vh, 760px); background: #f6f6f7; }
+.sk-studio-tools { display: grid; align-content: start; gap: 18px; padding: 24px; }
+.sk-studio-tools .sk-block { width: 62px; height: 54px; }
+.sk-studio-stage { flex: 1; display: grid; place-items: center; background: #fff; }
+.sk-garment { width: min(55%, 460px); aspect-ratio: .85; border-radius: 24% 24% 12% 12%; }
+.sk-admin-nav, .sk-admin-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 32px; }
+.sk-admin-nav .sk-block { height: 42px; }
+.sk-admin-stats .sk-block { height: 110px; }
+.sk-inline { padding: 16px 0; }
+.sk-inline-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.sk-inline-grid .sk-block { aspect-ratio: 1; }
+@media (max-width: 700px) {
+  .sk-page { padding-top: 24px; }
+  .sk-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px 12px; }
+  .sk-columns { grid-template-columns: 1fr; gap: 24px; }
+  .sk-home-hero { min-height: 380px; }
+  .sk-studio { padding-top: 0; }
+  .sk-studio-body { flex-direction: column-reverse; min-height: 68vh; }
+  .sk-studio-stage { min-height: 54vh; }
+  .sk-studio-tools { display: flex; justify-content: space-around; padding: 12px; }
+  .sk-studio-tools .sk-block { width: 48px; height: 42px; }
+  .sk-garment { width: min(70%, 320px); }
+  .sk-admin-nav, .sk-admin-stats { grid-template-columns: repeat(2, 1fr); }
+  .sk-order-image { width: 85px; }
+}
+@media (prefers-reduced-motion: reduce) { .sk-block::after { animation: none; transform: none; opacity: 0; } }

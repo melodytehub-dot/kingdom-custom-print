@@ -1,4 +1,5 @@
 "use client";
+import PageSkeleton from "@/components/PageSkeleton";
 
 import { useMemo, useRef, useState } from "react";
 import Link from "next/link";
@@ -145,13 +146,7 @@ export default function CheckoutForm({ settings, paymentsReady, paypalReady, acc
   }
 
   if (!hydrated) {
-    return (
-      <div className="wrap section">
-        <p className="muted" role="status">
-          Loading checkout…
-        </p>
-      </div>
-    );
+    return <PageSkeleton variant="checkout" />;
   }
 
   if (!items.length) {

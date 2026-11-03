@@ -16,6 +16,7 @@ import "./admin/admin.css";
 import "./content.css";
 import "./minimog.css";
 import "./refinements.css";
+import "./skeleton.css";
 import { CartProvider } from "@/lib/cart-context";
 import { DEFAULT_SETTINGS, getCategories, getSettings } from "@/lib/catalog";
 import Header from "@/components/Header";

@@ -1,4 +1,5 @@
 "use client";
+import PageSkeleton from "@/components/PageSkeleton";
 
 import { useState } from "react";
 import Link from "next/link";
@@ -59,13 +60,7 @@ export default function CartView({
   };
 
   if (!hydrated) {
-    return (
-      <div className="wrap section">
-        <p className="muted" role="status">
-          Loading your cart…
-        </p>
-      </div>
-    );
+    return <PageSkeleton variant="cart" />;
   }
 
   if (!items.length) {

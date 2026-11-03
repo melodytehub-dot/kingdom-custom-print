@@ -12,6 +12,7 @@ import { sizeSummary } from "@/lib/sizes";
 import { mockupBaseForProduct, TEE_MOCKUPS, type TeeMockup } from "@/lib/mockups";
 import { GarmentPreview } from "./GarmentPreview";
 import DesignPreviewImage from "@/components/DesignPreviewImage";
+import { InlineSkeleton } from "@/components/PageSkeleton";
 import { ensureFontLoaded, FONTS, svgFontStack } from "@/lib/fonts";
 import { ART_CATEGORIES, ART_LIBRARY, type ArtItem } from "./art";
 import { DESIGN_TEMPLATES, TEMPLATE_CATEGORIES, type DesignTemplate } from "./templates";
@@ -276,7 +277,7 @@ export function ArtPanel({ onAdd, onClose }: { onAdd: (item: ArtItem) => void; o
       <select className="rot-art-category" aria-label="Artwork category" value={category} onChange={(event) => { setCategory(event.target.value); setVisibleCount(60); }}>
         {categories.map((option) => <option key={option} value={option}>{option === "All" ? "All artwork" : option}</option>)}
       </select>
-      {lumise.loading ? <p className="rot-library-status" role="status">Loading the full clipart library…</p> : null}
+      {lumise.loading ? <InlineSkeleton label="Loading artwork" grid /> : null}
       {lumise.error ? <p className="rot-library-status is-error" role="status">The extended clipart library could not be loaded.</p> : null}
       {!lumise.loading && !results.length ? <p role="status">No artwork found.</p> : null}
       <ul className="rot-artgrid">
@@ -468,7 +469,7 @@ export function TemplatesPanel({ onAdd, onClose }: { onAdd: (template: DesignTem
       <select className="rot-art-category" aria-label="Template category" value={category} onChange={(event) => { setCategory(event.target.value); setVisibleCount(40); }}>
         {categories.map((option) => <option key={option} value={option}>{option === "All" ? "All categories" : option}</option>)}
       </select>
-      {lumise.loading ? <p className="rot-library-status" role="status">Loading the full template library…</p> : null}
+      {lumise.loading ? <InlineSkeleton label="Loading templates" grid /> : null}
       {lumise.error ? <p className="rot-library-status is-error" role="status">The extended template library could not be loaded.</p> : null}
       {!lumise.loading && !results.length ? <p role="status">No templates found.</p> : null}
       <ul className="rot-template-grid">
