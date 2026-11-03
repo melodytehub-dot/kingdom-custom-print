@@ -4,9 +4,7 @@ import {
   createContext,
   useCallback,
   useContext,
-  useEffect,
   useMemo,
-  useRef,
   useSyncExternalStore,
   type ReactNode,
 } from "react";
@@ -14,6 +12,9 @@ import type { CartItem, SizeLine } from "./types";
 import { round2 } from "./pricing";
 
 const CART_KEY = "kcp.cart.v1";
+export class CartStorageError extends Error {
+  constructor() { super("Cart storage is unavailable."); this.name = "CartStorageError"; }
+}
 
 interface CartContextValue {
   items: CartItem[];
@@ -110,35 +111,25 @@ function subscribe(listener: () => void): () => void {
   };
 }
 
-function persist(items: CartItem[]) {
+function persist(items: CartItem[]): boolean {
   try {
     window.localStorage.setItem(CART_KEY, JSON.stringify(items));
+    return true;
   } catch {
-    // Storage full or blocked: the in-memory cart still works for this session.
+    // Keep the current cart unchanged if storage is full or blocked.
+    return false;
   }
 }
 
 function commit(next: CartItem[]) {
+  const saved = persist(next);
+  if (!saved) throw new CartStorageError();
   snapshot = next;
-  persist(next);
   emit();
 }
 
 export function CartProvider({ children }: { children: ReactNode }) {
   const items = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
-
-  // Debounced mirror to storage so rapid quantity edits do not thrash
-  // synchronous writes on slower devices. The store itself is already current;
-  // this only paces the on-disk copy.
-  const writeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  useEffect(() => {
-    if (!hydrated) return;
-    if (writeTimer.current) clearTimeout(writeTimer.current);
-    writeTimer.current = setTimeout(() => persist(items), 220);
-    return () => {
-      if (writeTimer.current) clearTimeout(writeTimer.current);
-    };
-  }, [items]);
 
   const addItem = useCallback((item: Omit<CartItem, "id" | "createdAt">) => {
     const entry: CartItem = { ...item, id: makeId(), createdAt: Date.now() };

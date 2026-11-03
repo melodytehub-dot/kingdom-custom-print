@@ -1,7 +1,7 @@
 import Link from "next/link";
 import "../account.css";
 
-export const metadata = { title: "Confirm your email", robots: { index: false, follow: false }, referrer: "same-origin" as const };
+export const metadata = { title: "Confirm your email", robots: { index: false, follow: false }, referrer: "no-referrer" as const };
 
 export default async function VerifyPage({ searchParams }: { searchParams: Promise<{ token?: string }> }) {
   const { token = "" } = await searchParams;

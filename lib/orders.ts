@@ -35,6 +35,25 @@ export interface CheckoutInput {
   items: CartItem[];
 }
 
+export class CheckoutAttemptConflictError extends Error {}
+
+function canonical(value: unknown): string {
+  if (Array.isArray(value)) return `[${value.map(canonical).join(",")}]`;
+  if (value && typeof value === "object") {
+    const obj = value as Record<string, unknown>;
+    return `{${Object.keys(obj).filter((key) => obj[key] !== undefined).sort().map((key) => `${JSON.stringify(key)}:${canonical(obj[key])}`).join(",")}}`;
+  }
+  return JSON.stringify(value) ?? "null";
+}
+
+function orderItemSnapshot(item: CartItem) {
+  return { productId: item.productId, productName: item.productName, productKind: item.productKind,
+    colorName: item.colorName, colorHex: item.colorHex, unitPrice: item.unitPrice,
+    quantity: item.quantity, lines: item.lines, design: item.design,
+    previewFront: item.previewFront ?? null, previewBack: item.previewBack ?? null,
+    roster: item.roster ?? [], designNotes: item.designNotes ?? "" };
+}
+
 export interface OrderSummary {
   reference: string;
   email: string;
@@ -123,19 +142,43 @@ export async function createOrder(input: CheckoutInput): Promise<{
 
     if (!order) {
       const [existing] = await tx<{
+        id: number;
         reference: string;
         email: string;
         account_id: number | null;
         status: OrderStatus;
+        name: string; phone: string; address_line1: string; address_line2: string;
+        city: string; region: string; postal: string; country: string; notes: string;
+        subtotal: number; shipping: number; total: number;
       }[]>`
-        SELECT reference, email, account_id, status FROM orders
+        SELECT id, reference, email, account_id, status, name, phone, address_line1, address_line2,
+          city, region, postal, country, notes, subtotal, shipping, total FROM orders
         WHERE checkout_attempt_id = ${input.checkoutAttemptId}
         LIMIT 1`;
       if (!existing
         || existing.email !== input.email
         || existing.account_id !== (input.accountId ?? null)
         || existing.status !== "pending") {
-        throw new Error("Checkout attempt cannot be reused.");
+        throw new CheckoutAttemptConflictError();
+      }
+      const previousItems = await tx<{
+        product_id: number | null; product_name: string; product_kind: ProductKind;
+        color_name: string; color_hex: string; unit_price: number; quantity: number;
+        size_breakdown: SizeLine[]; design: Design; preview_front: string | null;
+        preview_back: string | null; roster: RosterEntry[]; notes: string;
+      }[]>`SELECT product_id, product_name, product_kind, color_name, color_hex, unit_price, quantity,
+        size_breakdown, design, preview_front, preview_back, roster, notes
+        FROM order_items WHERE order_id = ${existing.id} ORDER BY id`;
+      const previous = previousItems.map((item) => ({ productId: item.product_id, productName: item.product_name,
+        productKind: item.product_kind, colorName: item.color_name, colorHex: item.color_hex,
+        unitPrice: num(item.unit_price), quantity: item.quantity, lines: item.size_breakdown, design: item.design,
+        previewFront: item.preview_front, previewBack: item.preview_back, roster: item.roster ?? [], designNotes: item.notes ?? "" }));
+      if (existing.name !== input.name || existing.phone !== input.phone || existing.address_line1 !== input.addressLine1
+        || existing.address_line2 !== input.addressLine2 || existing.city !== input.city || existing.region !== input.region
+        || existing.postal !== input.postal || existing.country !== input.country || existing.notes !== input.notes
+        || num(existing.subtotal) !== subtotal || num(existing.shipping) !== shipping || num(existing.total) !== total
+        || canonical(previous) !== canonical(input.items.map(orderItemSnapshot))) {
+        throw new CheckoutAttemptConflictError();
       }
       return { reference: existing.reference, reused: true };
     }

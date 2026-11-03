@@ -1,4 +1,5 @@
 import vinextWorker from "vinext/server/fetch-handler";
+import { sql } from "./lib/db";
 import {
   closeDatabaseContext,
   runWithDatabaseContext,
@@ -22,6 +23,18 @@ type WorkerHandler = {
 const app = vinextWorker as WorkerHandler;
 
 export default {
+  async scheduled(_controller: unknown, env: WorkerEnvironment) {
+    const databaseContext: DatabaseContext = {
+      connectionString: env.HYPERDRIVE.connectionString,
+    };
+    try {
+      await runWithDatabaseContext(databaseContext, async () => {
+        await sql`DELETE FROM cutout_bridge_images WHERE created_at < now() - interval '1 day'`;
+      });
+    } finally {
+      await closeDatabaseContext(databaseContext);
+    }
+  },
   async fetch(request: Request, env: WorkerEnvironment, ctx: WorkerExecutionContext) {
     globalThis.__kcpWorkerConnectionString ??= env.HYPERDRIVE.connectionString;
     const databaseContext: DatabaseContext = {
@@ -33,7 +46,8 @@ export default {
         app.fetch(request, env, ctx)
       );
       const headers = new Headers(response.headers);
-      if (/^\/(?:invoice|quote)\//.test(new URL(request.url).pathname)) {
+      const pathname = new URL(request.url).pathname;
+      if (/^\/(?:invoice|quote)\//.test(pathname) || /^\/account\/verify\/?$/.test(pathname)) {
         headers.set("Cache-Control", "private, no-store");
         headers.set("Referrer-Policy", "no-referrer");
         headers.set("X-Robots-Tag", "noindex, nofollow");

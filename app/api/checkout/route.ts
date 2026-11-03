@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { randomUUID } from "node:crypto";
-import { createOrder, attachStripeSession, attachPayPalOrder, cancelOrder } from "@/lib/orders";
+import { createOrder, attachStripeSession, attachPayPalOrder, cancelOrder, CheckoutAttemptConflictError } from "@/lib/orders";
 import { InsufficientStockError } from "@/lib/inventory-reservations";
 import { paypalConfigured, paypalRequest } from "@/lib/paypal";
 import {
@@ -14,6 +14,7 @@ import { quoteProduct } from "@/lib/pricing";
 import { FONTS } from "@/lib/fonts";
 import { personalizationOf } from "@/lib/design";
 import { customerFromRequest, sameOrigin } from "@/lib/customer-auth";
+import { limitedJson } from "@/lib/limited-form-data";
 import type { CartItem, Design, DesignLayer, GarmentSide, RosterEntry } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -42,48 +43,42 @@ interface Body {
  *
  * Prices, names, colors and size labels all come from the product record so a
  * tampered request cannot set its own price or print an unavailable color or
- * size. Anything the cart asks for that the product no longer offers is dropped.
+ * size. Stop checkout if the cart contains an option that is no longer offered.
  */
 type PricedCartItem = CartItem & { sizeSurcharges: Record<string, number> };
+class CartUnavailableError extends Error {}
+class DesignUnavailableError extends Error {}
 
 async function sanitise(items: CartItem[]): Promise<PricedCartItem[]> {
-  const requested = items
-    .filter(
-      (i) =>
-        i &&
-        typeof i.productId === "number" &&
-        typeof i.productName === "string" &&
-        Array.isArray(i.lines) &&
-        i.quantity > 0
-    )
-    .slice(0, 30);
+  if (items.length > 30) throw new CartUnavailableError();
 
   const priced: PricedCartItem[] = [];
-  for (const item of requested) {
+  for (const item of items) {
+    if (!item || typeof item.productId !== "number" || typeof item.productName !== "string" || !Array.isArray(item.lines) || !(item.quantity > 0)) throw new CartUnavailableError();
     const product = await getProductById(item.productId);
-    if (!product || !product.active) continue;
+    if (!product || !product.active) throw new CartUnavailableError();
 
     const sizeLabels = new Set(product.sizes.map((s) => s.label));
-    const lines = item.lines
-      .map((l) => ({
-        label: String(l.label).slice(0, 20),
-        qty: Math.min(999, Math.max(0, Math.floor(Number(l.qty) || 0))),
-      }))
-      .filter((l) => sizeLabels.has(l.label) && l.qty > 0);
+    const lines = item.lines.map((l) => {
+      const label = String(l?.label ?? "");
+      const qty = Number(l?.qty);
+      if (!sizeLabels.has(label) || !Number.isSafeInteger(qty) || qty < 1 || qty > 999) throw new CartUnavailableError();
+      return { label, qty };
+    });
 
     const quantity = lines.reduce((n, l) => n + l.qty, 0);
-    if (!quantity) continue;
+    if (!quantity) throw new CartUnavailableError();
 
     const matched =
-      product.colors.find((c) => c.name.toLowerCase() === String(item.colorName ?? "").toLowerCase()) ??
-      product.colors[0];
-    if (!matched) continue;
+      product.colors.find((c) => c.name.toLowerCase() === String(item.colorName ?? "").trim().toLowerCase());
+    if (!matched) throw new CartUnavailableError();
 
+    const design = sanitiseDesign(item.design);
     const quote = quoteProduct(product, {
-      sides: designSides(item.design),
+      sides: designSides(design),
       lines,
       personalization: personalizationOf(
-        (item.design ?? {}) as Parameters<typeof personalizationOf>[0]
+        design
       ),
     });
 
@@ -96,19 +91,20 @@ async function sanitise(items: CartItem[]): Promise<PricedCartItem[]> {
     priced.push({
       ...item,
       productName: product.name,
+      productSlug: product.slug,
       productKind: product.kind,
       colorName,
       colorHex,
+      sidesUsed: designSides(design),
       sizeSurcharges: Object.fromEntries(product.sizes.map((size) => [size.label, size.surcharge])),
       unitPrice: quote.unitBase,
       total: quote.total,
       quantity: lines.reduce((n, l) => n + l.qty, 0),
       lines,
-      // Data-URL previews are size-limited; drop anything oversized rather than
-      // letting a large payload reach the database.
+      // Never silently discard a proof supplied by the customer.
       previewFront: truncateDataUrl(item.previewFront),
       previewBack: truncateDataUrl(item.previewBack),
-      design: sanitiseDesign(item.design),
+      design,
       designNotes: String(item.designNotes ?? "").trim().slice(0, 2000),
       roster: sanitiseRoster(item.roster),
     });
@@ -126,14 +122,30 @@ function designSides(design: unknown): GarmentSide[] {
 }
 
 function truncateDataUrl(value: string | null | undefined): string | null {
-  if (!value || typeof value !== "string") return null;
-  if (!value.startsWith("data:image/")) return null;
-  return value.length > 400_000 ? null : value;
+  if (value == null || value === "") return null;
+  if (typeof value !== "string" || !value.startsWith("data:image/") || value.length > 400_000) throw new DesignUnavailableError();
+  return value;
 }
 
 const FONT_VALUES = new Set(FONTS.map((f) => f.value));
 const hexOr = (v: unknown, fallback: string) =>
   /^#[0-9A-Fa-f]{6}$/.test(String(v)) ? String(v) : fallback;
+
+// Some imported templates use translucent RGB colors. Keep those values
+// rather than changing the customer's artwork to the default ink color.
+function textColorOr(value: unknown, fallback: string): string {
+  if (typeof value !== "string") return fallback;
+  if (/^#[0-9a-f]{6}$/i.test(value)) return value;
+  const rgba = /^rgba\(\s*(\d{1,3})\s*,\s*(\d{1,3})\s*,\s*(\d{1,3})\s*,\s*(0(?:\.\d+)?|1(?:\.0+)?)\s*\)$/i.exec(value);
+  return rgba && rgba.slice(1, 4).every(part => Number(part) <= 255) ? value : fallback;
+}
+
+function safeArtworkSource(value: unknown): string | null {
+  if (typeof value !== "string" || value.length > 600_000) return null;
+  if (/^data:image\/(?:png|jpe?g|webp|gif|svg\+xml)(?:;[^,]*)?,/i.test(value)) return value;
+  if (!value.includes("..") && /^\/lumise\/(?:cliparts|template-elements|templates)\/(?:[a-z0-9_ -]+\/)*[a-z0-9_. -]+\.(?:svg|png|jpe?g|webp)$/i.test(value)) return value;
+  return null;
+}
 
 function sanitiseDesign(design: unknown): Design {
   const empty: Design = { front: [], back: [] };
@@ -141,11 +153,13 @@ function sanitiseDesign(design: unknown): Design {
   const d = design as Record<string, unknown>;
 
   const cleanSide = (side: unknown): DesignLayer[] => {
-    if (!Array.isArray(side)) return [];
+    if (side == null) return [];
+    if (!Array.isArray(side)) throw new DesignUnavailableError();
+    if (side.length > 30) throw new DesignUnavailableError();
     const out: DesignLayer[] = [];
 
-    for (const raw of side.slice(0, 30)) {
-      if (!raw || typeof raw !== "object") continue;
+    for (const raw of side) {
+      if (!raw || typeof raw !== "object") throw new DesignUnavailableError();
       const l = raw as Record<string, unknown>;
 
       const base = {
@@ -159,11 +173,13 @@ function sanitiseDesign(design: unknown): Design {
         flipH: Boolean(l.flipH),
         flipV: Boolean(l.flipV),
         locked: l.locked ? true : undefined,
+        groupId: typeof l.groupId === "string" && l.groupId ? l.groupId.slice(0, 40) : undefined,
         distress: clampNum(l.distress, 0, 3, 0),
       };
 
       if (l.type === "text") {
-        const text = String(l.text ?? "").slice(0, 400);
+        const text = String(l.text ?? "");
+        if (text.length > 400) throw new DesignUnavailableError();
         if (!text.trim()) continue;
         out.push({
           ...base,
@@ -171,7 +187,7 @@ function sanitiseDesign(design: unknown): Design {
           text,
           font: FONT_VALUES.has(String(l.font)) ? String(l.font) : "anton",
           fontSize: clampNum(l.fontSize, 2, 60, 7),
-          color: hexOr(l.color, "#141414"),
+          color: textColorOr(l.color, "#141414"),
           weight: [400, 700, 900].includes(Number(l.weight))
             ? (Number(l.weight) as 400 | 700 | 900)
             : 700,
@@ -180,9 +196,9 @@ function sanitiseDesign(design: unknown): Design {
           align: ["left", "center", "right"].includes(String(l.align))
             ? (l.align as "left" | "center" | "right")
             : "center",
-          letterSpacing: clampNum(l.letterSpacing, -10, 50, 0),
+          letterSpacing: clampNum(l.letterSpacing, -10, 100, 0),
           lineHeight: clampNum(l.lineHeight, 0.7, 3, 1.05),
-          strokeColor: hexOr(l.strokeColor, "#FFFFFF"),
+          strokeColor: textColorOr(l.strokeColor, "#FFFFFF"),
           strokeWidth: clampNum(l.strokeWidth, 0, 30, 0),
           arc: clampNum(l.arc, -100, 100, 0),
           role:
@@ -194,16 +210,37 @@ function sanitiseDesign(design: unknown): Design {
       }
 
       if (l.type === "image") {
-        const src = String(l.src ?? "");
-        if (!src.startsWith("data:image/") || src.length > 600_000) continue;
+        const src = safeArtworkSource(l.src);
+        if (!src) throw new DesignUnavailableError();
+        const origSrc = l.origSrc == null ? undefined : safeArtworkSource(l.origSrc);
+        if (l.origSrc != null && !origSrc) throw new DesignUnavailableError();
+        const rawFx = l.fx && typeof l.fx === "object" ? l.fx as Record<string, unknown> : null;
+        if (rawFx && Array.isArray(rawFx.recolors) && rawFx.recolors.length > 30) throw new DesignUnavailableError();
+        const fx = rawFx ? {
+          filter: rawFx.filter === "single" ? "single" as const : "normal" as const,
+          inkColor: hexOr(rawFx.inkColor, "#141414"),
+          removeBg: Boolean(rawFx.removeBg),
+          crop: Boolean(rawFx.crop),
+          superRes: Boolean(rawFx.superRes),
+          recolors: Array.isArray(rawFx.recolors) ? rawFx.recolors.slice(0, 30).flatMap((entry: unknown) => {
+            if (!entry || typeof entry !== "object") return [];
+            const color = entry as Record<string, unknown>;
+            return /^#[0-9a-f]{6}$/i.test(String(color.from)) && /^#[0-9a-f]{6}$/i.test(String(color.to))
+              ? [{ from: String(color.from), to: String(color.to) }] : [];
+          }) : [],
+        } : undefined;
         out.push({
           ...base,
           type: "image",
           src,
+          origSrc: origSrc ?? undefined,
+          fx,
           name: String(l.name ?? "artwork").slice(0, 120),
           aspect: clampNum(l.aspect, 0.05, 20, 1),
         });
+        continue;
       }
+      throw new DesignUnavailableError();
     }
 
     return out;
@@ -214,7 +251,8 @@ function sanitiseDesign(design: unknown): Design {
 
 function sanitiseRoster(roster: unknown): RosterEntry[] | undefined {
   if (!Array.isArray(roster) || !roster.length) return undefined;
-  return roster.slice(0, 300).map((raw, i) => {
+  if (roster.length > 300) throw new DesignUnavailableError();
+  return roster.map((raw, i) => {
     const r = (raw ?? {}) as Record<string, unknown>;
     return {
       id: String(r.id ?? `r-${i}`).slice(0, 40),
@@ -235,7 +273,13 @@ function clampNum(v: unknown, min: number, max: number, fallback: number): numbe
 export async function POST(req: Request) {
   if (!sameOrigin(req)) return NextResponse.json({ error: "Invalid request origin." }, { status: 403 });
   let body: Body;
-  try { body = (await req.json()) as Body; } catch { return NextResponse.json({ error: "Invalid request." }, { status: 400 }); }
+  try {
+    body = (await limitedJson(req, 8 * 1024 * 1024)) as Body;
+  } catch (error) {
+    if (error instanceof RangeError) return NextResponse.json({ error: "Your cart is too large to submit. Please split it into smaller orders or contact us for help." }, { status: 413 });
+    return NextResponse.json({ error: "Invalid request." }, { status: 400 });
+  }
+  if (!body || typeof body !== "object" || Array.isArray(body)) return NextResponse.json({ error: "Invalid request." }, { status: 400 });
   const paypal = body.paymentMethod === "paypal";
   if (!(paypal ? await paypalConfigured() : await paymentsConfigured())) {
     return NextResponse.json(
@@ -274,7 +318,9 @@ export async function POST(req: Request) {
   let items: PricedCartItem[];
   try {
     items = await sanitise(Array.isArray(body.items) ? body.items : []);
-  } catch {
+  } catch (error) {
+    if (error instanceof CartUnavailableError) return NextResponse.json({ error: "Some cart options are no longer available. Please review your cart before checking out." }, { status: 422 });
+    if (error instanceof DesignUnavailableError) return NextResponse.json({ error: "We couldn't prepare all of your artwork. Please review your design or contact us for help." }, { status: 422 });
     return NextResponse.json(
       { error: "We could not load the catalog to price your cart. Please try again." },
       { status: 503 }
@@ -379,6 +425,7 @@ export async function POST(req: Request) {
     }
     return response;
   } catch (err) {
+    if (err instanceof CheckoutAttemptConflictError) return NextResponse.json({ error: "Your checkout details have changed. Please try again to start a new checkout." }, { status: 409 });
     if (err instanceof InsufficientStockError) return NextResponse.json({ error: err.message }, { status: 409 });
     console.error("checkout error:", err);
     let safeToCancel = !stripeSessionId;

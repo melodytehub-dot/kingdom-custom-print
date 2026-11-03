@@ -268,7 +268,42 @@ export interface ProductInput {
  *  begin() overloads do not narrow the callback parameter. */
 type Tx = postgres.TransactionSql;
 
+export class ProductInventoryConflictError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "ProductInventoryConflictError";
+  }
+}
+
 async function replaceVariants(productId: number, input: ProductInput, tx: Tx) {
+  // Inventory and payment holds use the displayed color and size names. Do not
+  // leave a count behind that might later be mistaken for newly available stock.
+  const oldColors = await tx<{ name: string }[]>`SELECT name FROM product_colors WHERE product_id = ${productId}`;
+  const oldSizes = await tx<{ label: string }[]>`SELECT label FROM product_sizes WHERE product_id = ${productId}`;
+  const stocks = await tx<{ color_name: string; size_label: string; quantity: number }[]>`SELECT color_name, size_label, quantity FROM inventory_stock WHERE product_id = ${productId}`;
+  const holds = await tx<{ color_name: string; size_label: string }[]>`SELECT color_name, size_label FROM inventory_reservations WHERE product_id = ${productId}`;
+  const oldColorNames = new Set(oldColors.map(c => c.name));
+  const oldSizeLabels = new Set(oldSizes.map(s => s.label));
+  const newColorNames = new Set(input.colors.map(c => c.name));
+  const newSizeLabels = new Set(input.sizes.map(s => s.label));
+  const existsBefore = (color: string, size: string) => oldColorNames.has(color) && oldSizeLabels.has(size);
+  const existsAfter = (color: string, size: string) => newColorNames.has(color) && newSizeLabels.has(size);
+  if (holds.some(row => !existsAfter(row.color_name, row.size_label))) {
+    throw new ProductInventoryConflictError("This option has stock held for a pending order. Resolve the order before changing or removing it.");
+  }
+  for (const stock of stocks) {
+    const before = existsBefore(stock.color_name, stock.size_label);
+    const after = existsAfter(stock.color_name, stock.size_label);
+    if (before && !after && stock.quantity > 0) {
+      throw new ProductInventoryConflictError("Set the stock count to zero before changing or removing a color or size.");
+    }
+    if (!before && after) {
+      throw new ProductInventoryConflictError("This option has an old stock count. Contact the site administrator to review it before adding the option.");
+    }
+    if (before && !after) {
+      await tx`DELETE FROM inventory_stock WHERE product_id = ${productId} AND color_name = ${stock.color_name} AND size_label = ${stock.size_label}`;
+    }
+  }
   await tx`DELETE FROM product_colors WHERE product_id = ${productId}`;
   await tx`DELETE FROM product_sizes WHERE product_id = ${productId}`;
   await tx`DELETE FROM price_breaks WHERE product_id = ${productId}`;
@@ -315,6 +350,7 @@ export async function updateProduct(
   input: ProductInput
 ): Promise<boolean> {
   return sql.begin(async (tx) => {
+    await tx`SELECT pg_advisory_xact_lock(1296786772, ${id})`;
     const result = await tx`
       UPDATE products SET
         slug = ${input.slug}, name = ${input.name}, style_code = ${input.styleCode},

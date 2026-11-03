@@ -61,7 +61,7 @@ function validate(raw: RawProduct): { value?: ProductInput; error?: string } {
   }
 
   if (!Array.isArray(raw.colors) || !raw.colors.length || raw.colors.length > 200) return { error: "Add between 1 and 200 colors." };
-  if (raw.colors.some((c) => !c || !c.slug || !c.name?.trim() || !HEX_RE.test(String(c.hex)))) return { error: "Give each color a name and choose a swatch color." };
+  if (raw.colors.some((c) => !c || typeof c.slug !== "string" || !c.slug || typeof c.name !== "string" || !c.name.trim() || !HEX_RE.test(String(c.hex)))) return { error: "Give each color a name and choose a swatch color." };
   const colors = raw.colors.map((c) => ({
       slug: slugify(String(c.slug)),
       name: String(c.name).slice(0, 40),
@@ -75,6 +75,8 @@ function validate(raw: RawProduct): { value?: ProductInput; error?: string } {
     seenColors.add(color.slug);
   }
 
+  if (raw.sizes !== undefined && !Array.isArray(raw.sizes)) return { error: "Add at least one size." };
+  if (raw.priceBreaks !== undefined && !Array.isArray(raw.priceBreaks)) return { error: "Check the quantity breaks." };
   const sizes = (raw.sizes ?? [])
     .filter((s) => s && s.label)
     .slice(0, 20)
@@ -155,6 +157,7 @@ export async function POST(req: Request) {
   let raw: RawProduct;
   try {
     raw = (await req.json()) as RawProduct;
+    if (!raw || typeof raw !== "object" || Array.isArray(raw)) throw new Error();
   } catch {
     return NextResponse.json({ error: "Invalid request." }, { status: 400 });
   }
@@ -182,6 +185,7 @@ export async function PUT(req: Request) {
   let raw: RawProduct;
   try {
     raw = (await req.json()) as RawProduct;
+    if (!raw || typeof raw !== "object" || Array.isArray(raw)) throw new Error();
   } catch {
     return NextResponse.json({ error: "Invalid request." }, { status: 400 });
   }
@@ -200,6 +204,9 @@ export async function PUT(req: Request) {
     revalidatePath("/", "layout");
     return NextResponse.json({ ok: true });
   } catch (err) {
+    if (err instanceof Error && err.name === "ProductInventoryConflictError") {
+      return NextResponse.json({ error: err.message }, { status: 409 });
+    }
     const message =
       err instanceof Error && err.message.includes("duplicate")
         ? "A product with this name or link already exists."
@@ -215,6 +222,7 @@ export async function PATCH(req: Request) {
   let raw: { id?: number; featured?: boolean; active?: boolean };
   try {
     raw = await req.json();
+    if (!raw || typeof raw !== "object" || Array.isArray(raw)) throw new Error();
   } catch {
     return NextResponse.json({ error: "Invalid request." }, { status: 400 });
   }

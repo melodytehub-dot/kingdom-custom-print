@@ -6,12 +6,14 @@ import { recordPayPalCapture, markPayPalRefunded } from "@/lib/orders";
 import { sendPaidOrderReceipt } from "@/lib/order-email";
 import { capturePayPalInvoice } from "@/lib/invoice-payments";
 import { sql } from "@/lib/db";
+import { limitedText } from "@/lib/limited-form-data";
 
 export const dynamic = "force-dynamic";
 export async function POST(request: Request) {
   if (!(await paypalCredentialsConfigured())) return NextResponse.json({ error: "PayPal is not configured." }, { status: 503 });
-  const raw = await request.text();
-  if (raw.length > 1_000_000) return NextResponse.json({ error: "Event too large." }, { status: 413 });
+  let raw: string;
+  try { raw = await limitedText(request, 1_000_000); }
+  catch (error) { return NextResponse.json({ error: "Invalid event." }, { status: error instanceof RangeError ? 413 : 400 }); }
   let event: { id?: string; event_type?: string; resource?: { id?: string; status?: string; amount?: { value?: string; currency_code?: string }; supplementary_data?: { related_ids?: { order_id?: string; capture_id?: string } } } };
   try { event = JSON.parse(raw); } catch { return NextResponse.json({ error: "Invalid event." }, { status: 400 }); }
   const keys = ["paypal-auth-algo", "paypal-cert-url", "paypal-transmission-id", "paypal-transmission-sig", "paypal-transmission-time"] as const;

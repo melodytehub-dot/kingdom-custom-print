@@ -31,7 +31,7 @@ export async function POST(req: Request) {
   const denied = await requireAdmin(req);
   if (denied) return denied;
   let raw: Record<string, unknown>;
-  try { raw = (await req.json()) as Record<string, unknown>; } catch { return NextResponse.json({ error: "Invalid request." }, { status: 400 }); }
+  try { raw = (await req.json()) as Record<string, unknown>; if (!raw || typeof raw !== "object" || Array.isArray(raw)) throw new Error(); } catch { return NextResponse.json({ error: "Invalid request." }, { status: 400 }); }
   const { value, error } = validate(raw);
   if (!value) return NextResponse.json({ error }, { status: 422 });
   try {
@@ -48,7 +48,7 @@ export async function PUT(req: Request) {
   const denied = await requireAdmin(req);
   if (denied) return denied;
   let raw: Record<string, unknown>;
-  try { raw = (await req.json()) as Record<string, unknown>; } catch { return NextResponse.json({ error: "Invalid request." }, { status: 400 }); }
+  try { raw = (await req.json()) as Record<string, unknown>; if (!raw || typeof raw !== "object" || Array.isArray(raw)) throw new Error(); } catch { return NextResponse.json({ error: "Invalid request." }, { status: 400 }); }
   const id = Number(raw.id);
   if (!Number.isInteger(id) || id <= 0) return NextResponse.json({ error: "Missing category id." }, { status: 422 });
   const { value, error } = validate(raw);

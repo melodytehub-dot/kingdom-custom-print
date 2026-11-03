@@ -3,6 +3,7 @@ import { Webhook } from "svix";
 import { NextResponse } from "next/server";
 import { sql } from "@/lib/db";
 import { sendEmail } from "@/lib/email";
+import { limitedText } from "@/lib/limited-form-data";
 
 export const dynamic = "force-dynamic";
 
@@ -12,8 +13,9 @@ export async function POST(request: Request) {
   const domain = process.env.SUPPORT_INBOUND_DOMAIN?.trim().toLowerCase();
   const owner = process.env.SUPPORT_EMAIL?.trim().toLowerCase();
   if (!secret || !apiKey || !domain || !owner) return NextResponse.json({ error: "Unavailable" }, { status: 503 });
-  const body = await request.text();
-  if (body.length > 100000) return NextResponse.json({ error: "Too large" }, { status: 413 });
+  let body: string;
+  try { body = await limitedText(request, 100_000); }
+  catch (error) { return NextResponse.json({ error: "Invalid event" }, { status: error instanceof RangeError ? 413 : 400 }); }
   const id = request.headers.get("svix-id"), timestamp = request.headers.get("svix-timestamp"), signature = request.headers.get("svix-signature");
   if (!id || !timestamp || !signature) return NextResponse.json({ error: "Invalid signature" }, { status: 400 });
   type ReceivedEvent = { type?: string; data?: { email_id?: string } };

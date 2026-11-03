@@ -12,10 +12,12 @@ function load(file, dependencies) {
   vm.runInNewContext(output, { exports, require: name => {
     if (!(name in dependencies)) throw new Error(`Unexpected dependency: ${name}`);
     return dependencies[name];
-  }, process, console, Request, Response, URL, Buffer }, { filename: file });
+  }, process, console, Request, Response, Headers, Blob, RangeError, URL, Buffer }, { filename: file });
   return exports;
 }
 const pricing = load("lib/pricing.ts", {});
+const inputLimits = load("lib/limited-form-data.ts", {});
+const fonts = load("lib/fonts.ts", {});
 const product = { id: 1, active: true, name: "Catalog tee", slug: "catalog-tee", kind: "tee", basePrice: 10, printFeePerSide: 4, priceBreaks: [], colors: [{ name: "Black", hex: "#111111" }], sizes: [{ label: "M", surcharge: 0 }, { label: "2XL", surcharge: 3 }] };
 let configured = false;
 let account = null;
@@ -24,32 +26,54 @@ let sessionInput;
 let paypalInput;
 let paypalEnabled = false;
 let writes = 0;
+let conflictAttempt = false;
+class CheckoutAttemptConflictError extends Error {}
 const checkout = load("app/api/checkout/route.ts", {
   "next/server": { NextResponse },
   "node:crypto": { randomUUID: () => "11111111-1111-4111-8111-111111111111" },
-  "@/lib/orders": { createOrder: async input => { writes++; orderInput = input; const subtotal = input.items.reduce((sum, item) => sum + item.total, 0); return { reference: "KCP-TEST01", subtotal, shipping: 6.95, total: subtotal + 6.95 }; }, attachStripeSession: async () => {}, attachPayPalOrder: async () => {}, cancelOrder: async () => true },
+  "@/lib/orders": { CheckoutAttemptConflictError, createOrder: async input => { if (conflictAttempt) throw new CheckoutAttemptConflictError(); writes++; orderInput = input; const subtotal = input.items.reduce((sum, item) => sum + item.total, 0); return { reference: "KCP-TEST01", subtotal, shipping: 6.95, total: subtotal + 6.95 }; }, attachStripeSession: async () => {}, attachPayPalOrder: async () => {}, cancelOrder: async () => true },
   "@/lib/inventory-reservations": { InsufficientStockError: class InsufficientStockError extends Error {} },
   "@/lib/paypal": { paypalConfigured: async () => paypalEnabled, paypalRequest: async (_path, options) => { paypalInput = JSON.parse(options.body); return { id: "PAYPALID", links: [{ rel: "payer-action", href: "https://www.paypal.com/checkoutnow" }] }; } },
   "@/lib/order-access": { createOrderAccessSession: async () => "test_access_token", ORDER_ACCESS_COOKIE: "kcp_order_access", orderAccessCookieOptions: () => ({ httpOnly: true, sameSite: "lax", path: "/" }) },
   "@/lib/stripe": { paymentsConfigured: () => configured, siteUrl: () => "https://kingdom.example", stripeClient: () => ({ checkout: { sessions: { create: async input => { sessionInput = input; return { id: "cs_test_local", url: "https://checkout.stripe.com/test" }; }, expire: async () => ({}) } } }) },
-  "@/lib/catalog": { getProductById: async () => product },
+  "@/lib/catalog": { getProductById: async id => id === product.id ? product : null },
   "@/lib/pricing": pricing,
-  "@/lib/fonts": { FONTS: [{ id: "Anton" }] },
+  "@/lib/fonts": fonts,
   "@/lib/design": { personalizationOf: () => "none" },
   "@/lib/customer-auth": { sameOrigin: () => true, customerFromRequest: async () => account },
+  "@/lib/limited-form-data": inputLimits,
 });
-const payload = { email: "qa@example.com", name: "Test buyer", addressLine1: "1 Test Street", city: "Austin", postal: "78701", region: "TX", items: [{ productId: 1, productName: "Fake client name", quantity: 999, unitPrice: .01, total: .01, colorName: "Fake color", colorHex: "#ff0000", lines: [{ label: "M", qty: 2 }, { label: "2XL", qty: 1 }], design: { front: [], back: [] } }] };
+const payload = { email: "qa@example.com", name: "Test buyer", addressLine1: "1 Test Street", city: "Austin", postal: "78701", region: "TX", items: [{ productId: 1, productName: "Fake client name", quantity: 999, unitPrice: .01, total: .01, colorName: "Black", colorHex: "#ff0000", lines: [{ label: "M", qty: 2 }, { label: "2XL", qty: 1 }], design: { front: [], back: [] } }] };
 const request = data => new Request("https://kingdom.example/api/checkout", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(data) });
 let response = await checkout.POST(request(payload));
 assert.equal(response.status, 503);
 assert.equal(writes, 0);
 console.log("PASS missing Stripe configuration refuses checkout without creating an order");
 configured = true;
+conflictAttempt = true;
+response = await checkout.POST(request(payload));
+assert.equal(response.status, 409);
+assert.equal(writes, 0);
+conflictAttempt = false;
+response = await checkout.POST(request({ padding: "x".repeat(8 * 1024 * 1024) }));
+assert.equal(response.status, 413);
+assert.equal(writes, 0);
+response = await checkout.POST(request(null));
+assert.equal(response.status, 400);
+response = await checkout.POST(request({ ...payload, items: [{ ...payload.items[0], colorName: "Unavailable color" }] }));
+assert.equal(response.status, 422);
+assert.equal(writes, 0);
+response = await checkout.POST(request({ ...payload, items: [payload.items[0], { ...payload.items[0], productId: 999 }] }));
+assert.equal(response.status, 422);
+assert.equal(writes, 0);
+console.log("PASS unavailable colors and mixed carts cannot silently change the order");
 response = await checkout.POST(request(payload));
 assert.equal(response.status, 200);
 assert.equal(orderInput.items[0].productName, product.name);
+assert.equal(orderInput.items[0].productSlug, product.slug);
 assert.equal(orderInput.items[0].quantity, 3);
 assert.equal(orderInput.items[0].colorName, "Black");
+assert.equal(orderInput.items[0].colorHex, "#111111");
 assert.equal(orderInput.items[0].total, 33);
 const charged = sessionInput.line_items.reduce((sum, item) => sum + item.quantity * item.price_data.unit_amount, 0);
 assert.equal(charged, 3300);
@@ -57,7 +81,10 @@ assert.equal(sessionInput.shipping_options[0].shipping_rate_data.fixed_amount.am
 assert.equal(sessionInput.payment_method_types[0], "card");
 console.log("PASS server prices override client tampering, quantity, names and colors; Stripe includes size surcharges exactly");
 response = await checkout.POST(request({ ...payload, items: [{ ...payload.items[0], lines: [{ label: "INVALID", qty: 1 }] }] }));
-assert.equal(response.status, 400);
+assert.equal(response.status, 422);
+assert.equal(writes, 1);
+response = await checkout.POST(request({ ...payload, items: [{ ...payload.items[0], lines: [{ label: "M", qty: 1 }, { label: "INVALID", qty: 1 }] }] }));
+assert.equal(response.status, 422);
 assert.equal(writes, 1);
 console.log("PASS invalid sizes cannot create an order");
 account = { id: 7, email: "qa@example.com" };
@@ -74,6 +101,49 @@ assert.equal(response.status, 200);
 assert.equal(paypalInput.purchase_units[0].amount.value, "39.95");
 assert.equal(paypalInput.purchase_units[0].amount.currency_code, "USD");
 console.log("PASS PayPal checkout uses the server-calculated total");
+const source = "/lumise/cliparts/2017/07/high jump.svg";
+const templateSource = "/lumise/template-elements/lumise-template-343-5.svg";
+const artwork = (src) => ({ id: "art1", type: "image", src, origSrc: src, name: "Artwork", aspect: 1, x: 50, y: 50, scaleX: 1, scaleY: 1, rotation: 0, opacity: 1, groupId: "group-1", fx: { filter: "single", inkColor: "#123456", removeBg: true, crop: false, superRes: false, recolors: [{ from: "#111111", to: "#222222" }] } });
+response = await checkout.POST(request({ ...payload, items: [{ ...payload.items[0], sidesUsed: ["back"], design: { front: [{ ...artwork(source), origSrc: templateSource }, artwork(templateSource)], back: [] } }] }));
+assert.equal(response.status, 200);
+assert.equal(orderInput.items[0].design.front.length, 2);
+assert.equal(orderInput.items[0].design.front[0].src, source);
+assert.equal(orderInput.items[0].design.front[0].origSrc, templateSource);
+assert.equal(orderInput.items[0].design.front[0].groupId, "group-1");
+assert.equal(orderInput.items[0].design.front[0].fx.removeBg, true);
+assert.equal(orderInput.items[0].design.front[0].fx.recolors[0].to, "#222222");
+assert.equal(orderInput.items[0].design.front[1].src, templateSource);
+assert.equal(orderInput.items[0].sidesUsed.join(","), "front");
+assert.match(sessionInput.line_items[0].price_data.product_data.description, /Print: Front/);
+response = await checkout.POST(request({ ...payload, items: [{ ...payload.items[0], design: { front: [{ id: "text1", type: "text", text: "Hello", font: "google-comfortaa", color: "rgba(51, 51, 51, 0.96)", letterSpacing: 100 }], back: [] } }] }));
+assert.equal(response.status, 200);
+assert.equal(orderInput.items[0].design.front[0].font, "google-comfortaa");
+assert.equal(orderInput.items[0].design.front[0].color, "rgba(51, 51, 51, 0.96)");
+assert.equal(orderInput.items[0].design.front[0].letterSpacing, 100);
+const priorWrites = writes;
+for (const src of ["/lumise/cliparts/../../api/admin/orders.svg", "https://example.test/art.svg", `data:image/png;base64,${"a".repeat(600001)}`]) {
+  response = await checkout.POST(request({ ...payload, items: [{ ...payload.items[0], design: { front: [artwork(src)], back: [] } }] }));
+  assert.equal(response.status, 422);
+  assert.equal(writes, priorWrites);
+}
+response = await checkout.POST(request({ ...payload, items: [{ ...payload.items[0], design: { front: Array.from({ length: 31 }, () => artwork(source)), back: [] } }] }));
+assert.equal(response.status, 422);
+assert.equal(writes, priorWrites);
+for (const front of [[null], { invalid: true }]) {
+  response = await checkout.POST(request({ ...payload, items: [{ ...payload.items[0], design: { front, back: [] } }] }));
+  assert.equal(response.status, 422);
+  assert.equal(writes, priorWrites);
+}
+response = await checkout.POST(request({ ...payload, items: [{ ...payload.items[0], roster: Array.from({ length: 301 }, () => ({ name: "Player" })) }] }));
+assert.equal(response.status, 422);
+assert.equal(writes, priorWrites);
+response = await checkout.POST(request({ ...payload, items: [{ ...payload.items[0], previewFront: `data:image/png;base64,${"a".repeat(400001)}` }] }));
+assert.equal(response.status, 422);
+assert.equal(writes, priorWrites);
+response = await checkout.POST(request({ ...payload, items: [{ ...payload.items[0], previewFront: "data:image/webp;base64,cHJvb2Y=" }] }));
+assert.equal(response.status, 200);
+assert.equal(orderInput.items[0].previewFront, "data:image/webp;base64,cHJvb2Y=");
+console.log("PASS library artwork and original sources survive checkout; unsafe or oversized artwork is rejected");
 const stripe = new Stripe("sk_test_local_fixture");
 const secret = "whsec_local_fixture";
 const previousSecret = process.env.STRIPE_WEBHOOK_SECRET;
@@ -84,6 +154,7 @@ let receiptCalls = 0;
 let receiptFails = false;
 const webhook = load("app/api/webhook/route.ts", {
   "next/server": { NextResponse },
+  "@/lib/limited-form-data": inputLimits,
   "@/lib/orders": {
     markOrderPaid: async () => { paidCalls++; return { reference: "KCP-TEST01" }; },
     markOrderRefunded: async () => { refundedCalls++; },
@@ -94,6 +165,8 @@ const webhook = load("app/api/webhook/route.ts", {
   "@/lib/invoice-payments": { recordStripeInvoicePayment: async () => false, closeStripeInvoiceSession: async () => false },
   "@/lib/db": { sql: async () => [] },
 });
+const oversizedWebhook = new Request("https://kingdom.example/api/webhook", { method: "POST", headers: { "stripe-signature": "fixture" }, body: "x".repeat(1_000_001) });
+assert.equal((await webhook.POST(oversizedWebhook)).status, 413);
 async function event(status, type = "checkout.session.completed", valid = true, object) {
   const body = JSON.stringify({ id: "evt_local", type, data: { object: object ?? { id: "cs_test_local", payment_status: status, payment_intent: "pi_local" } } });
   const signature = valid ? stripe.webhooks.generateTestHeaderString({ payload: body, secret }) : "t=0,v1=invalid";

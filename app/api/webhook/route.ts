@@ -6,6 +6,7 @@ import { sendPaidOrderReceipt } from "@/lib/order-email";
 import { getPaymentCredential } from "@/lib/payment-credentials";
 import { closeStripeInvoiceSession, recordStripeInvoicePayment } from "@/lib/invoice-payments";
 import { sql } from "@/lib/db";
+import { limitedText } from "@/lib/limited-form-data";
 
 export const dynamic = "force-dynamic";
 
@@ -25,7 +26,9 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Missing signature." }, { status: 400 });
   }
 
-  const payload = await req.text();
+  let payload: string;
+  try { payload = await limitedText(req, 1_000_000); }
+  catch (error) { return NextResponse.json({ error: "Invalid event." }, { status: error instanceof RangeError ? 413 : 400 }); }
 
   let event: Stripe.Event;
   try {

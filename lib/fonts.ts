@@ -128,6 +128,7 @@ const GOOGLE_FONT_FAMILIES = [
   "Rubik Mono One", "Slabo 27px", "Suez One", "Tangerine",
   "Titillium Web", "Vast Shadow", "Vinhan", "Yellowtail",
   "Yesteryear", "Zilla Slab Highlight",
+  "Comfortaa", "Quicksand", "Architects Daughter", "Oxygen", "Special Elite",
 ] as const;
 
 const googleFonts: FontOption[] = GOOGLE_FONT_FAMILIES.map((family) => {

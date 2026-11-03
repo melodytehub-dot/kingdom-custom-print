@@ -444,9 +444,9 @@ const baseProducts = [
     category: "t-shirts",
     kind: "longsleeve",
     material: "100% ring-spun cotton, 4.5 oz, long sleeve",
-    blurb: "Extra surface for sleeve prints, cuffs and full-length back art.",
+    blurb: "A long-sleeve tee ready for your front and back design.",
     description:
-      "Long sleeves open up print placements a short sleeve cannot take — full sleeve runs, cuff marks and a tall back panel. Ring-spun cotton keeps the surface smooth for detail.",
+      "Make this long-sleeve tee yours with a custom design on the front, back, or both.",
     base_price: 15.0,
     compare_at: null,
     print_fee: 5.5,

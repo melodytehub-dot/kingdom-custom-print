@@ -1,0 +1,20 @@
+import assert from "node:assert/strict";
+import fs from "node:fs";
+import vm from "node:vm";
+import ts from "typescript";
+
+const source = fs.readFileSync("lib/cart-context.tsx", "utf8") + "\nexport const qaCommit = commit; export const qaSnapshot = () => snapshot;\n";
+const code = ts.transpileModule(source, { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX } }).outputText;
+const exports = {};
+let stored = "";
+let fail = false;
+const deps = { react: { createContext: () => ({}) }, "react/jsx-runtime": {}, "./pricing": { round2: (n) => n } };
+vm.runInNewContext(code, { exports, require: (name) => { if (!deps[name]) throw new Error(`Missing dependency ${name}`); return deps[name]; }, window: { localStorage: { setItem: (_key, value) => { if (fail) throw new Error("quota"); stored = value; } } } });
+exports.qaCommit([{ id: "existing" }]);
+assert.equal(JSON.parse(stored)[0].id, "existing");
+fail = true;
+assert.throws(() => exports.qaCommit([{ id: "replacement" }]), { name: "CartStorageError" });
+assert.throws(() => exports.qaCommit([]), { name: "CartStorageError" });
+assert.equal(exports.qaSnapshot()[0].id, "existing");
+assert.equal(JSON.parse(stored)[0].id, "existing");
+console.log("PASS: failed cart persistence reports an error without replacing the existing cart");

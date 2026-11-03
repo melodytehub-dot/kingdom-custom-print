@@ -1175,7 +1175,7 @@ export function QuantityPanel({
 
       <dl className="rot-totals">
         <div>
-          <dt>Shirts</dt>
+          <dt>Items</dt>
           <dd>{quantity}</dd>
         </div>
         <div>
@@ -1267,8 +1267,8 @@ export function ReviewPanel({
             return `${line.label} × ${line.qty} at ${formatUSD(quote.unitBase + surcharge)} each`;
           }).join(", ") || "None"
         )}
-        {roster ? item("Names & numbers", `${roster} shirts`) : null}
-        {item("Shirts", quantity)}
+        {roster ? item("Names & numbers", `${roster} items`) : null}
+        {item("Items", quantity)}
         {item("Average price each", quantity ? formatUSD(quote.total / quantity) : formatUSD(quote.unitBase))}
         <li className="is-total">
           <span>Subtotal</span>

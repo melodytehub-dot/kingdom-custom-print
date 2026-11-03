@@ -5,6 +5,9 @@ compatibility_date = "2026-10-28"
 compatibility_flags = ["nodejs_compat"]
 assets = { directory = ".cloudflare/output/v0/workers/default/assets" }
 
+[triggers]
+crons = ["0 * * * *"]
+
 # KV namespace for Vinext cache
 [[kv_namespaces]]
 binding = "VINEXT_KV_CACHE"

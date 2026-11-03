@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { sameOrigin } from "@/lib/customer-auth";
+import { limitedJson } from "@/lib/limited-form-data";
 import {
   ORDER_ACCESS_COOKIE,
   orderAccessAttemptAllowed,
@@ -19,10 +20,12 @@ export async function POST(request: Request) {
 
   let body: { reference?: string; email?: string };
   try {
-    body = (await request.json()) as { reference?: string; email?: string };
-  } catch {
+    body = (await limitedJson(request, 4096)) as { reference?: string; email?: string };
+  } catch (error) {
+    if (error instanceof RangeError) return NextResponse.json({ error: "Request is too large." }, { status: 413 });
     return NextResponse.json({ error: "Invalid request." }, { status: 400 });
   }
+  if (!body || typeof body !== "object" || Array.isArray(body)) return NextResponse.json({ error: "Invalid request." }, { status: 400 });
 
   const reference = String(body.reference ?? "").trim().toUpperCase();
   const email = String(body.email ?? "").trim().toLowerCase();

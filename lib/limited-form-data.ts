@@ -22,6 +22,11 @@ export async function limitedJson(request: Request, limit: number): Promise<unkn
   return JSON.parse(await (await limitedBody(request, limit)).text());
 }
 
+/** Preserve the raw UTF-8 text used for webhook signature verification. */
+export async function limitedText(request: Request, limit: number): Promise<string> {
+  return (await limitedBody(request, limit)).text();
+}
+
 export async function limitedFormData(request: Request, limit: number): Promise<FormData> {
   const body = await limitedBody(request, limit);
   const headers = new Headers();

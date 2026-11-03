@@ -112,7 +112,7 @@ import {
 import { drawPreview } from "./preview";
 import { mockupBaseForProduct, mockupByCode, mockupsForProduct, TEE_MOCKUPS, type TeeMockup } from "@/lib/mockups";
 import { ensureFontLoaded } from "@/lib/fonts";
-import { useCart } from "@/lib/cart-context";
+import { CartStorageError, useCart } from "@/lib/cart-context";
 import { quoteProduct, formatUSD } from "@/lib/pricing";
 import type {
   CutoutSource,
@@ -215,14 +215,14 @@ function luminance(hex: string): number {
   return 0.299 * r + 0.587 * g + 0.114 * b;
 }
 
-/** Drops editor-only data (original pixels, fx recipe) before the cart stores a design. */
+/** Keep the working original and edit settings without duplicating unchanged image data. */
 function stripForCart(design: Design): Design {
   const clean = (layers: DesignLayer[]) =>
     layers.map((l) => {
       if (l.type !== "image") return l;
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      const { origSrc, backgroundRemovedSrc, fx, ...rest } = l as ImageLayer;
-      return rest as ImageLayer;
+      const { origSrc, backgroundRemovedSrc, altRemovedSrc, ...rest } = l as ImageLayer;
+      return { ...rest, origSrc: origSrc && origSrc !== l.src ? origSrc : undefined } as ImageLayer;
     });
   return { front: clean(design.front), back: clean(design.back) };
 }
@@ -1382,7 +1382,7 @@ export default function Customizer({
       return;
     }
     if (sides.length === 0) {
-      setNotice({ tone: "warn", text: "No artwork added — this shirt will be added blank." });
+      setNotice({ tone: "warn", text: "No artwork added — this item will be added blank." });
     }
 
     setBusy(true);
@@ -1416,10 +1416,12 @@ export default function Customizer({
       setNotice({ tone: "ok", text: updated ? "Cart item updated." : "Added to cart." });
       setLines(Object.fromEntries(product.sizes.map((s) => [s.label, 0])));
       setSelectedIds([]);
-    } catch {
+    } catch (error) {
       setNotice({
         tone: "error",
-        text: "We could not render a preview of that design. Try a smaller image.",
+        text: error instanceof CartStorageError
+          ? "Your cart could not be saved on this device. Free up browser storage or try a smaller design, then try again."
+          : "We could not render a preview of that design. Try a smaller image.",
       });
     } finally {
       setBusy(false);
@@ -1572,7 +1574,7 @@ export default function Customizer({
           product={product}
           mockup={mockup}
           sidesLabel={
-            sides.length ? sides.map((s) => (s === "front" ? "Front" : "Back")).join(" + ") : "Blank shirt"
+            sides.length ? sides.map((s) => (s === "front" ? "Front" : "Back")).join(" + ") : "Blank"
           }
           elements={design.front.length + design.back.length}
           quantity={quantity}

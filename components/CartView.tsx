@@ -1,11 +1,11 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import DesignPreviewImage from "@/components/DesignPreviewImage";
 import Trash from "@/components/icons/Trash";
 import ArrowRight from "@/components/icons/ArrowRight";
-import { useCart } from "@/lib/cart-context";
+import { CartStorageError, useCart } from "@/lib/cart-context";
 import { useToast } from "@/lib/toast-context";
 import { describeDesign, type CartItem } from "@/lib/types";
 
@@ -19,15 +19,25 @@ export default function CartView({
   const { items, hydrated, updateLine, removeItem, addItem, subtotal } = useCart();
   const { showToast } = useToast();
   const [removing, setRemoving] = useState<string | null>(null);
-  const removedItemRef = useRef<CartItem | null>(null);
 
   const remaining = Math.max(0, freeThreshold - subtotal);
   const qualifies = remaining <= 0 && subtotal > 0;
 
+  const updateCart = (action: () => void) => {
+    try {
+      action();
+      return true;
+    } catch (error) {
+      if (!(error instanceof CartStorageError)) throw error;
+      showToast("We couldn't save your cart changes. Please free up browser storage and try again.", "error");
+      return false;
+    }
+  };
+
   const handleRemove = (item: CartItem) => {
+    if (!updateCart(() => removeItem(item.id))) return;
     setRemoving(item.id);
-    removedItemRef.current = item;
-    removeItem(item.id);
+    let restored = false;
     
     showToast(
       "Item removed from cart",
@@ -35,9 +45,12 @@ export default function CartView({
       {
         label: "Undo",
         onClick: () => {
-          if (removedItemRef.current) {
-            addItem(removedItemRef.current);
-            showToast("Item restored to cart", "success", undefined, 3000);
+          if (!restored) {
+            if (updateCart(() => { addItem(item); })) {
+              restored = true;
+              setRemoving(null);
+              showToast("Item restored to cart", "success", undefined, 3000);
+            }
           }
         },
       },
@@ -104,7 +117,7 @@ export default function CartView({
               key={item.id}
               item={item}
               busy={removing === item.id}
-              onQty={(label, qty) => updateLine(item.id, label, qty)}
+              onQty={(label, qty) => { updateCart(() => updateLine(item.id, label, qty)); }}
               onRemove={() => handleRemove(item)}
             />
           ))}

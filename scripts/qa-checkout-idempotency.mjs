@@ -60,6 +60,11 @@ try {
   assert.equal(first.reused, false);
   assert.equal(retry.reused, true);
   assert.equal(retry.reference, first.reference);
+  const conflict = (err) => err instanceof exports.CheckoutAttemptConflictError;
+  await assert.rejects(() => exports.createOrder({ ...input, addressLine1: "2 Different Street" }), conflict);
+  await assert.rejects(() => exports.createOrder({ ...input, items: [{ ...input.items[0], designNotes: "Changed artwork instructions" }] }), conflict);
+  await assert.rejects(() => exports.createOrder({ ...input, items: [{ ...input.items[0], lines: [{ label: "L", qty: 2 }] }] }), conflict);
+  await assert.rejects(() => exports.createOrder({ ...input, items: [{ ...input.items[0], design: { front: [{ type: "text", text: "Different" }], back: [] } }] }), conflict);
   const [counts] = await sql`
     SELECT count(DISTINCT o.id)::int AS orders, count(oi.id)::int AS items
     FROM orders o LEFT JOIN order_items oi ON oi.order_id = o.id

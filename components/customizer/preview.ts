@@ -1,5 +1,5 @@
 import type { Design, DesignLayer, GarmentSide, PrintArea } from "@/lib/types";
-import { areaFor, layerBox, teeArea } from "@/lib/design";
+import { areaFor, encodeCanvasUnder, layerBox, teeArea } from "@/lib/design";
 import { displayText, drawArcLine, fontShorthand, measureTextLayer } from "./textGeometry";
 
 /**
@@ -98,8 +98,6 @@ async function renderSide(
   layers: DesignLayer[],
   printArea?: PrintArea
 ): Promise<string | null> {
-  if (!layers.length) return null;
-
   const canvas = document.createElement("canvas");
   canvas.width = SIZE;
   canvas.height = SIZE;
@@ -159,11 +157,9 @@ async function renderSide(
     ctx.restore();
   }
 
-  try {
-    return canvas.toDataURL("image/webp", 0.85);
-  } catch {
-    return canvas.toDataURL("image/png");
-  }
+  const { dataUrl } = encodeCanvasUnder(canvas);
+  if (dataUrl.length > 400_000) throw new Error("Preview is too large.");
+  return dataUrl;
 }
 
 export async function drawPreview(

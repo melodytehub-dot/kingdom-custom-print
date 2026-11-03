@@ -17,7 +17,8 @@ export async function GET(
   }
 
   const rows = await sql<{ content_type: string; bytes: Buffer }[]>`
-    SELECT content_type, bytes FROM cutout_bridge_images WHERE id = ${id}
+    SELECT content_type, bytes FROM cutout_bridge_images
+    WHERE id = ${id} AND created_at > now() - interval '1 day'
   `;
   const row = rows[0];
   if (!row) return new NextResponse("Not found", { status: 404 });
@@ -25,7 +26,8 @@ export async function GET(
   return new NextResponse(new Uint8Array(row.bytes), {
     headers: {
       "Content-Type": row.content_type,
-      "Cache-Control": "public, max-age=3600",
+      "Cache-Control": "private, no-store",
+      "X-Content-Type-Options": "nosniff",
     },
   });
 }

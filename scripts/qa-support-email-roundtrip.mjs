@@ -13,7 +13,7 @@ const sql = async (strings, ...values) => {
 };
 const exports = {};
 const code = ts.transpileModule(fs.readFileSync("app/api/support/inbound/route.ts", "utf8"), { compilerOptions: { module: ts.ModuleKind.CommonJS } }).outputText;
-const deps = { "node:crypto": { createHash, createHmac }, "svix": { Webhook: class { verify() {} } }, "next/server": { NextResponse }, "@/lib/db": { sql }, "@/lib/email": { sendEmail: async (message) => { sent.push(message); return "ok"; } } };
+const deps = { "node:crypto": { createHash, createHmac }, "svix": { Webhook: class { verify() {} } }, "next/server": { NextResponse }, "@/lib/db": { sql }, "@/lib/email": { sendEmail: async (message) => { sent.push(message); return "ok"; } }, "@/lib/limited-form-data": { limitedText: request => request.text() } };
 vm.runInNewContext(code, { exports, process: { env: { RESEND_WEBHOOK_SECRET: "fixture-secret", RESEND_INBOUND_API_KEY: "fixture", SUPPORT_INBOUND_DOMAIN: "reply.example.test", SUPPORT_EMAIL: "owner@example.test" } }, fetch: async () => ({ ok: true, json: async () => ({ from: sender, to: [`kcp-${token}@reply.example.test`], text: "Hello there\n\nOn Tuesday, someone wrote:\n> old message", authentication: { dmarc } }) }), AbortSignal, require: (name) => { assert.ok(name in deps, name); return deps[name]; } });
 const request = () => new Request("https://example.test/api/support/inbound", { method: "POST", headers: { "svix-id": "1", "svix-timestamp": "1", "svix-signature": "1" }, body: JSON.stringify({ type: "email.received", data: { email_id: emailId } }) });
 assert.equal((await exports.POST(request())).status, 200);

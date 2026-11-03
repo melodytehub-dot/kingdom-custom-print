@@ -2,10 +2,15 @@ import { NextResponse } from "next/server";
 import { sql } from "@/lib/db";
 import { sameOrigin } from "@/lib/customer-auth";
 import { verificationHash } from "@/lib/account-verification";
+import { limitedFormData } from "@/lib/limited-form-data";
 
 export async function POST(request: Request) {
   if (!sameOrigin(request)) return new NextResponse("Invalid request.", { status: 403 });
-  const data = await request.formData();
+  let data: FormData;
+  try { data = await limitedFormData(request, 4096); }
+  catch (error) {
+    return new NextResponse(error instanceof RangeError ? "Request too large." : "Invalid request.", { status: error instanceof RangeError ? 413 : 400 });
+  }
   const token = String(data.get("token") ?? "");
   if (!/^[a-f0-9]{64}$/.test(token)) return NextResponse.redirect(new URL("/account?verification=invalid", request.url), 303);
   try {

@@ -10,6 +10,7 @@ export default defineConfig({
       issues: { enabled: true },
     },
     triggers: [
+      triggers.scheduled({ schedule: "0 * * * *" }),
       triggers.fetch({ pattern: "kingdomcustomprint.com/*", zone: "kingdomcustomprint.com" }),
       triggers.fetch({ pattern: "www.kingdomcustomprint.com/*", zone: "kingdomcustomprint.com" }),
     ],

@@ -531,9 +531,12 @@ function OrderDetailPanel({
                   <div className="admin-source-files">
                     <strong className="small">Source artwork saved with order</strong>
                     {sourceArtwork(item.design).map((art, artIndex) => (
-                      <a key={`${art.side}-${artIndex}`} className="link small" href={art.src} download={`${detail.reference}-${art.side}-artwork-${artIndex + 1}`}>
-                        Download {art.side} artwork {artIndex + 1}
-                      </a>
+                      <div key={`${art.side}-${artIndex}`}>
+                        <a className="link small" href={art.src} download={`${detail.reference}-${art.side}-artwork-${artIndex + 1}`}>
+                          Download {art.side} artwork {artIndex + 1}
+                        </a>
+                        {art.origSrc && art.origSrc !== art.src ? <> · <a className="link small" href={art.origSrc} download={`${detail.reference}-${art.side}-unedited-${artIndex + 1}`}>Download unedited image</a></> : null}
+                      </div>
                     ))}
                   </div>
                 ) : null}
@@ -632,9 +635,9 @@ function sourceArtwork(design: AdminOrderDetail["items"][number]["design"]) {
     const layers = Array.isArray(design[side]) ? design[side] : [];
     return layers.flatMap((layer) => {
       if (!layer || typeof layer !== "object") return [];
-      const value = layer as { type?: unknown; src?: unknown };
+      const value = layer as { type?: unknown; src?: unknown; origSrc?: unknown };
       return value.type === "image" && typeof value.src === "string"
-        ? [{ side, src: value.src }]
+        ? [{ side, src: value.src, origSrc: typeof value.origSrc === "string" ? value.origSrc : undefined }]
         : [];
     });
   });
