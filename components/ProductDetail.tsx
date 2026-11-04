@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import ProductPhotography from "./ProductPhotography";
@@ -9,12 +9,29 @@ import ProductColorQuery from "./ProductColorQuery";
 import SizeChart from "./SizeChart";
 import { PRODUCT_VIEWS, type ProductView } from "@/lib/product-presentation";
 import ArrowRight from "@/components/icons/ArrowRight";
-import { formatUSD, lowestPrintedUnit, quoteProduct, resolveBreak } from "@/lib/pricing";
+import { formatUSD, lowestPrintedUnit, lowestUnitPrice, quoteProduct, resolveBreak } from "@/lib/pricing";
 import { sizeSummary } from "@/lib/sizes";
 import type { Product, ProductColor } from "@/lib/types";
+import { CartStorageError, useCart } from "@/lib/cart-context";
 
 export default function ProductDetail({ product, initialColor = "" }: { product: Product; initialColor?: string }) {
   const router = useRouter();
+  const { addItem } = useCart();
+  const [cartError, setCartError] = useState("");
+  const readyMade = product.saleMode === "ready-made";
+  const [availability, setAvailability] = useState<{ color: string; size: string; available: number }[] | null>(null);
+  const [availabilityError, setAvailabilityError] = useState(false);
+  useEffect(() => {
+    if (!readyMade) return;
+    const controller = new AbortController();
+    fetch(`/api/products/${product.id}/availability`, { cache: "no-store", signal: controller.signal })
+      .then(async response => {
+        if (!response.ok) throw new Error("Availability unavailable");
+        const data = await response.json() as { options: { color: string; size: string; available: number }[] };
+        setAvailability(data.options);
+      }).catch(() => { if (!controller.signal.aborted) setAvailabilityError(true); });
+    return () => controller.abort();
+  }, [product.id, readyMade]);
   const firstColor = product.colors[0];
 
   const [colorSlug, setColorSlug] = useState(product.colors.find(c => c.slug === initialColor)?.slug ?? firstColor?.slug ?? "");
@@ -24,8 +41,8 @@ export default function ProductDetail({ product, initialColor = "" }: { product:
   const [lines, setLines] = useState<Record<string, number>>(() => {
     const seed: Record<string, number> = {};
     for (const s of product.sizes) seed[s.label] = 0;
-    if (product.sizes[1]) seed[product.sizes[1].label] = 1;
-    else if (product.sizes[0]) seed[product.sizes[0].label] = 1;
+    if (!readyMade && product.sizes[1]) seed[product.sizes[1].label] = 1;
+    else if (!readyMade && product.sizes[0]) seed[product.sizes[0].label] = 1;
     return seed;
   });
 
@@ -36,6 +53,7 @@ export default function ProductDetail({ product, initialColor = "" }: { product:
 
   function pickColor(c: ProductColor) {
     setColorSlug(c.slug);
+    if (readyMade && !c.backImage) setView("front");
   }
 
   const sizeLines = useMemo(
@@ -46,11 +64,11 @@ export default function ProductDetail({ product, initialColor = "" }: { product:
   const totalQty = sizeLines.reduce((n, l) => n + l.qty, 0);
 
   // Default configuration is a single front print; the back is an add-on.
-  const quote = quoteProduct(product, { sides: ["front"], lines: sizeLines });
-  const productViews = product.kind === "polo" ? PRODUCT_VIEWS.filter((angle) => angle !== "side") : PRODUCT_VIEWS;
+  const quote = quoteProduct(product, { sides: readyMade ? [] : ["front"], lines: sizeLines });
+  const productViews = readyMade ? PRODUCT_VIEWS.filter((angle) => angle === "front" || (angle === "back" && !!color?.backImage)) : product.kind === "polo" ? PRODUCT_VIEWS.filter((angle) => angle !== "side") : PRODUCT_VIEWS;
   const tier = resolveBreak(product.priceBreaks, totalQty);
 
-  const floor = lowestPrintedUnit(product);
+  const floor = readyMade ? lowestUnitPrice(product) : lowestPrintedUnit(product);
   const surcharge = quote.surchargeTotal;
   const perUnit = quote.unitBase;
   const secondSide = product.printFeePerSide;
@@ -64,18 +82,30 @@ export default function ProductDetail({ product, initialColor = "" }: { product:
         .map((b) => ({
           minQty: b.minQty,
           unit: quoteProduct(product, {
-            sides: ["front"],
+            sides: readyMade ? [] : ["front"],
             lines: [{ label: "__tier__", qty: b.minQty }],
           }).unitBase,
         })),
-    [product]
+    [product, readyMade]
   );
 
-  const canCustomize = totalQty > 0;
+  const availableFor = (label: string) => availability?.find(option => option.color === color?.slug && option.size === label)?.available ?? 0;
+  const canCustomize = totalQty > 0 && (!readyMade || Boolean(availability && sizeLines.every(line => line.qty <= availableFor(line.label))));
 
   function setQty(label: string, value: number) {
-    const next = Math.max(0, Math.min(999, Math.floor(Number(value) || 0)));
+    const next = Math.max(0, Math.min(readyMade ? Math.min(999, availableFor(label)) : 999, Math.floor(Number(value) || 0)));
     setLines((prev) => ({ ...prev, [label]: next }));
+  }
+
+  function addReadyMade() {
+    if (!color || !totalQty) return;
+    try {
+      addItem({ productId: product.id, productSlug: product.slug, productName: product.name, productKind: product.kind, saleMode: "ready-made", colorSlug: color.slug, colorName: color.name, colorHex: color.hex, sidesUsed: [], design: { front: [], back: [] }, previewFront: color.frontImage ?? null, previewBack: color.backImage ?? null, lines: sizeLines.filter(line => line.qty > 0), surcharges: Object.fromEntries(product.sizes.map(size => [size.label, size.surcharge])), unitPrice: quote.unitBase, total: quote.total, quantity: totalQty });
+      router.push("/cart");
+    } catch (error) {
+      if (!(error instanceof CartStorageError)) throw error;
+      setCartError("Your cart could not be saved. Please allow browser storage and try again.");
+    }
   }
 
   return (
@@ -113,7 +143,7 @@ export default function ProductDetail({ product, initialColor = "" }: { product:
 
         <div className="pdp-price-row">
           <p className="pdp-price tnum">
-            <strong>{formatUSD(quote.unitBase)}</strong> each, one side
+            <strong>{formatUSD(quote.unitBase)}</strong> each{readyMade ? "" : ", one side"}
           </p>
           {floor !== null && floor < quote.unitBase ? (
             <p className="small muted">
@@ -151,19 +181,19 @@ export default function ProductDetail({ product, initialColor = "" }: { product:
             Size run
             <span className="opt-hint">
               {totalQty > 0
-                ? `${totalQty} garment${totalQty === 1 ? "" : "s"}`
+                ? `${totalQty} ${readyMade ? "item" : "garment"}${totalQty === 1 ? "" : "s"}`
                 : "Set a quantity per size"}
             </span>
           </legend>
 
-          <button
+          {product.kind !== "other" ? <button
             type="button"
             className="link"
             onClick={() => setShowSizeChart(true)}
             style={{ marginBottom: "12px", fontSize: "11px" }}
           >
             View size chart
-          </button>
+          </button> : null}
 
           <div className="size-run">
             {product.sizes.map((s) => (
@@ -173,6 +203,7 @@ export default function ProductDetail({ product, initialColor = "" }: { product:
               >
                 <label htmlFor={`qty-${s.label}`} className="size-label">
                   {s.label}
+                  {readyMade && availability && availableFor(s.label) === 0 ? <span className="size-add">Sold out</span> : null}
                   {s.surcharge > 0 ? (
                     <span className="size-add">+{formatUSD(s.surcharge)}</span>
                   ) : null}
@@ -192,6 +223,7 @@ export default function ProductDetail({ product, initialColor = "" }: { product:
                     inputMode="numeric"
                     min={0}
                     max={999}
+                    disabled={readyMade && (!availability || availableFor(s.label) === 0)}
                     value={lines[s.label] ?? 0}
                     onChange={(e) => setQty(s.label, Number(e.target.value))}
                     aria-label={`${s.label} quantity`}
@@ -199,6 +231,7 @@ export default function ProductDetail({ product, initialColor = "" }: { product:
                   <button
                     type="button"
                     onClick={() => setQty(s.label, (lines[s.label] ?? 0) + 1)}
+                    disabled={readyMade && (!availability || (lines[s.label] ?? 0) >= availableFor(s.label))}
                     aria-label={`Increase ${s.label} quantity`}
                   >
                     +
@@ -218,9 +251,10 @@ export default function ProductDetail({ product, initialColor = "" }: { product:
                 <button
                   key={label}
                   type="button"
+                  disabled={readyMade && (!availability || currentQty >= availableFor(label))}
                   className="quick-btn"
                   onClick={() => {
-                    setLines((prev) => ({ ...prev, [label]: currentQty + 1 }));
+                    setQty(label, currentQty + 1);
                   }}
                   title={`Add one ${label}`}
                 >
@@ -234,11 +268,11 @@ export default function ProductDetail({ product, initialColor = "" }: { product:
         {/* Quote summary */}
         <div className="pdp-quote" aria-live="polite">
           <div className="quote-row">
-            <span>Front print</span>
+            <span>{readyMade ? "Item price" : "Front print"}</span>
             <span className="tnum">{formatUSD(quote.unitBase)} each</span>
           </div>
 
-          {secondSide > 0 ? (
+          {!readyMade && secondSide > 0 ? (
             <div className="quote-row">
               <span>Add a back print</span>
               <span className="tnum muted">+{formatUSD(secondSide)} each</span>
@@ -267,11 +301,15 @@ export default function ProductDetail({ product, initialColor = "" }: { product:
         </div>
 
         <div className="pdp-actions">
+          {readyMade && !availability && !availabilityError ? <p role="status">Checking availability…</p> : null}
+          {readyMade && availabilityError ? <p role="alert">Availability is temporarily unavailable. Please refresh the page or contact us.</p> : null}
+          {readyMade && availability && totalQty > 0 && !canCustomize ? <p role="alert">Please adjust your quantities for the selected color.</p> : null}
+          {cartError ? <p role="alert">{cartError}</p> : null}
           <button
             type="button"
             className="btn btn-lg"
             disabled={!canCustomize}
-            onClick={() =>
+            onClick={() => readyMade ? addReadyMade() :
               router.push(
                 `/customize/${product.slug}?color=${color?.slug ?? ""}&sizes=${encodeURIComponent(
                   Object.entries(lines)
@@ -282,7 +320,7 @@ export default function ProductDetail({ product, initialColor = "" }: { product:
               )
             }
           >
-            Customize this
+            {readyMade ? "Add to cart" : "Customize this"}
             <ArrowRight />
           </button>
           <Link href="/contact" className="btn btn-lg btn-ghost">
@@ -303,18 +341,18 @@ export default function ProductDetail({ product, initialColor = "" }: { product:
               <span>{product.material}</span>
             </li>
           ) : null}
-          <li>
+          {!readyMade ? <li>
             <span className="spec-k">Printable sides</span>
             <span>Front and back</span>
-          </li>
+          </li> : null}
           <li>
             <span className="spec-k">Sizes</span>
-            <span className="wrap-anywhere">{sizeSummary(product.sizes)}</span>
+            <span className="wrap-anywhere">{product.kind === "other" ? product.sizes.map(size => size.label).join(", ") : sizeSummary(product.sizes)}</span>
           </li>
-          <li>
+          {!readyMade ? <li>
             <span className="spec-k">Decoration</span>
             <span>Screen print and DTF available on request</span>
-          </li>
+          </li> : null}
         </ul>
 
         {tiers.length > 1 ? (
@@ -342,7 +380,7 @@ export default function ProductDetail({ product, initialColor = "" }: { product:
                 })}
               </tbody>
             </table>
-            <p className="hint">One printed side. Free US shipping over $75.</p>
+            {!readyMade ? <p className="hint">One printed side. Free US shipping over $75.</p> : null}
           </div>
         ) : null}
       </div>

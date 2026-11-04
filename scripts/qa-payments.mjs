@@ -196,4 +196,14 @@ try {
   if (previousSecret === undefined) delete process.env.STRIPE_WEBHOOK_SECRET;
   else process.env.STRIPE_WEBHOOK_SECRET = previousSecret;
 }
+product.saleMode = "ready-made";
+product.colors[0].frontImage = "/api/product-media/00000000-0000-4000-8000-000000000001";
+response = await checkout.POST(request({ ...payload, items: [{ ...payload.items[0], saleMode: "customizable", previewFront: "https://attacker.invalid/photo", design: { front: [artwork(source)], back: [] } }] }));
+assert.equal(response.status, 200);
+assert.equal(orderInput.items[0].saleMode, "ready-made");
+assert.equal(orderInput.items[0].design.front.length, 0);
+assert.equal(orderInput.items[0].previewFront, product.colors[0].frontImage);
+assert.equal(orderInput.items[0].total, 33);
+assert.doesNotMatch(sessionInput.line_items[0].price_data.product_data.description, /Print:/);
+console.log("PASS finished goods use catalog photos and pricing, ignoring client-supplied artwork and prices");
 console.log("ALL PAYMENT CONTRACT CHECKS PASSED (live Stripe checkout still requires credentials)");

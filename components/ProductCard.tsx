@@ -6,7 +6,7 @@ import Link from "next/link";
 import ProductPhotography from "./ProductPhotography";
 import { brandForProduct } from "@/lib/product-brands";
 import Garment from "./Garment";
-import { formatUSD, lowestPrintedUnit } from "@/lib/pricing";
+import { formatUSD, lowestPrintedUnit, lowestUnitPrice } from "@/lib/pricing";
 import type { Product } from "@/lib/types";
 
 
@@ -41,7 +41,7 @@ export default function ProductCard({
   const baseHex = selectedColor?.hex ?? product.colors[0]?.hex ?? "#141414";
 
   const wasPrice = product.compareAt;
-  const fromUnit = lowestPrintedUnit(product);
+  const fromUnit = product.saleMode === "ready-made" ? lowestUnitPrice(product) : lowestPrintedUnit(product);
   const currentPrice = fromUnit !== null ? fromUnit : product.basePrice;
 
   return (
@@ -119,8 +119,8 @@ export default function ProductCard({
             ) : null}
           </div>
         ) : null}
-        <Link prefetch={false} href={`/customize/${product.slug}?color=${encodeURIComponent(selectedColor?.slug ?? "")}`} className="mm-card-bottom-btn">
-          Customize <span aria-hidden="true">↗</span>
+        <Link prefetch={false} href={`${product.saleMode === "ready-made" ? "/product/" : "/customize/"}${product.slug}?color=${encodeURIComponent(selectedColor?.slug ?? "")}`} className="mm-card-bottom-btn">
+          {product.saleMode === "ready-made" ? "View product" : "Customize"} <span aria-hidden="true">↗</span>
         </Link>
       </div>
     </article>

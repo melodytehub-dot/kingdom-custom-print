@@ -66,6 +66,12 @@
 }
 .admin-menu-toggle, .admin-menu-heading, .admin-menu-backdrop { display: none; }
 .fieldset .repeat-row:has(.input-color) { grid-template-columns: minmax(0, 1fr) 100px auto; }
+.admin-color-photos { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.admin-color-photos input { display: block; max-width: 100%; margin-top: 6px; font-size: 12px; }
+.admin-color-photo-preview { display: flex; align-items: center; gap: 8px; margin-top: 8px; }
+.admin-color-photo-preview img { width: 64px; height: 64px; object-fit: contain; border-radius: 8px; background: #f3f3f3; }
+.admin-color-photos [role="alert"] { color: #ad202c; }
+@media (max-width: 600px) { .admin-color-photos { grid-template-columns: 1fr; } }
 @media (max-width: 767px) {
   .fieldset .repeat-row:has(.input-color) { grid-template-columns: minmax(0, 1fr) 90px; }
 }

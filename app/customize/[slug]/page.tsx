@@ -1,4 +1,4 @@
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import type { Metadata } from "next";
 import Customizer from "@/components/customizer/Customizer";
 import { getProductBySlug, getProducts, getSettings } from "@/lib/catalog";
@@ -43,9 +43,10 @@ export default async function CustomizePage({ params, searchParams }: Params) {
 
   const product = await getProductBySlug(slug);
   if (!product) notFound();
+  if (product.saleMode === "ready-made") redirect(`/product/${product.slug}${color ? `?color=${encodeURIComponent(color)}` : ""}`);
 
   const [products, settings] = await Promise.all([
-    getProducts({}),
+    getProducts({}).then(items => items.filter(item => item.saleMode !== "ready-made")),
     getSettings().catch(() => null),
   ]);
 

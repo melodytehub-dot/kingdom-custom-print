@@ -12,6 +12,9 @@ try {
     for (const table of ["products", "product_colors", "product_sizes", "price_breaks", "inventory_stock", "inventory_reservations"]) {
       await tx.unsafe(`CREATE TEMP TABLE ${table} (LIKE public.${table} INCLUDING DEFAULTS) ON COMMIT DROP`);
     }
+    await tx`ALTER TABLE products ADD COLUMN IF NOT EXISTS sale_mode text NOT NULL DEFAULT 'customizable'`;
+    await tx`ALTER TABLE product_colors ADD COLUMN IF NOT EXISTS front_image text`;
+    await tx`ALTER TABLE product_colors ADD COLUMN IF NOT EXISTS back_image text`;
     await tx`INSERT INTO products (id, slug, name, kind, base_price) VALUES (99101, 'qa-fixture', 'Fixture', 'tee', 10)`;
     await tx`INSERT INTO product_colors (product_id, slug, name, hex) VALUES (99101, 'black', 'Black', '#000000')`;
     await tx`INSERT INTO product_sizes (product_id, label) VALUES (99101, 'M')`;
@@ -20,8 +23,9 @@ try {
     const exports = {};
     const source = ts.transpileModule(fs.readFileSync('lib/catalog.ts', 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, esModuleInterop: true } }).outputText;
     vm.runInNewContext(source, { exports, require: name => name === './db' ? { sql, num: Number } : name === 'postgres' ? { default: {} } : {} });
-    const input = { slug: 'qa-fixture', name: 'Fixture', styleCode: '', kind: 'tee', categoryId: null, blurb: 'Changed', description: '', material: '', basePrice: 10, compareAt: null, printFeePerSide: 0, printArea: {}, featured: false, active: true, colors: [{ slug: 'black', name: 'Black', hex: '#000000' }], sizes: [{ label: 'M', surcharge: 0 }], priceBreaks: [{ minQty: 1, amountOff: 0 }] };
+    const input = { slug: 'qa-fixture', name: 'Fixture', styleCode: '', kind: 'tee', saleMode: 'ready-made', categoryId: null, blurb: 'Changed', description: '', material: '', basePrice: 10, compareAt: null, printFeePerSide: 0, printArea: {}, featured: false, active: true, colors: [{ slug: 'black', name: 'Black', hex: '#000000', frontImage: '/api/product-media/00000000-0000-4000-8000-000000000001' }], sizes: [{ label: 'M', surcharge: 0 }], priceBreaks: [{ minQty: 1, amountOff: 0 }] };
     assert.equal(await exports.updateProduct(99101, input), true);
+    assert.equal((await tx`SELECT front_image FROM product_colors WHERE product_id = 99101`)[0].front_image, input.colors[0].frontImage);
     assert.equal((await tx`SELECT quantity FROM inventory_stock WHERE product_id = 99101`)[0].quantity, 3);
     const renamed = { ...input, colors: [{ slug: 'navy', name: 'Navy', hex: '#000033' }] };
     await assert.rejects(exports.updateProduct(99101, renamed), /stock count to zero/);

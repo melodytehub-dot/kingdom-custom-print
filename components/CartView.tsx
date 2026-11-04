@@ -78,15 +78,14 @@ export default function CartView({
           </svg>
           <h2 className="h3">Your cart is empty</h2>
           <p>
-            Browse the blanks, then customize one and it will appear here with your
-            artwork attached.
+            Explore the shop or create a design to get started.
           </p>
           <div className="state-actions">
             <Link href="/customize" className="btn">
               Start designing
             </Link>
             <Link href="/shop" className="btn btn-ghost">
-              Browse blanks
+              Browse shop
             </Link>
           </div>
         </div>
@@ -101,7 +100,7 @@ export default function CartView({
           <h1 className="h2">Your cart</h1>
           <p className="small muted">
             {items.length} item{items.length === 1 ? "" : "s"} ·{" "}
-            {items.reduce((n, i) => n + i.quantity, 0)} garment
+            {items.reduce((n, i) => n + i.quantity, 0)} unit
             {items.reduce((n, i) => n + i.quantity, 0) === 1 ? "" : "s"}
           </p>
         </div>
@@ -174,7 +173,7 @@ export default function CartView({
           </Link>
 
           <p className="hint">
-            You will confirm sizes and artwork on the next step before payment.
+            Review your items and delivery details before payment.
           </p>
 
           <Link href="/shop" className="link cart-continue">
@@ -202,7 +201,7 @@ function CartRow({
   return (
     <li className={`cart-row${busy ? " is-busy" : ""}`}>
       <div className="cart-thumb">
-        <DesignPreviewImage src={preview} alt={`${item.productName} in ${item.colorName} with your design`} kind={item.productKind} color={item.colorHex} />
+        <DesignPreviewImage src={preview} alt={`${item.productName} in ${item.colorName}${item.saleMode === "ready-made" ? "" : " with your design"}`} kind={item.productKind} color={item.colorHex} />
       </div>
 
       <div className="cart-info">
@@ -217,7 +216,7 @@ function CartRow({
                 style={{ background: item.colorHex }}
                 aria-hidden="true"
               />
-              {item.colorName} · {describeDesign(item.design)}
+              {item.colorName}{item.saleMode === "ready-made" ? "" : ` · ${describeDesign(item.design)}`}
             </p>
             {item.designNotes ? <p className="small wrap-anywhere"><strong>Design notes:</strong> {item.designNotes}</p> : null}
           </div>
@@ -254,9 +253,7 @@ function CartRow({
         </ul>
 
         <div className="cart-actions">
-          <Link href={`/customize/${item.productSlug}?cartItem=${encodeURIComponent(item.id)}`} className="link">
-            Edit design
-          </Link>
+          {item.saleMode !== "ready-made" ? <Link href={`/customize/${item.productSlug}?cartItem=${encodeURIComponent(item.id)}`} className="link">Edit design</Link> : <Link href={`/product/${item.productSlug}?color=${encodeURIComponent(item.colorSlug)}`} className="link">View product</Link>}
           <button type="button" className="cart-remove" onClick={onRemove}>
             <Trash />
             Remove

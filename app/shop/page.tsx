@@ -1,6 +1,6 @@
 import Link from "next/link";
 import ProductCard from "@/components/ProductCard";
-import { lowestPrintedUnit } from "@/lib/pricing";
+import { lowestPrintedUnit, lowestUnitPrice } from "@/lib/pricing";
 import ShopSort from "@/components/ShopSort";
 import { getProducts, getCategories } from "@/lib/catalog";
 import { brandForProduct, PRODUCT_BRANDS } from "@/lib/product-brands";
@@ -8,9 +8,9 @@ import { brandForProduct, PRODUCT_BRANDS } from "@/lib/product-brands";
 export const revalidate = 60;
 
 export const metadata = {
-  title: "Shop custom printed apparel",
+  title: "Shop apparel and merchandise",
   description:
-    "Apparel and accessories printed to order. Filter by fit, then design yours online with text, artwork and names & numbers.",
+    "Shop apparel and accessories, including ready-to-wear products and styles you can customize.",
 };
 
 const KIND_FILTERS = [
@@ -54,9 +54,10 @@ export default async function ShopPage({
   if (activeBrand) products = products.filter((p) => brandForProduct(p)?.slug === activeBrand);
 
   const sort = params.sort ?? "featured";
+  const sortPrice = (product: typeof allProducts[number]) => (product.saleMode === "ready-made" ? lowestUnitPrice(product) : lowestPrintedUnit(product)) ?? product.basePrice;
   products = [...products].sort((a, b) => {
-    if (sort === "price-asc") return (lowestPrintedUnit(a) ?? a.basePrice) - (lowestPrintedUnit(b) ?? b.basePrice);
-    if (sort === "price-desc") return (lowestPrintedUnit(b) ?? b.basePrice) - (lowestPrintedUnit(a) ?? a.basePrice);
+    if (sort === "price-asc") return sortPrice(a) - sortPrice(b);
+    if (sort === "price-desc") return sortPrice(b) - sortPrice(a);
     if (sort === "name") return a.name.localeCompare(b.name);
     return Number(b.featured) - Number(a.featured) || a.sortOrder - b.sortOrder;
   });
@@ -83,13 +84,13 @@ export default async function ShopPage({
     <div className="mm-shop-page" style={{ paddingBottom: "80px" }}>
       <div className="minimog-container" style={{ paddingTop: "30px", marginBottom: "30px" }}>
         <span className="mm-hero-tag" style={{ marginBottom: "12px" }}>
-          {activeCategoryName ?? "ALL BLANKS & APPAREL"}
+          {activeCategoryName ?? "ALL PRODUCTS"}
         </span>
         <h1 style={{ fontSize: "36px", letterSpacing: "1px", margin: "6px 0 12px" }}>
           {query ? `Results for “${query}”` : activeCategoryName ? `SHOP ${activeCategoryName.toUpperCase()}` : "FIND YOUR NEXT FAVORITE"}
         </h1>
         <p style={{ color: "var(--minimog-text)", maxWidth: "600px", margin: 0 }}>
-          Choose your favorite blank garment, examine available color runs and print specs, then open the online studio to customize.
+          Shop ready-to-wear styles or choose a blank and make it your own.
         </p>
       </div>
 
@@ -111,7 +112,7 @@ export default async function ShopPage({
               }}
               aria-current={!activeCategory && !activeKind ? "true" : undefined}
             >
-              All Blanks ({allProducts.length})
+              All Products ({allProducts.length})
             </Link>
             {filterCategories.map((category) => {
               const active = activeCategory === category.slug && !activeKind;

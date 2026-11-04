@@ -25,13 +25,13 @@ export default function OrderDetail({ order }: { order: OrderSummary }) {
           {order.items.map((item, i) => (
             <li key={i} className="order-item">
               <div className="order-thumb">
-                <DesignPreviewImage src={item.previewFront ?? item.previewBack} alt={`${item.productName} in ${item.colorName} with your design`} kind={item.productKind} color={item.colorHex} />
+                <DesignPreviewImage src={item.previewFront ?? item.previewBack} alt={`${item.productName} in ${item.colorName}${item.saleMode === "ready-made" ? "" : " with your design"}`} kind={item.productKind} color={item.colorHex} />
               </div>
 
               <div className="grow">
                 <p className="order-item-name wrap-anywhere">{item.productName}</p>
                 <p className="small muted">
-                  {item.colorName} · {describeDesign(item.design)}
+                  {item.colorName}{item.saleMode === "ready-made" ? "" : ` · ${describeDesign(item.design)}`}
                 </p>
                 <ul className="order-sizes">
                   {item.sizeBreakdown

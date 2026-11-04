@@ -5,7 +5,6 @@ import type {
   PriceBreak,
   PrintArea,
   Product,
-  ProductColor,
   ProductKind,
   ProductSize,
 } from "./types";
@@ -16,6 +15,7 @@ interface ProductRow {
   name: string;
   style_code: string;
   kind: ProductKind;
+  sale_mode: "customizable" | "ready-made";
   category_id: number | null;
   category_slug: string | null;
   category_name: string | null;
@@ -32,14 +32,14 @@ interface ProductRow {
 }
 
 const productColumns = () => sql`
-  p.id, p.slug, p.name, p.style_code, p.kind, p.category_id,
+  p.id, p.slug, p.name, p.style_code, p.kind, p.sale_mode, p.category_id,
   c.slug AS category_slug, c.name AS category_name,
   p.blurb, p.description, p.material,
   p.base_price, p.compare_at, p.print_fee_per_side, p.print_area,
   p.featured, p.active, p.sort_order
 `;
 
-type VariantRow = { id: number; product_id: number; slug: string; name: string; hex: string };
+type VariantRow = { id: number; product_id: number; slug: string; name: string; hex: string; front_image: string | null; back_image: string | null };
 type SizeRow = { id: number; product_id: number; label: string; surcharge: unknown };
 type BreakRow = { product_id: number; min_qty: number; amount_off: unknown };
 type ImageRow = { id: number; product_id: number; url: string; alt: string };
@@ -59,7 +59,7 @@ function groupByProduct<T extends { product_id: number }>(
 async function loadVariants(ids: number[]) {
   if (!ids.length) {
     return {
-      colors: new Map<number, ProductColor[]>(),
+      colors: new Map<number, VariantRow[]>(),
       sizes: new Map<number, ProductSize[]>(),
       breaks: new Map<number, PriceBreak[]>(),
       images: new Map<number, Product["images"]>(),
@@ -68,7 +68,7 @@ async function loadVariants(ids: number[]) {
 
   const [colorRows, sizeRows, breakRows, imageRows] = await Promise.all([
     sql<VariantRow[]>`
-      SELECT id, product_id, slug, name, hex FROM product_colors
+      SELECT id, product_id, slug, name, hex, front_image, back_image FROM product_colors
       WHERE product_id = ANY(${sql.array(ids, 1007)}) ORDER BY sort_order, id`,
     sql<SizeRow[]>`
       SELECT id, product_id, label, surcharge FROM product_sizes
@@ -97,6 +97,7 @@ function hydrate(row: ProductRow, variants: Awaited<ReturnType<typeof loadVarian
     name: row.name,
     styleCode: row.style_code,
     kind: row.kind,
+    saleMode: row.sale_mode,
     categoryId: row.category_id,
     categorySlug: row.category_slug,
     categoryName: row.category_name,
@@ -115,6 +116,8 @@ function hydrate(row: ProductRow, variants: Awaited<ReturnType<typeof loadVarian
       slug: c.slug,
       name: c.name,
       hex: c.hex,
+      frontImage: c.front_image,
+      backImage: c.back_image,
     })),
     sizes: (sizes.get(row.id) ?? []).map((s) => ({
       id: s.id,
@@ -249,6 +252,7 @@ export interface ProductInput {
   slug: string;
   styleCode: string;
   kind: ProductKind;
+  saleMode: "customizable" | "ready-made";
   categoryId: number | null;
   blurb: string;
   description: string;
@@ -259,7 +263,7 @@ export interface ProductInput {
   printArea: PrintArea;
   featured: boolean;
   active: boolean;
-  colors: { slug: string; name: string; hex: string }[];
+  colors: { slug: string; name: string; hex: string; frontImage?: string | null; backImage?: string | null }[];
   sizes: { label: string; surcharge: number }[];
   priceBreaks: { minQty: number; amountOff: number }[];
 }
@@ -310,8 +314,8 @@ async function replaceVariants(productId: number, input: ProductInput, tx: Tx) {
 
   for (const [i, c] of input.colors.entries()) {
     await tx`
-      INSERT INTO product_colors (product_id, slug, name, hex, sort_order)
-      VALUES (${productId}, ${c.slug}, ${c.name}, ${c.hex}, ${i})`;
+      INSERT INTO product_colors (product_id, slug, name, hex, sort_order, front_image, back_image)
+      VALUES (${productId}, ${c.slug}, ${c.name}, ${c.hex}, ${i}, ${c.frontImage ?? null}, ${c.backImage ?? null})`;
   }
   for (const [i, s] of input.sizes.entries()) {
     await tx`
@@ -333,9 +337,9 @@ function asJson(value: unknown) {
 export async function createProduct(input: ProductInput): Promise<number> {
   return sql.begin(async (tx) => {
     const [row] = await tx<{ id: number }[]>`
-      INSERT INTO products (slug, name, style_code, category_id, kind, blurb, description, material,
+      INSERT INTO products (slug, name, style_code, category_id, kind, sale_mode, blurb, description, material,
         base_price, compare_at, print_fee_per_side, print_area, featured, active)
-      VALUES (${input.slug}, ${input.name}, ${input.styleCode}, ${input.categoryId}, ${input.kind},
+      VALUES (${input.slug}, ${input.name}, ${input.styleCode}, ${input.categoryId}, ${input.kind}, ${input.saleMode},
         ${input.blurb}, ${input.description}, ${input.material}, ${input.basePrice},
         ${input.compareAt}, ${input.printFeePerSide}, ${tx.json(asJson(input.printArea))},
         ${input.featured}, ${input.active})
@@ -355,7 +359,7 @@ export async function updateProduct(
       UPDATE products SET
         slug = ${input.slug}, name = ${input.name}, style_code = ${input.styleCode},
         category_id = ${input.categoryId},
-        kind = ${input.kind}, blurb = ${input.blurb}, description = ${input.description},
+        kind = ${input.kind}, sale_mode = ${input.saleMode}, blurb = ${input.blurb}, description = ${input.description},
         material = ${input.material}, base_price = ${input.basePrice},
         compare_at = ${input.compareAt}, print_fee_per_side = ${input.printFeePerSide},
         print_area = ${tx.json(asJson(input.printArea))}, featured = ${input.featured},

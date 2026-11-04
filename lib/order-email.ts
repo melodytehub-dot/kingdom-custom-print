@@ -25,7 +25,7 @@ export async function sendPaidOrderReceipt(reference: string): Promise<void> {
     const providerId = await sendEmail({
       to: destination,
       subject: `New paid order ${reference}`,
-      text: `A new order has been paid.\n\nOrder: ${reference}\nCustomer: ${order.name}\n${lines.join("\n")}\nTotal: $${order.total.toFixed(2)}\n\nSign in to the admin dashboard to review the order and artwork.`,
+      text: `A new order has been paid.\n\nOrder: ${reference}\nCustomer: ${order.name}\n${lines.join("\n")}\nTotal: $${order.total.toFixed(2)}\n\nSign in to the admin dashboard to review the order.`,
       action: { label: "Open admin dashboard", url: "https://kingdomcustomprint.com/admin" },
       idempotencyKey: `order-business/${reference}`,
     });

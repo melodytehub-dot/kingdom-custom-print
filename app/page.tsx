@@ -15,6 +15,7 @@ export const revalidate = 60;
 const POD_CATEGORIES = [
   { name: "SHIRTS", href: "/shop?kind=tee", image: "/img/category-prints/shirts.webp" },
   { name: "POLOS", href: "/shop?kind=polo", image: "/img/category-prints/polos.webp" },
+  { name: "LONG SLEEVES", href: "/shop?kind=longsleeve", image: "/img/mockups/families/longsleeve/BLK_fr.webp" },
   { name: "HOODIES", href: "/shop?kind=fleece", image: "/img/category-prints/hoodies.webp" },
   { name: "CAPS", href: "/shop?kind=cap", image: "/img/category-prints/caps.webp" },
   { name: "TOTES", href: "/shop?kind=tote", image: "/img/category-prints/totes.webp" },
@@ -78,14 +79,20 @@ export default async function HomePage() {
         </div>
       </section>
 
-      <nav className="mm-category-strip minimog-container" aria-label="Shop by category">
-        {POD_CATEGORIES.map((category) => (
-          <Link key={category.name} href={category.href} className="mm-category-link">
-            <span className="mm-category-art" aria-hidden="true" style={{ backgroundImage: `url(${category.image})` }} />
-            <span>{category.name}</span>
-          </Link>
-        ))}
-      </nav>
+      <section className="mm-category-section minimog-container" aria-labelledby="shop-categories-title">
+        <div className="mm-category-heading">
+          <div><span>FIND YOUR FAVORITE</span><h2 id="shop-categories-title">Shop by category</h2></div>
+          <Link href="/shop">View all <ArrowRight size={15} /></Link>
+        </div>
+        <nav className="mm-category-strip" aria-label="Shop by category">
+          {POD_CATEGORIES.map((category) => (
+            <Link key={category.name} href={category.href} className="mm-category-link">
+              <span className="mm-category-art" aria-hidden="true" style={{ backgroundImage: `url(${category.image})` }} />
+              <span>{category.name}</span>
+            </Link>
+          ))}
+        </nav>
+      </section>
 
       <section className="mm-colour-intro minimog-container" aria-label="Make it yours">
         <div className="mm-colour-intro-inner">
@@ -100,10 +107,10 @@ export default async function HomePage() {
 
       {/* Featured products */}
       <section className="mm-start-section minimog-container" aria-label="Ways to get started">
-        <div className="mm-start-heading"><span>YOUR NEXT IDEA STARTS HERE</span><h2>Made for the moments that matter.</h2><p>Make something personal, or bring your whole team together.</p></div>
+        <div className="mm-start-heading"><span>MADE FOR YOUR IDEAS</span><h2>Make it personal.<br />Make it yours.</h2><p>Design something for yourself, or tell us what you need for your team, event or business.</p><Link href="/contact" className="mm-start-contact">Talk to our team <ArrowRight size={16} /></Link></div>
         <div className="mm-start-links">
-          <Link href="/customize"><span>01</span><strong>Design it online</strong><small>Add your artwork and make it yours.</small><ArrowRight size={18} /></Link>
-          <Link href="/contact"><span>02</span><strong>Plan a group order</strong><small>Tell us what you have in mind.</small><ArrowRight size={18} /></Link>
+          <Link href="/customize" className="mm-start-card"><span className="mm-start-photo"><Image src="/img/feature-studio.png" alt="" fill sizes="(max-width: 700px) 45vw, 360px" /></span><span className="mm-start-card-copy"><span>CREATE YOUR OWN</span><strong>Design online</strong><small>Choose a product and add your artwork.</small><span className="mm-start-card-action">Start designing <ArrowRight size={15} /></span></span></Link>
+          <Link href="/contact" className="mm-start-card"><span className="mm-start-photo"><Image src="/img/kingdom-team.webp" alt="" fill sizes="(max-width: 700px) 45vw, 360px" /></span><span className="mm-start-card-copy"><span>FOR TEAMS & EVENTS</span><strong>Plan a group order</strong><small>Share your ideas and get a quote.</small><span className="mm-start-card-action">Request a quote <ArrowRight size={15} /></span></span></Link>
         </div>
       </section>
       <section className="mm-section">

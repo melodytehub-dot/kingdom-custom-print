@@ -73,7 +73,7 @@ async function sanitise(items: CartItem[]): Promise<PricedCartItem[]> {
       product.colors.find((c) => c.name.toLowerCase() === String(item.colorName ?? "").trim().toLowerCase());
     if (!matched) throw new CartUnavailableError();
 
-    const design = sanitiseDesign(item.design);
+    const design = product.saleMode === "ready-made" ? { front: [], back: [] } : sanitiseDesign(item.design);
     const quote = quoteProduct(product, {
       sides: designSides(design),
       lines,
@@ -93,6 +93,7 @@ async function sanitise(items: CartItem[]): Promise<PricedCartItem[]> {
       productName: product.name,
       productSlug: product.slug,
       productKind: product.kind,
+      saleMode: product.saleMode,
       colorName,
       colorHex,
       sidesUsed: designSides(design),
@@ -102,11 +103,11 @@ async function sanitise(items: CartItem[]): Promise<PricedCartItem[]> {
       quantity: lines.reduce((n, l) => n + l.qty, 0),
       lines,
       // Never silently discard a proof supplied by the customer.
-      previewFront: truncateDataUrl(item.previewFront),
-      previewBack: truncateDataUrl(item.previewBack),
+      previewFront: product.saleMode === "ready-made" ? matched.frontImage ?? null : truncateDataUrl(item.previewFront),
+      previewBack: product.saleMode === "ready-made" ? matched.backImage ?? null : truncateDataUrl(item.previewBack),
       design,
-      designNotes: String(item.designNotes ?? "").trim().slice(0, 2000),
-      roster: sanitiseRoster(item.roster),
+      designNotes: product.saleMode === "ready-made" ? "" : String(item.designNotes ?? "").trim().slice(0, 2000),
+      roster: product.saleMode === "ready-made" ? [] : sanitiseRoster(item.roster),
     });
   }
   return priced;
@@ -464,6 +465,6 @@ function buildDescription(item: CartItem): string {
   const sides = item.sidesUsed?.length
     ? item.sidesUsed.map((s) => (s === "front" ? "Front" : "Back")).join(" + ")
     : "Blank";
-  const parts = [sizes, `Print: ${sides}`].filter(Boolean);
+  const parts = [sizes, item.saleMode === "ready-made" ? "" : `Print: ${sides}`].filter(Boolean);
   return parts.join(" · ").slice(0, 500);
 }

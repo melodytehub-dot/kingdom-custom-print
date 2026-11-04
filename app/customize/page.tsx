@@ -11,7 +11,7 @@ export const metadata = {
 };
 
 export default async function CustomizeStartPage() {
-  const products = await getProducts({});
+  const products = (await getProducts({})).filter(product => product.saleMode !== "ready-made");
 
   return (
     <>

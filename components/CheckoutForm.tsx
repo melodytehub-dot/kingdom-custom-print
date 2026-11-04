@@ -319,7 +319,7 @@ export default function CheckoutForm({ settings, paymentsReady, paypalReady, acc
                 <div className="grow">
                   <p className="wrap-anywhere co-name">{item.productName}</p>
                   <p className="small muted co-meta">
-                    {item.colorName} · {describeDesign(item.design)} ·{" "}
+                    {item.colorName}{item.saleMode === "ready-made" ? "" : ` · ${describeDesign(item.design)}`} ·{" "}
                     {item.lines
                       .filter((l) => l.qty > 0)
                       .map((l) => `${l.label}×${l.qty}`)

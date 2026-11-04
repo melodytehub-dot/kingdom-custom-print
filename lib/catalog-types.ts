@@ -55,6 +55,7 @@ export interface CustomerRow {
 export interface AdminOrderItem {
   productName: string;
   productKind: ProductKind;
+  saleMode: "customizable" | "ready-made";
   colorName: string;
   colorHex: string;
   quantity: number;

@@ -18,9 +18,12 @@ async function lockProducts(tx: Tx, productIds: number[]) {
 /** Called inside the order transaction. Unknown counts are unavailable when enabled. */
 export async function reserveInventory(tx: Tx, orderId: number, items: CartItem[]): Promise<void> {
   const [control] = await tx<{ enabled: boolean }[]>`SELECT enabled FROM inventory_control WHERE id = true FOR SHARE`;
-  if (!control?.enabled) return;
+  // Finished goods always require an explicit stock count. Existing customizable
+  // blanks continue to follow the shop-wide inventory setting.
+  const stockItems = control?.enabled ? items : items.filter(item => item.saleMode === "ready-made");
+  if (!stockItems.length) return;
   const grouped = new Map<string, Variant>();
-  for (const item of items) for (const line of item.lines) {
+  for (const item of stockItems) for (const line of item.lines) {
     if (!Number.isSafeInteger(line.qty) || line.qty < 1) throw new InsufficientStockError();
     const key = JSON.stringify([item.productId, item.colorName, line.label]);
     const row = grouped.get(key) ?? { productId: item.productId, color: item.colorName, size: line.label, quantity: 0 };

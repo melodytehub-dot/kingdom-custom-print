@@ -3,6 +3,7 @@ import { revalidatePath } from "next/cache";
 import { requireAdmin } from "../_guard";
 import {
   createProduct,
+  getProductById,
   deleteProduct,
   setProductActive,
   setProductFeatured,
@@ -10,10 +11,11 @@ import {
   type ProductInput,
 } from "@/lib/catalog";
 import type { ProductKind } from "@/lib/types";
+import { sql } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
 
-const KINDS: ProductKind[] = ["tee", "polo", "longsleeve", "hoodie", "crew", "cap", "mug", "tote"];
+const KINDS: ProductKind[] = ["tee", "polo", "longsleeve", "hoodie", "crew", "cap", "mug", "tote", "other"];
 const HEX_RE = /^#[0-9A-Fa-f]{6}$/;
 const SLUG_RE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 
@@ -23,6 +25,7 @@ interface RawProduct {
   slug?: string;
   styleCode?: string;
   kind?: string;
+  saleMode?: string;
   categoryId?: number | null;
   blurb?: string;
   description?: string;
@@ -33,7 +36,7 @@ interface RawProduct {
   printArea?: Record<string, number>;
   featured?: boolean;
   active?: boolean;
-  colors?: { slug?: string; name?: string; hex?: string }[];
+  colors?: { slug?: string; name?: string; hex?: string; frontImage?: string | null; backImage?: string | null }[];
   sizes?: { label?: string; surcharge?: number }[];
   priceBreaks?: { minQty?: number; amountOff?: number }[];
 }
@@ -45,6 +48,13 @@ function slugify(value: string): string {
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "")
     .slice(0, 60);
+}
+
+async function photosExist(product: ProductInput): Promise<boolean> {
+  const ids = [...new Set(product.colors.flatMap(color => [color.frontImage, color.backImage]).filter((url): url is string => Boolean(url)).map(url => url.split("/").pop()!))];
+  if (!ids.length) return true;
+  const rows = await sql<{ id: string }[]>`SELECT id FROM catalog_media WHERE id IN (SELECT jsonb_array_elements_text(${sql.json(ids)}::jsonb))`;
+  return rows.length === ids.length;
 }
 
 function validate(raw: RawProduct): { value?: ProductInput; error?: string } {
@@ -59,13 +69,21 @@ function validate(raw: RawProduct): { value?: ProductInput; error?: string } {
   if (!KINDS.includes(raw.kind as ProductKind)) {
     return { error: "Choose a valid product type." };
   }
+  const saleMode = raw.saleMode ?? "customizable";
+  if (saleMode !== "customizable" && saleMode !== "ready-made") return { error: "Choose how this product is sold." };
+  if (raw.kind === "other" && saleMode !== "ready-made") return { error: "Choose a garment type for products customers can customize." };
+  const validPhoto = (url: unknown) => url == null || url === "" || (typeof url === "string" && /^\/api\/product-media\/[0-9a-f-]{36}$/i.test(url));
 
   if (!Array.isArray(raw.colors) || !raw.colors.length || raw.colors.length > 200) return { error: "Add between 1 and 200 colors." };
   if (raw.colors.some((c) => !c || typeof c.slug !== "string" || !c.slug || typeof c.name !== "string" || !c.name.trim() || !HEX_RE.test(String(c.hex)))) return { error: "Give each color a name and choose a swatch color." };
+  if (raw.colors.some(c => !validPhoto(c.frontImage) || !validPhoto(c.backImage))) return { error: "Upload the product photos again." };
+  if (saleMode === "ready-made" && raw.active !== false && raw.colors.some(c => !c.frontImage)) return { error: "Add a front photo for each color before publishing." };
   const colors = raw.colors.map((c) => ({
       slug: slugify(String(c.slug)),
       name: String(c.name).slice(0, 40),
       hex: String(c.hex).toLowerCase(),
+      frontImage: c.frontImage || null,
+      backImage: c.backImage || null,
     }));
   if (!colors.length) return { error: "Add at least one color with a valid hex value." };
   const seenColors = new Set<string>();
@@ -127,6 +145,7 @@ function validate(raw: RawProduct): { value?: ProductInput; error?: string } {
       slug,
       styleCode: String(raw.styleCode ?? "").trim().slice(0, 40),
       kind: raw.kind as ProductKind,
+      saleMode,
       categoryId: raw.categoryId ? Number(raw.categoryId) : null,
       blurb: String(raw.blurb ?? "").trim().slice(0, 400),
       description: String(raw.description ?? "").trim().slice(0, 6000),
@@ -166,6 +185,7 @@ export async function POST(req: Request) {
   if (!value) return NextResponse.json({ error }, { status: 422 });
 
   try {
+    if (!(await photosExist(value))) return NextResponse.json({ error: "One or more photos are missing. Please upload them again." }, { status: 422 });
     const id = await createProduct(value);
     revalidatePath("/", "layout");
     return NextResponse.json({ ok: true, id });
@@ -199,6 +219,7 @@ export async function PUT(req: Request) {
   if (!value) return NextResponse.json({ error }, { status: 422 });
 
   try {
+    if (!(await photosExist(value))) return NextResponse.json({ error: "One or more photos are missing. Please upload them again." }, { status: 422 });
     const ok = await updateProduct(id, value);
     if (!ok) return NextResponse.json({ error: "Product not found." }, { status: 404 });
     revalidatePath("/", "layout");
@@ -230,6 +251,14 @@ export async function PATCH(req: Request) {
   const id = Number(raw.id);
   if (!Number.isInteger(id) || id <= 0) {
     return NextResponse.json({ error: "Missing product id." }, { status: 422 });
+  }
+
+  if (raw.active === true) {
+    const product = await getProductById(id);
+    if (!product) return NextResponse.json({ error: "Product not found." }, { status: 404 });
+    if (product.saleMode === "ready-made" && product.colors.some(color => !color.frontImage)) {
+      return NextResponse.json({ error: "Add a front photo for each color before publishing." }, { status: 422 });
+    }
   }
 
   const ok =

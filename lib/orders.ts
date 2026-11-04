@@ -48,6 +48,7 @@ function canonical(value: unknown): string {
 
 function orderItemSnapshot(item: CartItem) {
   return { productId: item.productId, productName: item.productName, productKind: item.productKind,
+    saleMode: item.saleMode ?? "customizable",
     colorName: item.colorName, colorHex: item.colorHex, unitPrice: item.unitPrice,
     quantity: item.quantity, lines: item.lines, design: item.design,
     previewFront: item.previewFront ?? null, previewBack: item.previewBack ?? null,
@@ -67,6 +68,7 @@ export interface OrderSummary {
   items: {
     productName: string;
     productKind: ProductKind;
+    saleMode: "customizable" | "ready-made";
     colorName: string;
     colorHex: string;
     quantity: number;
@@ -162,15 +164,15 @@ export async function createOrder(input: CheckoutInput): Promise<{
         throw new CheckoutAttemptConflictError();
       }
       const previousItems = await tx<{
-        product_id: number | null; product_name: string; product_kind: ProductKind;
+        product_id: number | null; product_name: string; product_kind: ProductKind; sale_mode: "customizable" | "ready-made";
         color_name: string; color_hex: string; unit_price: number; quantity: number;
         size_breakdown: SizeLine[]; design: Design; preview_front: string | null;
         preview_back: string | null; roster: RosterEntry[]; notes: string;
-      }[]>`SELECT product_id, product_name, product_kind, color_name, color_hex, unit_price, quantity,
+      }[]>`SELECT product_id, product_name, product_kind, sale_mode, color_name, color_hex, unit_price, quantity,
         size_breakdown, design, preview_front, preview_back, roster, notes
         FROM order_items WHERE order_id = ${existing.id} ORDER BY id`;
       const previous = previousItems.map((item) => ({ productId: item.product_id, productName: item.product_name,
-        productKind: item.product_kind, colorName: item.color_name, colorHex: item.color_hex,
+        productKind: item.product_kind, saleMode: item.sale_mode, colorName: item.color_name, colorHex: item.color_hex,
         unitPrice: num(item.unit_price), quantity: item.quantity, lines: item.size_breakdown, design: item.design,
         previewFront: item.preview_front, previewBack: item.preview_back, roster: item.roster ?? [], designNotes: item.notes ?? "" }));
       if (existing.name !== input.name || existing.phone !== input.phone || existing.address_line1 !== input.addressLine1
@@ -186,10 +188,10 @@ export async function createOrder(input: CheckoutInput): Promise<{
     await reserveInventory(tx, order.id, input.items);
     for (const item of input.items) {
       await tx`
-        INSERT INTO order_items (order_id, product_id, product_name, product_kind,
+        INSERT INTO order_items (order_id, product_id, product_name, product_kind, sale_mode,
           color_name, color_hex, unit_price, quantity, size_breakdown, design,
           preview_front, preview_back, roster, notes)
-        VALUES (${order.id}, ${item.productId}, ${item.productName}, ${item.productKind},
+        VALUES (${order.id}, ${item.productId}, ${item.productName}, ${item.productKind}, ${item.saleMode ?? "customizable"},
           ${item.colorName}, ${item.colorHex}, ${item.unitPrice}, ${item.quantity},
           ${tx.json(item.lines as never)},
           ${tx.json(item.design as never)},
@@ -394,6 +396,7 @@ export async function getOrderByReference(reference: string): Promise<OrderSumma
     {
       product_name: string;
       product_kind: ProductKind;
+      sale_mode: "customizable" | "ready-made";
       color_name: string;
       color_hex: string;
       quantity: number;
@@ -406,7 +409,7 @@ export async function getOrderByReference(reference: string): Promise<OrderSumma
       notes: string;
     }[]
   >`
-    SELECT product_name, product_kind, color_name, color_hex, quantity, unit_price,
+    SELECT product_name, product_kind, sale_mode, color_name, color_hex, quantity, unit_price,
       size_breakdown, design, preview_front, preview_back, roster, notes
     FROM order_items WHERE order_id = (SELECT id FROM orders WHERE reference = ${reference})
     ORDER BY id`;
@@ -424,6 +427,7 @@ export async function getOrderByReference(reference: string): Promise<OrderSumma
     items: items.map((i) => ({
       productName: i.product_name,
       productKind: i.product_kind,
+      saleMode: i.sale_mode,
       colorName: i.color_name,
       colorHex: i.color_hex,
       quantity: i.quantity,

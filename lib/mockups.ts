@@ -18,7 +18,7 @@ export interface TeeMockup {
 type ProductLike = {
   slug: string;
   kind: ProductKind;
-  colors: { slug: string; name: string; hex: string }[];
+  colors: { slug: string; name: string; hex: string; frontImage?: string | null; backImage?: string | null }[];
 };
 
 const DEDICATED_FAMILY_SLUGS = new Set([
@@ -192,8 +192,8 @@ export function mockupsForProduct(product: ProductLike): TeeMockup[] {
       hex: color.hex,
     };
     const preview = (view: "front" | "back") => `/api/garment-preview?family=${family ?? "tee"}&color=${color.hex.replace("#", "")}&view=${view}&v=2`;
-    const front = productVariantImage(product.slug, color.slug, color.hex, "front");
-    const back = productVariantImage(product.slug, color.slug, color.hex, "back");
+    const front = (color.frontImage && color.backImage ? color.frontImage : null) ?? productVariantImage(product.slug, color.slug, color.hex, "front");
+    const back = (color.frontImage && color.backImage ? color.backImage : null) ?? productVariantImage(product.slug, color.slug, color.hex, "back");
     return { ...productColor, front: front ?? preview("front"), back: back ?? preview("back"), precolored: Boolean(front && back) };
   });
 }

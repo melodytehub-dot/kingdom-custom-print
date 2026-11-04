@@ -17,7 +17,7 @@ CREATE TABLE IF NOT EXISTS products (
   style_code  text NOT NULL DEFAULT '',
   category_id int REFERENCES categories(id) ON DELETE SET NULL,
   -- garment kind drives which customizer template renders
-  kind        text NOT NULL CHECK (kind IN ('tee','polo','longsleeve','hoodie','crew','cap','mug','tote')),
+  kind        text NOT NULL CHECK (kind IN ('tee','polo','longsleeve','hoodie','crew','cap','mug','tote','other')),
   blurb       text NOT NULL DEFAULT '',
   description text NOT NULL DEFAULT '',
   -- fabric/weight spec shown on the product page
@@ -37,9 +37,10 @@ CREATE TABLE IF NOT EXISTS products (
 
 -- Idempotent add for databases created before the style number existed.
 ALTER TABLE products ADD COLUMN IF NOT EXISTS style_code text NOT NULL DEFAULT '';
+ALTER TABLE products ADD COLUMN IF NOT EXISTS sale_mode text NOT NULL DEFAULT 'customizable';
 ALTER TABLE products DROP CONSTRAINT IF EXISTS products_kind_check;
 ALTER TABLE products ADD CONSTRAINT products_kind_check
-  CHECK (kind IN ('tee','polo','longsleeve','hoodie','crew','cap','mug','tote'));
+  CHECK (kind IN ('tee','polo','longsleeve','hoodie','crew','cap','mug','tote','other'));
 
 CREATE INDEX IF NOT EXISTS products_active_idx ON products (active, sort_order);
 CREATE INDEX IF NOT EXISTS products_featured_idx ON products (featured) WHERE featured;
@@ -62,6 +63,16 @@ CREATE TABLE IF NOT EXISTS product_sizes (
   surcharge  numeric(10,2) NOT NULL DEFAULT 0 CHECK (surcharge >= 0),
   sort_order int NOT NULL DEFAULT 0,
   UNIQUE (product_id, label)
+);
+
+-- Photos are referenced by stable URLs and are independent of a deployment.
+ALTER TABLE product_colors ADD COLUMN IF NOT EXISTS front_image text;
+ALTER TABLE product_colors ADD COLUMN IF NOT EXISTS back_image text;
+CREATE TABLE IF NOT EXISTS catalog_media (
+  id text PRIMARY KEY,
+  content_type text NOT NULL CHECK (content_type IN ('image/jpeg','image/png','image/webp')),
+  content bytea NOT NULL,
+  created_at timestamptz NOT NULL DEFAULT now()
 );
 
 -- Physical counts are keyed by the stable product and displayed variant names,
@@ -341,6 +352,7 @@ CREATE TABLE IF NOT EXISTS order_items (
 );
 
 ALTER TABLE order_items ADD COLUMN IF NOT EXISTS roster jsonb NOT NULL DEFAULT '[]'::jsonb;
+ALTER TABLE order_items ADD COLUMN IF NOT EXISTS sale_mode text NOT NULL DEFAULT 'customizable';
 
 CREATE INDEX IF NOT EXISTS order_items_order_idx ON order_items (order_id);
 

@@ -48,6 +48,7 @@ const KIND_OPTIONS: { value: ProductKind; label: string }[] = [
   { value: "cap", label: "Cap" },
   { value: "mug", label: "Mug" },
   { value: "tote", label: "Tote bag" },
+  { value: "other", label: "Other product" },
 ];
 
 interface AdminData {
@@ -117,7 +118,7 @@ export default function AdminDashboard({
         <nav id="admin-menu" aria-label="Dashboard sections" className={`admin-tabs${menuOpen ? " is-open" : ""}`}>
           <div className="admin-menu-heading"><strong>Dashboard</strong><button type="button" onClick={closeMenu} aria-label="Close menu"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><path d="M5 5l14 14M19 5 5 19" /></svg></button></div>
           {TABS.map((t) => (
-            <button
+          <button
               key={t.id}
               type="button"
               className={`admin-tab${tab === t.id ? " is-active" : ""}`}
@@ -508,25 +509,25 @@ function OrderDetailPanel({
                 </div>
 
                 <div className="admin-proof-grid" aria-label={`${item.productName} customer proof previews`}>
-                  {(["front", "back"] as const).map((side) => {
+                  {(["front", "back"] as const).filter(side => item.saleMode !== "ready-made" || (side === "front" ? item.previewFront : item.previewBack)).map((side) => {
                     const preview = side === "front" ? item.previewFront : item.previewBack;
                     const layerCount = Array.isArray(item.design[side]) ? item.design[side].length : 0;
                     return (
                       <figure key={side} className="admin-proof">
                         <div className="admin-proof-image">
-                          <DesignPreviewImage src={preview} alt={`${item.productName} ${side} customer proof`} kind={item.productKind} color={item.colorHex} back={side === "back"} />
+                          <DesignPreviewImage src={preview} alt={`${item.productName} ${side} ${item.saleMode === "ready-made" ? "photo" : "customer proof"}`} kind={item.productKind} color={item.colorHex} back={side === "back"} />
                         </div>
                         <figcaption>
                           <strong>{side === "front" ? "Front" : "Back"}</strong>
-                          <span className="muted">{layerCount} design {layerCount === 1 ? "element" : "elements"}</span>
-                          {preview ? <a className="link" href={preview} download={`${detail.reference}-${i + 1}-${side}-proof.png`}>Download proof</a> : null}
+                          {item.saleMode !== "ready-made" ? <span className="muted">{layerCount} design {layerCount === 1 ? "element" : "elements"}</span> : null}
+                          {preview ? <a className="link" href={preview} download={`${detail.reference}-${i + 1}-${side}`}>Download {item.saleMode === "ready-made" ? "photo" : "proof"}</a> : null}
                         </figcaption>
                       </figure>
                     );
                   })}
                 </div>
 
-                <p className="hint">Customer-approved screen proof; verify dimensions and source quality before production.</p>
+                {item.saleMode !== "ready-made" ? <p className="hint">Customer-approved screen proof; verify dimensions and source quality before production.</p> : null}
                 {sourceArtwork(item.design).length ? (
                   <div className="admin-source-files">
                     <strong className="small">Source artwork saved with order</strong>
@@ -653,6 +654,7 @@ interface DraftProduct {
   slug: string;
   styleCode: string;
   kind: ProductKind;
+  saleMode: "customizable" | "ready-made";
   categoryId: string;
   blurb: string;
   description: string;
@@ -666,7 +668,7 @@ interface DraftProduct {
   backH: string;
   featured: boolean;
   active: boolean;
-  colors: { slug: string; name: string; hex: string; autoSlug?: boolean }[];
+  colors: { slug: string; name: string; hex: string; frontImage?: string | null; backImage?: string | null; autoSlug?: boolean }[];
   sizes: { label: string; surcharge: string }[];
   priceBreaks: { minQty: number; amountOff: string }[];
 }
@@ -677,11 +679,12 @@ function emptyProduct(): DraftProduct {
     slug: "",
     styleCode: "",
     kind: "tee",
+    saleMode: "customizable",
     categoryId: "",
     blurb: "",
     description: "",
     material: "",
-    basePrice: "24",
+    basePrice: "",
     compareAt: "",
     printFeePerSide: "6",
     frontW: "0.42",
@@ -689,7 +692,7 @@ function emptyProduct(): DraftProduct {
     backW: "0.62",
     backH: "0.66",
     featured: false,
-    active: true,
+    active: false,
     colors: [{ slug: "black", name: "Black", hex: "#141414", autoSlug: true }],
     sizes: [
       { label: "S", surcharge: "0" },
@@ -708,6 +711,7 @@ function toDraft(p: Product): DraftProduct {
     slug: p.slug,
     styleCode: p.styleCode,
     kind: p.kind,
+    saleMode: p.saleMode ?? "customizable",
     categoryId: p.categoryId ? String(p.categoryId) : "",
     blurb: p.blurb,
     description: p.description,
@@ -721,7 +725,7 @@ function toDraft(p: Product): DraftProduct {
     backH: String(p.printArea.backH),
     featured: p.featured,
     active: p.active,
-    colors: p.colors.map((c) => ({ slug: c.slug, name: c.name, hex: c.hex })),
+    colors: p.colors.map((c) => ({ slug: c.slug, name: c.name, hex: c.hex, frontImage: c.frontImage, backImage: c.backImage })),
     sizes: p.sizes.map((s) => ({ label: s.label, surcharge: String(s.surcharge) })),
     priceBreaks: p.priceBreaks.map((b) => ({ minQty: b.minQty, amountOff: String(b.amountOff) })),
   };
@@ -736,8 +740,8 @@ function ProductsPanel({ data, editingProduct }: { data: AdminData; editingProdu
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
 
-  function patchDraft(next: Partial<DraftProduct>) {
-    setDraft((prev) => (prev ? { ...prev, ...next } : prev));
+  function patchDraft(next: Partial<DraftProduct> | ((previous: DraftProduct) => Partial<DraftProduct>)) {
+    setDraft((prev) => (prev ? { ...prev, ...(typeof next === "function" ? next(prev) : next) } : prev));
   }
 
   async function save() {
@@ -752,6 +756,7 @@ function ProductsPanel({ data, editingProduct }: { data: AdminData; editingProdu
       slug: draft.slug,
       styleCode: draft.styleCode,
       kind: draft.kind,
+      saleMode: draft.saleMode,
       categoryId: draft.categoryId ? Number(draft.categoryId) : null,
       blurb: draft.blurb,
       description: draft.description,
@@ -946,17 +951,56 @@ function ProductsPanel({ data, editingProduct }: { data: AdminData; editingProdu
 
 function AdminProductThumb({ product }: { product: Product }) {
   const mockup = mockupsForProduct(product)[0];
+  const image = product.colors[0]?.frontImage ?? mockup?.front;
 
   return (
     <div className="pa-thumb">
-      {mockup ? (
+      {image ? (
         // eslint-disable-next-line @next/next/no-img-element
-        <img src={mockup.front} alt={`${product.name} preview`} />
+        <img src={image} alt={`${product.name} preview`} />
       ) : (
         <Garment kind={product.kind} color={product.colors[0]?.hex ?? "#141414"} />
       )}
     </div>
   );
+}
+
+function ProductColorPhotos({ color, onChange, onUploading }: { color: DraftProduct["colors"][number]; onChange: (patch: { frontImage?: string | null; backImage?: string | null }) => void; onUploading: (delta: number) => void }) {
+  const [uploading, setUploading] = useState(false);
+  const [error, setError] = useState("");
+  async function upload(file: File | undefined, side: "frontImage" | "backImage") {
+    if (!file) return;
+    setError(""); setUploading(true); onUploading(1);
+    try {
+      if (file.size > 4 * 1024 * 1024) throw new Error("Choose a photo under 4 MB.");
+      const localUrl = URL.createObjectURL(file);
+      try {
+        await new Promise<void>((resolve, reject) => {
+          const image = new window.Image();
+          image.onload = () => image.naturalWidth && image.naturalHeight ? resolve() : reject(new Error("Choose a valid image."));
+          image.onerror = () => reject(new Error("Choose a valid JPG, PNG or WebP photo."));
+          image.src = localUrl;
+        });
+      } finally { URL.revokeObjectURL(localUrl); }
+      const form = new FormData(); form.set("image", file);
+      const response = await fetch("/api/admin/product-media", { method: "POST", body: form });
+      const result = await response.json() as { url?: string; error?: string };
+      if (!response.ok || !result.url) throw new Error(result.error || "The photo could not be uploaded.");
+      onChange({ [side]: result.url });
+    } catch (err) { setError(err instanceof Error ? err.message : "The photo could not be uploaded."); }
+    finally { setUploading(false); onUploading(-1); }
+  }
+  return <div className="admin-color-photos">
+    {([ ["frontImage", "Front photo"], ["backImage", "Back photo (optional)"] ] as const).map(([side, label]) => <div key={side}>
+      <label className="small">{label}<input type="file" accept="image/jpeg,image/png,image/webp" disabled={uploading} onChange={(e) => { void upload(e.target.files?.[0], side); e.target.value = ""; }} /></label>
+      {color[side] ? <div className="admin-color-photo-preview">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={color[side] ?? ""} alt={`${color.name || "Product"} ${side === "frontImage" ? "front" : "back"}`} />
+        <button type="button" className="link" disabled={uploading} onClick={() => onChange({ [side]: null })}>Remove photo</button></div> : null}
+    </div>)}
+    {uploading ? <p role="status">Uploading photo…</p> : null}
+    {error ? <p role="alert">{error}</p> : null}
+  </div>;
 }
 
 function ProductForm({
@@ -970,20 +1014,29 @@ function ProductForm({
   draft: DraftProduct;
   categories: { id: number; name: string }[];
   saving: boolean;
-  onChange: (next: Partial<DraftProduct>) => void;
+  onChange: (next: Partial<DraftProduct> | ((previous: DraftProduct) => Partial<DraftProduct>)) => void;
   onSave: () => void;
   onCancel: () => void;
 }) {
   const [colorSearch, setColorSearch] = useState("");
+  const [uploads, setUploads] = useState(0);
   return (
     <form
       className="product-form"
       onSubmit={(e) => {
         e.preventDefault();
-        onSave();
+        if (!uploads) onSave();
       }}
     >
       <div className="field-grid">
+        <div className="field">
+          <label className="label" htmlFor="p-sale-mode">How will customers buy this?</label>
+          <select id="p-sale-mode" className="select" value={draft.saleMode} onChange={(e) => onChange({ saleMode: e.target.value as DraftProduct["saleMode"], ...(e.target.value === "customizable" && draft.kind === "other" ? { kind: "tee" as const } : {}) })}>
+            <option value="customizable">Customize before ordering</option>
+            <option value="ready-made">Buy as shown</option>
+          </select>
+          {draft.saleMode === "ready-made" ? <p className="hint">After saving, enter stock quantities in Inventory. Customers cannot order an option without stock.</p> : null}
+        </div>
         <div className="field">
           <label className="label" htmlFor="p-name">
             Product name
@@ -1018,7 +1071,7 @@ function ProductForm({
             value={draft.kind}
             onChange={(e) => onChange({ kind: e.target.value as ProductKind })}
           >
-            {KIND_OPTIONS.map((k) => (
+            {KIND_OPTIONS.filter(k => draft.saleMode === "ready-made" || k.value !== "other").map((k) => (
               <option key={k.value} value={k.value}>
                 {k.label}
               </option>
@@ -1053,6 +1106,7 @@ function ProductForm({
             type="number"
             min={0}
             step="0.01"
+            required
             value={draft.basePrice}
             onChange={(e) => onChange({ basePrice: e.target.value })}
           />
@@ -1071,7 +1125,7 @@ function ProductForm({
             onChange={(e) => onChange({ compareAt: e.target.value })}
           />
         </div>
-        <div className="field">
+        {draft.saleMode === "customizable" ? <div className="field">
           <label className="label" htmlFor="p-fee">
             Print fee per side (USD)
           </label>
@@ -1084,7 +1138,7 @@ function ProductForm({
             value={draft.printFeePerSide}
             onChange={(e) => onChange({ printFeePerSide: e.target.value })}
           />
-        </div>
+        </div> : null}
         <div className="field">
           <label className="label" htmlFor="p-material">
             Material
@@ -1124,7 +1178,7 @@ function ProductForm({
         />
       </div>
 
-      <details className="admin-advanced">
+      {draft.saleMode === "customizable" ? <details className="admin-advanced">
       <summary>Print area settings</summary>
       <fieldset className="fieldset">
         <legend className="label">Printable area</legend>
@@ -1159,11 +1213,12 @@ function ProductForm({
           ))}
         </div>
       </fieldset>
-      </details>
+      </details> : null}
 
       <fieldset className="fieldset">
         <legend className="label">Colors</legend>
-        <p className="hint">Enter the color name and choose a matching swatch. Customers will select from these colors.</p>
+        <p className="hint">Add each color, choose its swatch and upload matching photos. Finished products need a front photo for every color. Photos can be JPG, PNG or WebP, up to 4 MB each.</p>
+        {draft.saleMode === "customizable" ? <p className="hint">Upload both front and back photos to use them in the design studio.</p> : null}
         {draft.colors.length > 8 ? <label className="field">Find a color<input className="input" type="search" value={colorSearch} onChange={(e) => setColorSearch(e.target.value)} placeholder="Search colors" /></label> : null}
         <div className="repeat-list">
           {draft.colors.map((c, i) => ({ c, i })).filter(({ c }) => !c.name || c.name.toLowerCase().includes(colorSearch.trim().toLowerCase())).map(({ c, i }) => (
@@ -1206,16 +1261,18 @@ function ProductForm({
                 onClick={() =>
                   onChange({ colors: draft.colors.filter((_, idx) => idx !== i) })
                 }
-                disabled={draft.colors.length <= 1}
+                disabled={draft.colors.length <= 1 || uploads > 0}
               >
                 Remove
               </button>
+              <ProductColorPhotos color={c} onUploading={(delta) => setUploads(count => count + delta)} onChange={(patch) => onChange(previous => ({ colors: previous.colors.map((entry, index) => index === i ? { ...entry, ...patch } : entry) }))} />
             </div>
           ))}
         </div>
         <button
           type="button"
           className="btn btn-light btn-sm add-row"
+          disabled={uploads > 0}
           onClick={() =>
             onChange({
               colors: [...draft.colors, { slug: "", name: "", hex: "#3A3A3C", autoSlug: true }],
@@ -1228,6 +1285,7 @@ function ProductForm({
 
       <fieldset className="fieldset">
         <legend className="label">Sizes</legend>
+        <p className="hint">For an item without sizes, use one option named “One size.”</p>
         <div className="repeat-list">
           {draft.sizes.map((s, i) => (
             <div className="repeat-row repeat-row-sm" key={i}>
@@ -1374,11 +1432,11 @@ function ProductForm({
       </div>
 
       <div className="form-actions">
-        <button type="button" className="btn btn-ghost" onClick={onCancel}>
+        <button type="button" className="btn btn-ghost" disabled={uploads > 0} onClick={onCancel}>
           Cancel
         </button>
-        <button type="submit" className="btn" disabled={saving}>
-          {saving ? "Saving…" : draft.id ? "Save changes" : "Create product"}
+        <button type="submit" className="btn" disabled={saving || uploads > 0}>
+          {saving ? "Saving…" : uploads ? "Uploading photo…" : draft.id ? "Save changes" : "Create product"}
         </button>
       </div>
     </form>

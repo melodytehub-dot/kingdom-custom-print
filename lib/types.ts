@@ -6,7 +6,8 @@ export type ProductKind =
   | "crew"
   | "cap"
   | "mug"
-  | "tote";
+  | "tote"
+  | "other";
 
 export type GarmentSide = "front" | "back";
 
@@ -15,6 +16,8 @@ export interface ProductColor {
   slug: string;
   name: string;
   hex: string;
+  frontImage?: string | null;
+  backImage?: string | null;
 }
 
 export interface ProductSize {
@@ -45,6 +48,7 @@ export interface Product {
   name: string;
   styleCode: string;
   kind: ProductKind;
+  saleMode?: "customizable" | "ready-made";
   categoryId: number | null;
   categorySlug: string | null;
   categoryName: string | null;
@@ -203,6 +207,7 @@ export interface CartItem {
   productSlug: string;
   productName: string;
   productKind: ProductKind;
+  saleMode?: "customizable" | "ready-made";
   colorSlug: string;
   colorName: string;
   colorHex: string;

@@ -51,6 +51,10 @@ try {
     await tx.savepoint(async (inner) => inventory.reserveInventory(inner, 100, [item]));
     assert.equal((await tx`SELECT * FROM inventory_reservations`).length, 0, "disabled protection does not reserve stock");
     assert.equal((await exports.PUT(request({ ...payload, counts: [{ ...payload.counts[0], expected: 0, quantity: 3 }] }))).status, 200);
+    await tx.savepoint(async (inner) => inventory.reserveInventory(inner, 103, [{ ...item, saleMode: "ready-made" }]));
+    assert.equal((await tx`SELECT * FROM inventory_reservations WHERE order_id = 103`).length, 1, "finished goods reserve stock even when blank-garment protection is off");
+    await assert.rejects(tx.savepoint(async (inner) => inventory.reserveInventory(inner, 104, [{ ...item, saleMode: "ready-made" }])), /no longer available/);
+    await tx.savepoint(async (inner) => inventory.releaseInventory(inner, 103));
     await tx`INSERT INTO orders (status, stripe_session_id, paypal_order_id) VALUES ('pending', NULL, NULL)`;
     assert.equal((await exports.PATCH(protection(true))).status, 409, "existing pending orders block activation");
     await tx`DELETE FROM orders`;

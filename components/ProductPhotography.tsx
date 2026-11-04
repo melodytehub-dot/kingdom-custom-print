@@ -15,6 +15,10 @@ export default function ProductPhotography({ product, color, view = "front", cla
   const selected = color ?? product.colors[0];
   const label = `${product.name} in ${selected?.name ?? "White"}, ${view} view`;
   const index = { front: 0, back: 1, side: 2 }[view];
+  const uploaded = view === "front" ? selected?.frontImage : view === "back" ? selected?.backImage : null;
+  if (uploaded) return <span className={`product-photography ${className}`} data-photo-color={selected?.slug} data-photo-view={view}>
+    <Image unoptimized src={uploaded} alt={decorative ? "" : label} fill sizes="(max-width: 640px) 50vw, 600px" style={{ objectFit: "contain" }} />
+  </span>;
   const variant = selected && view !== "side" ? productVariantImage(product.slug, selected.slug, selected.hex, view) : null;
   if (variant) {
     return <span className={`product-photography ${className}`} data-photo-color={selected?.slug} data-photo-view={view}>

@@ -78,8 +78,8 @@ export default function InventoryPanel({ products }: { products: Product[] }) {
     finally { setSaving(false); }
   }
 
-  return <section aria-label="Inventory"><div className="admin-block-head"><div><h2 className="h3">Inventory</h2><p className="small muted">Record the number of blank items you have in each color and size.</p></div></div>
-    <div className="banner-note"><p>{enabled ? "Stock protection is on. Pending checkouts hold stock, and confirmed payments update counts." : "Stock protection is off. Counts do not limit checkout until you enable it."}</p><button type="button" className="btn btn-light btn-sm" disabled={saving || loading || !products.length} onClick={() => void toggleProtection()}>{enabled ? "Turn off stock protection" : "Enable stock protection"}</button></div>
+  return <section aria-label="Inventory"><div className="admin-block-head"><div><h2 className="h3">Inventory</h2><p className="small muted">Record how many items you have in each color and size.</p></div></div>
+    <div className="banner-note"><p>{enabled ? "Stock protection is on. Pending checkouts hold stock, and confirmed payments update counts." : "Finished products always require stock. Protection for customizable products is off."}</p><button type="button" className="btn btn-light btn-sm" disabled={saving || loading || !products.length} onClick={() => void toggleProtection()}>{enabled ? "Turn off stock protection" : "Enable stock protection"}</button></div>
     {message ? <p className="banner-note" role="status">{message}</p> : null}
     <PaymentHolds disabled={dirty} onChanged={() => { setLoading(true); setReload((n) => n + 1); }} />
     {!products.length ? <p>No products yet.</p> : <><label className="field admin-inventory-product">Product<select className="select" value={productId} disabled={saving} onChange={(event) => choose(event.target.value)}>{products.map((item) => <option key={item.id} value={item.id}>{item.name}{item.active ? "" : " (hidden)"}</option>)}</select></label>
