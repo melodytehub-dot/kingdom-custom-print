@@ -74,7 +74,7 @@ const react = {
 };
 const { default: Canvas } = load("components/customizer/DesignCanvas.tsx", {
   react, "react/jsx-runtime": jsx,
-  "@/lib/design": { areaFor: area => area, teeArea: () => ({ w: .4, h: .5, cx: .5, cy: .47 }), layerBox: () => ({ w: 100, h: 60 }) },
+  "@/lib/design": { printableArea: () => ({ w: .4, h: .5, cx: .5, cy: .47 }), layerBox: () => ({ w: 100, h: 60 }) },
   "@/lib/fonts": { svgFontStack: () => "sans-serif" },
   "./textGeometry": {},
 }, { window: {
@@ -252,6 +252,7 @@ const { TextIdeasPanel } = load("components/customizer/panels.tsx", {
   "./GarmentPreview": { GarmentPreview: () => null },
   "./SupportPanel": { default: () => null },
   "@/components/DesignPreviewImage": { default: () => null },
+  "@/components/PageSkeleton": { InlineSkeleton: () => null },
   "./art": {}, "./editors": { PanelHeader: () => null }, "./templates": {},
   "./lumise-library": { useLumiseLibrary: () => ({ categories: [], items: [], loading: false, error: false }) },
   "./icons": { CheckGlyph: () => null },

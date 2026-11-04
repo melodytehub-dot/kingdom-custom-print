@@ -550,7 +550,7 @@ export default function Customizer({
   useEffect(() => {
     if (step !== "review") return;
     let live = true;
-    drawPreview(mockup.front, mockup.back, stripForCart(design), product.printArea)
+    drawPreview(mockup.front, mockup.back, stripForCart(design), product.printArea, product.kind)
       .then((p) => live && setPreviews(p))
       .catch(() => {
         if (!live) return;
@@ -560,7 +560,7 @@ export default function Customizer({
     return () => {
       live = false;
     };
-  }, [step, mockup, design, product.printArea]);
+  }, [step, mockup, design, product.printArea, product.kind]);
 
   const patch = useCallback(
     (targetSide: GarmentSide, id: string, changes: Partial<DesignLayer>) => {
@@ -653,7 +653,7 @@ export default function Customizer({
     if (busy) return;
     setBusy(true);
     try {
-      const previews = await drawPreview(mockup.front, mockup.back, stripForCart(design), product.printArea);
+      const previews = await drawPreview(mockup.front, mockup.back, stripForCart(design), product.printArea, product.kind);
       const preview = previews[side];
       if (!preview) throw new Error("No preview available");
       const blob = await (await fetch(preview)).blob();
@@ -715,7 +715,7 @@ export default function Customizer({
       Promise.allSettled(textFonts.map(ensureFontLoaded)),
       new Promise((resolve) => window.setTimeout(resolve, 4000)),
     ]);
-    const area = printAreaView(side, product.printArea);
+    const area = printAreaView(side, product.printArea, product.kind);
     for (const element of elements) {
       if (element.type === "text") {
         const { sourceWidthPct, ...textStyle } = element.layer;
@@ -1388,7 +1388,7 @@ export default function Customizer({
     setBusy(true);
     try {
       const cartDesign = stripForCart(design);
-      const rendered = await drawPreview(mockup.front, mockup.back, cartDesign, product.printArea);
+      const rendered = await drawPreview(mockup.front, mockup.back, cartDesign, product.printArea, product.kind);
       const item = {
         productId: product.id,
         productSlug: product.slug,
@@ -1519,9 +1519,9 @@ export default function Customizer({
   const visibleStageH = overlayPanel ? Math.max(120, stageBox.h - panelHeight) : stageBox.h;
   const focusY = useMemo(() => {
     if (!overlayPanel) return null;
-    const pa = printAreaView(side, product.printArea);
+    const pa = printAreaView(side, product.printArea, product.kind);
     return pa.y + ((selected?.y ?? 50) / 100) * pa.h;
-  }, [overlayPanel, side, product.printArea, selected?.y]);
+  }, [overlayPanel, side, product.printArea, product.kind, selected?.y]);
   const fit = useMemo(
     () => fitStage(stageBox.w, stageBox.h, zoom, { visibleH: visibleStageH, focusY, contentBounds: garmentContentBounds(product.kind, product.slug, side) }),
     [stageBox, zoom, visibleStageH, focusY, product.kind, product.slug, side]
@@ -2095,6 +2095,7 @@ export default function Customizer({
                   fabricColor={mockup.precolored ? undefined : mockup.hex}
                   side={side}
                   printArea={product.printArea}
+                  productKind={product.kind}
                   design={design}
                   selectedIds={selectedIds}
                   compact={compact}

@@ -17,8 +17,7 @@ function canvas() {
 }
 const deps = {
   "@/lib/design": {
-    areaFor: (area) => ({ w: area.frontW, h: area.frontH }),
-    teeArea: () => ({ w: 0.4, h: 0.5, cx: 0.5, cy: 0.5 }),
+    printableArea: () => ({ w: 0.4, h: 0.5, cx: 0.5, cy: 0.5 }),
     layerBox: () => ({ w: 20, h: 20 }),
     encodeCanvasUnder: (value) => ({ dataUrl: `data:image/webp,${value.firstImage}` }),
   },

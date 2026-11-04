@@ -5,6 +5,7 @@ import type {
   ImageLayer,
   PersonalizationKind,
   PrintArea,
+  ProductKind,
   RosterEntry,
   TextLayer,
 } from "./types";
@@ -66,6 +67,36 @@ export const TEE_PRINT_AREA: Record<GarmentSide, TeeArea> = {
 
 export function teeArea(side: GarmentSide): TeeArea {
   return TEE_PRINT_AREA[side];
+}
+
+// The family mockups are not all centred within their square images. Keep the
+// placement guide and flattened proofs on the same printable part of each one.
+const FAMILY_PRINT_AREA: Partial<Record<ProductKind, Record<GarmentSide, TeeArea>>> = {
+  hoodie: {
+    front: { cx: 0.56, cy: 0.42, w: 0.42, h: 0.32 },
+    back: { cx: 0.46, cy: 0.45, w: 0.48, h: 0.48 },
+  },
+  crew: {
+    front: { cx: 0.53, cy: 0.48, w: 0.46, h: 0.48 },
+    back: { cx: 0.49, cy: 0.48, w: 0.46, h: 0.48 },
+  },
+  tote: {
+    front: { cx: 0.604, cy: 0.69, w: 0.48, h: 0.43 },
+    back: { cx: 0.399, cy: 0.69, w: 0.48, h: 0.43 },
+  },
+};
+
+export function printableArea(side: GarmentSide, printArea?: PrintArea, kind?: ProductKind): TeeArea {
+  const family = kind ? FAMILY_PRINT_AREA[kind]?.[side] : undefined;
+  const configured = printArea ? areaFor(printArea, side) : undefined;
+  if (family) {
+    return {
+      ...family,
+      w: configured ? Math.min(family.w, configured.w) : family.w,
+      h: configured ? Math.min(family.h, configured.h) : family.h,
+    };
+  }
+  return configured ? { ...teeArea(side), ...configured } : teeArea(side);
 }
 
 /**
