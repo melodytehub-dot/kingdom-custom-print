@@ -26,5 +26,33 @@ export default function PageTransition({ children }: { children: React.ReactNode
     };
   }, [pathname]);
 
-  return <div key={pathname} className="page-transition">{children}</div>;
+  useEffect(() => {
+    if (pathname.startsWith("/admin") || pathname.startsWith("/customize/")) return;
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches || !("IntersectionObserver" in window)) return;
+    const root = document.querySelector<HTMLElement>(".page-transition");
+    if (!root) return;
+    const selector = "[data-reveal], .kcp-heading, .kcp-project-intro, .kcp-project-card, .kcp-process-inner > *, .kcp-contact, .kcp-questions-inner > *, .page-head";
+    const registered = new WeakSet<Element>();
+    const observer = new IntersectionObserver((entries) => {
+      for (const entry of entries) {
+        if (!entry.isIntersecting) continue;
+        entry.target.classList.add("kcp-revealed");
+        observer.unobserve(entry.target);
+      }
+    }, { threshold: 0.12 });
+    const register = () => root.querySelectorAll<HTMLElement>(selector).forEach(target => {
+      if (!registered.has(target)) {
+        registered.add(target);
+        observer.observe(target);
+      }
+    });
+    register();
+    // Route content can stream in after this layout's effect has mounted.
+    const changes = new MutationObserver(register);
+    changes.observe(root, { childList: true, subtree: true });
+    return () => { changes.disconnect(); observer.disconnect(); };
+  }, [pathname]);
+
+  const isStudio = pathname.startsWith("/customize/") || pathname.startsWith("/admin");
+  return <div key={pathname} className={`page-transition${isStudio ? "" : " kcp-storefront-page"}`}>{children}</div>;
 }

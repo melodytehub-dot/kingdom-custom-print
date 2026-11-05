@@ -1,15 +1,16 @@
 import Image from "next/image";
 import Link from "next/link";
-import { getSettings } from "@/lib/catalog";
+import { DEFAULT_SETTINGS, getSettings } from "@/lib/catalog";
 
 
 export default async function Footer() {
-  const settings = await getSettings();
+  const settings = await getSettings().catch(() => DEFAULT_SETTINGS);
   const year = new Date().getFullYear();
 
   return (
     <footer className="mm-footer">
       <div className="minimog-container">
+        <div className="kcp-footer-lead"><div><span>MADE FOR YOUR IDEAS</span><p>Let&apos;s make something<br /><em>worth wearing.</em></p></div><Link href="/customize">Start designing <span aria-hidden="true">↗</span></Link></div>
         <div className="mm-footer-grid">
           {/* Column 1: Subscribe & Brand */}
           <div className="mm-footer-col mm-footer-brand-info">
