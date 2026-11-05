@@ -673,13 +673,13 @@ interface DraftProduct {
   priceBreaks: { minQty: number; amountOff: string }[];
 }
 
-function emptyProduct(): DraftProduct {
+function emptyProduct(saleMode: DraftProduct["saleMode"]): DraftProduct {
   return {
     name: "",
     slug: "",
     styleCode: "",
     kind: "tee",
-    saleMode: "customizable",
+    saleMode,
     categoryId: "",
     blurb: "",
     description: "",
@@ -735,7 +735,8 @@ function ProductsPanel({ data, editingProduct }: { data: AdminData; editingProdu
   const router = useRouter();
   const [products, setProducts] = useState(data.products);
   const [productSearch, setProductSearch] = useState("");
-  const [draft, setDraft] = useState<DraftProduct | null>(() => editingProduct === "new" ? emptyProduct() : editingProduct ? (data.products.find((p) => String(p.id) === editingProduct) ? toDraft(data.products.find((p) => String(p.id) === editingProduct)!) : null) : null);
+  const [productFilter, setProductFilter] = useState<"all" | DraftProduct["saleMode"]>("all");
+  const [draft, setDraft] = useState<DraftProduct | null>(() => editingProduct === "new-print" ? emptyProduct("customizable") : editingProduct === "new-shop" ? emptyProduct("ready-made") : editingProduct && editingProduct !== "new" ? (data.products.find((p) => String(p.id) === editingProduct) ? toDraft(data.products.find((p) => String(p.id) === editingProduct)!) : null) : null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
@@ -836,8 +837,13 @@ function ProductsPanel({ data, editingProduct }: { data: AdminData; editingProdu
     }
   }
 
+  if (editingProduct === "new") return <section aria-label="Choose a product type">
+    <div className="admin-block-head"><div><h2 className="h3">What would you like to add?</h2><p className="small muted">Choose how customers will order this product.</p></div><button type="button" className="btn btn-light btn-sm" onClick={() => router.push("/admin?tab=products")}>Back to products</button></div>
+    <ProductCreationChoices onChoose={(mode) => router.push(`/admin?tab=products&edit=${mode === "customizable" ? "new-print" : "new-shop"}`)} />
+  </section>;
+
   if (editingProduct) return <section aria-label="Product editor">
-    <div className="admin-block-head"><div><h2 className="h3">{draft?.id ? `Edit ${draft.name}` : draft ? "New product" : "Product not found"}</h2></div><button type="button" className="btn btn-light btn-sm" onClick={() => router.push("/admin?tab=products")}>Back to products</button></div>
+    <div className="admin-block-head"><div><h2 className="h3">{draft?.id ? `Edit ${draft.name}` : draft ? (draft.saleMode === "customizable" ? "Add a print product" : "Add a shop product") : "Product not found"}</h2>{draft ? <p className="small muted">{draft.saleMode === "customizable" ? "Customers personalize this item in the design studio." : "Customers buy this item as shown."}</p> : null}</div><button type="button" className="btn btn-light btn-sm" onClick={() => router.push("/admin?tab=products")}>Back to products</button></div>
     {error ? <p className="banner-note is-error" role="alert">{error}</p> : null}
     {draft ? <ProductForm draft={draft} categories={data.categories} saving={saving} onChange={patchDraft} onSave={save} onCancel={() => router.push("/admin?tab=products")} /> : null}
   </section>;
@@ -852,15 +858,6 @@ function ProductsPanel({ data, editingProduct }: { data: AdminData; editingProdu
             {products.filter((p) => p.active).length} published
           </p>
         </div>
-        <button
-          type="button"
-          className="btn btn-sm"
-          onClick={() => {
-            router.push("/admin?tab=products&edit=new");
-          }}
-        >
-          New product
-        </button>
       </div>
 
       {error ? (
@@ -874,7 +871,12 @@ function ProductsPanel({ data, editingProduct }: { data: AdminData; editingProdu
         </p>
       ) : null}
 
+      <ProductCreationChoices onChoose={(mode) => router.push(`/admin?tab=products&edit=${mode === "customizable" ? "new-print" : "new-shop"}`)} />
+
       {products.length ? <label className="field admin-product-search">Find a product<input className="input" type="search" placeholder="Search by name or style" value={productSearch} onChange={(event) => setProductSearch(event.target.value)} /></label> : null}
+      {products.length ? <div className="admin-product-filters" role="group" aria-label="Filter products by type">
+        {([ ["all", "All products"], ["customizable", "Print products"], ["ready-made", "Shop products"] ] as const).map(([value, label]) => <button key={value} type="button" className={`admin-product-filter${productFilter === value ? " is-active" : ""}`} aria-pressed={productFilter === value} onClick={() => setProductFilter(value)}>{label}</button>)}
+      </div> : null}
 
       {draft ? (
         <ProductForm
@@ -889,7 +891,7 @@ function ProductsPanel({ data, editingProduct }: { data: AdminData; editingProdu
 
       {products.length ? (
         <ul className="product-admin-list">
-          {products.filter((p) => `${p.name} ${p.styleCode}`.toLowerCase().includes(productSearch.trim().toLowerCase())).map((p) => (
+          {products.filter((p) => (productFilter === "all" || (p.saleMode ?? "customizable") === productFilter) && `${p.name} ${p.styleCode}`.toLowerCase().includes(productSearch.trim().toLowerCase())).map((p) => (
             <li key={p.id} className="product-admin-row">
               <AdminProductThumb product={p} />
               <div className="grow">
@@ -900,7 +902,7 @@ function ProductsPanel({ data, editingProduct }: { data: AdminData; editingProdu
                   ) : null}
                 </p>
                 <p className="small muted wrap-anywhere">
-                  {KIND_OPTIONS.find((k) => k.value === p.kind)?.label ?? p.kind} ·{" "}
+                  {p.saleMode === "ready-made" ? "Shop product" : "Print product"} · {KIND_OPTIONS.find((k) => k.value === p.kind)?.label ?? p.kind} ·{" "}
                   {p.colors.length} colors · {p.sizes.length} sizes
                 </p>
               </div>
@@ -941,12 +943,19 @@ function ProductsPanel({ data, editingProduct }: { data: AdminData; editingProdu
       ) : (
         <EmptyState
           title="No products yet"
-          body="Create your first blank to populate the storefront."
+          body="Choose a product type above to get started."
         />
       )}
-      {products.length > 0 && !products.some((p) => `${p.name} ${p.styleCode}`.toLowerCase().includes(productSearch.trim().toLowerCase())) ? <p role="status">No matching products. Try a different search.</p> : null}
+      {products.length > 0 && !products.some((p) => (productFilter === "all" || (p.saleMode ?? "customizable") === productFilter) && `${p.name} ${p.styleCode}`.toLowerCase().includes(productSearch.trim().toLowerCase())) ? <p role="status">No matching products. Try a different search or filter.</p> : null}
     </section>
   );
+}
+
+function ProductCreationChoices({ onChoose }: { onChoose: (mode: DraftProduct["saleMode"]) => void }) {
+  return <div className="admin-product-choices" aria-label="Add a product">
+    <button type="button" className="admin-product-choice" onClick={() => onChoose("customizable")}><span className="admin-product-choice-kicker">DESIGN STUDIO</span><strong>Print product</strong><span>Customers add their own text or artwork before ordering.</span><span className="admin-product-choice-action">Add print product <ArrowRight size={15} /></span></button>
+    <button type="button" className="admin-product-choice" onClick={() => onChoose("ready-made")}><span className="admin-product-choice-kicker">SHOP</span><strong>Ready-made product</strong><span>Customers choose from your photos and buy the item as shown.</span><span className="admin-product-choice-action">Add shop product <ArrowRight size={15} /></span></button>
+  </div>;
 }
 
 function AdminProductThumb({ product }: { product: Product }) {
@@ -1029,14 +1038,7 @@ function ProductForm({
       }}
     >
       <div className="field-grid">
-        <div className="field">
-          <label className="label" htmlFor="p-sale-mode">How will customers buy this?</label>
-          <select id="p-sale-mode" className="select" value={draft.saleMode} onChange={(e) => onChange({ saleMode: e.target.value as DraftProduct["saleMode"], ...(e.target.value === "customizable" && draft.kind === "other" ? { kind: "tee" as const } : {}) })}>
-            <option value="customizable">Customize before ordering</option>
-            <option value="ready-made">Buy as shown</option>
-          </select>
-          {draft.saleMode === "ready-made" ? <p className="hint">After saving, enter stock quantities in Inventory. Customers cannot order an option without stock.</p> : null}
-        </div>
+        {draft.saleMode === "ready-made" ? <p className="hint admin-stock-hint">After saving, enter stock quantities in Inventory. Customers cannot order an option without stock.</p> : null}
         <div className="field">
           <label className="label" htmlFor="p-name">
             Product name
@@ -1217,7 +1219,7 @@ function ProductForm({
 
       <fieldset className="fieldset">
         <legend className="label">Colors</legend>
-        <p className="hint">Add each color, choose its swatch and upload matching photos. Finished products need a front photo for every color. Photos can be JPG, PNG or WebP, up to 4 MB each.</p>
+        <p className="hint">Add each color, choose its swatch and upload matching photos. {draft.saleMode === "ready-made" ? "Add a front photo for every color before publishing. " : ""}Photos can be JPG, PNG or WebP, up to 4 MB each.</p>
         {draft.saleMode === "customizable" ? <p className="hint">Upload both front and back photos to use them in the design studio.</p> : null}
         {draft.colors.length > 8 ? <label className="field">Find a color<input className="input" type="search" value={colorSearch} onChange={(e) => setColorSearch(e.target.value)} placeholder="Search colors" /></label> : null}
         <div className="repeat-list">
@@ -1345,8 +1347,8 @@ function ProductForm({
       <fieldset className="fieldset">
         <legend className="label">Quantity breaks</legend>
         <p className="hint">
-          When an order reaches this many garments, the amount is added to the base
-          price per garment. Use a negative number for a discount.
+          When an order reaches this quantity, the amount is added to the base
+          price per item. Use a negative number for a discount.
         </p>
         <div className="repeat-list">
           {draft.priceBreaks.map((b, i) => (
