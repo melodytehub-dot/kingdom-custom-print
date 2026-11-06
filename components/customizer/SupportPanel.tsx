@@ -48,7 +48,7 @@ export default function SupportPanel({ phone }: { phone: string }) {
   return <div className="rot-support">
     <button type="button" className="rot-barbtn rot-support-trigger" aria-label="Contact customer service" aria-expanded={open} aria-controls="rot-support-panel" onClick={() => { if (!open) void refresh(); setOpen(!open); }}><HeadsetIcon size={34} /><span>Call or Chat</span></button>
     {open && <section id="rot-support-panel" className="rot-support-panel" aria-label="Customer support">
-      <div className="rot-support-heading"><div><span>KINGDOM CUSTOM PRINT</span><h2>Chat with us</h2></div><button type="button" aria-label="Close support" onClick={() => setOpen(false)}>×</button></div>
+      <div className="rot-support-heading"><div><span>Kingdom Custom Print</span><h2>Chat with us</h2></div><button type="button" aria-label="Close support" onClick={() => setOpen(false)}>×</button></div>
       <p>Ask us about your design or order. We’ll reply here and by email.</p>
       {phone && <a className="rot-support-call" href={`tel:${phone.replace(/[^\d+]/g, "")}`}>Call {phone}</a>}
       {messages.length > 0 && <div ref={conversationRef} className="rot-support-messages" aria-label="Conversation" aria-live="polite">{messages.map((message, index) => <div key={index} className={`rot-support-message ${message.sender === "customer" ? "is-customer" : "is-business"}`}><strong>{message.sender === "customer" ? "You" : "Kingdom Custom Print"}</strong><p>{message.body}</p></div>)}</div>}

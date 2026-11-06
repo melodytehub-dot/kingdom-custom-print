@@ -22,7 +22,7 @@
   font-size: 12px;
   font-weight: 500;
   letter-spacing: 0.08em;
-  text-transform: uppercase;
+  text-transform: capitalize;
 }
 
 .announce-dot {
@@ -95,7 +95,7 @@
   font-size: 25px;
   line-height: 1;
   letter-spacing: 0.015em;
-  text-transform: uppercase;
+  text-transform: capitalize;
 }
 
 .brand-wordmark-sub {
@@ -103,7 +103,7 @@
   font-size: 10px;
   font-weight: 800;
   letter-spacing: 0.14em;
-  text-transform: uppercase;
+  text-transform: capitalize;
 }
 
 .brand-logo {
@@ -139,7 +139,7 @@
   font-size: 13px;
   font-weight: 600;
   letter-spacing: 0.08em;
-  text-transform: uppercase;
+  text-transform: capitalize;
   color: var(--ink);
   border-radius: var(--r-sm);
   cursor: pointer;
@@ -386,7 +386,7 @@
   font-size: 15px;
   font-weight: 500;
   letter-spacing: 0.08em;
-  text-transform: uppercase;
+  text-transform: capitalize;
   line-height: 1.2;
   border-bottom: 1px solid var(--line);
 }
@@ -463,7 +463,7 @@
   font-size: 10.5px;
   font-weight: 600;
   letter-spacing: 0.04em;
-  text-transform: uppercase;
+  text-transform: capitalize;
   color: var(--muted);
   position: relative;
 }
@@ -541,7 +541,7 @@
   font-size: 11px;
   font-weight: 700;
   letter-spacing: 0.18em;
-  text-transform: uppercase;
+  text-transform: capitalize;
   color: var(--muted);
   margin-bottom: 16px;
 }

@@ -953,7 +953,7 @@ function ProductsPanel({ data, editingProduct }: { data: AdminData; editingProdu
 
 function ProductCreationChoices({ onChoose }: { onChoose: (mode: DraftProduct["saleMode"]) => void }) {
   return <div className="admin-product-choices" aria-label="Add a product">
-    <button type="button" className="admin-product-choice" onClick={() => onChoose("customizable")}><span className="admin-product-choice-kicker">DESIGN STUDIO</span><strong>Print product</strong><span>Customers add their own text or artwork before ordering.</span><span className="admin-product-choice-action">Add print product <ArrowRight size={15} /></span></button>
+    <button type="button" className="admin-product-choice" onClick={() => onChoose("customizable")}><span className="admin-product-choice-kicker">Design Studio</span><strong>Print product</strong><span>Customers add their own text or artwork before ordering.</span><span className="admin-product-choice-action">Add print product <ArrowRight size={15} /></span></button>
     <button type="button" className="admin-product-choice" onClick={() => onChoose("ready-made")}><span className="admin-product-choice-kicker">SHOP</span><strong>Ready-made product</strong><span>Customers choose from your photos and buy the item as shown.</span><span className="admin-product-choice-action">Add shop product <ArrowRight size={15} /></span></button>
   </div>;
 }

@@ -7,14 +7,14 @@ import MobileNav from "./MobileNav";
 import Search from "./icons/Search";
 
 const MAIN_NAV_LINKS = [
-  { href: "/", label: "HOME" },
-  { href: "/shop", label: "SHOP ALL" },
-  { href: "/shop?kind=tee", label: "T-SHIRTS" },
-  { href: "/shop?kind=polo", label: "POLO SHIRTS" },
-  { href: "/shop?kind=longsleeve", label: "LONG SLEEVES" },
-  { href: "/shop?kind=hoodie", label: "HOODIES" },
-  { href: "/customize", label: "DESIGN STUDIO", highlight: true },
-  { href: "/contact", label: "CONTACT" },
+  { href: "/", label: "Home" },
+  { href: "/shop", label: "Shop All" },
+  { href: "/shop?kind=tee", label: "T-Shirts" },
+  { href: "/shop?kind=polo", label: "Polo Shirts" },
+  { href: "/shop?kind=longsleeve", label: "Long Sleeves" },
+  { href: "/shop?kind=hoodie", label: "Hoodies" },
+  { href: "/customize", label: "Design Studio", highlight: true },
+  { href: "/contact", label: "Contact" },
 ];
 
 export default async function Header({

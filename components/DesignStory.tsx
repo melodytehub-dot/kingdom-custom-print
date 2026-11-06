@@ -17,7 +17,7 @@ export default function DesignStory() {
     <section className="kcp-story" aria-labelledby="story-title">
       <div className="kcp-wrap">
         <div className="kcp-story-heading" data-reveal>
-          <span className="kcp-eyebrow">YOUR IDEA, ON A SHIRT</span>
+          <span className="kcp-eyebrow">Your Idea, on a Shirt</span>
           <h2 id="story-title">A little imagination.<br /><em>A lot of possibilities.</em></h2>
           <p>Start with a blank and make it yours, right here in the design studio.</p>
         </div>

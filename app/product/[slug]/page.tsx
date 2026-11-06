@@ -64,8 +64,8 @@ export default async function ProductPage({ params, searchParams }: Params) {
         <section className="minimog-container" style={{ paddingBlock: "60px", borderTop: "1px solid var(--minimog-border)" }}>
           <div className="mm-section-head" style={{ textAlign: "left", display: "flex", justifyContent: "space-between", alignItems: "flex-end", marginBottom: "30px" }}>
             <div>
-              <span className="mm-card-cat">YOU MAY ALSO LIKE</span>
-              <h2 className="mm-section-title" style={{ margin: "4px 0 0" }}>RELATED PRODUCTS</h2>
+              <span className="mm-card-cat">You May Also Like</span>
+              <h2 className="mm-section-title" style={{ margin: "4px 0 0" }}>Related Products</h2>
             </div>
             <Link href="/shop" className="mm-btn mm-btn-outline" style={{ height: "38px", padding: "0 20px" }}>
               Shop all products

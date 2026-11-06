@@ -2236,7 +2236,7 @@ export default function Customizer({
 
             <button type="button" className="rot-share" onClick={shareDesign} aria-label="Share this design">
               <ShareIcon size={34} />
-              <span>SHARE</span>
+              <span>Share</span>
             </button>
           </section>
 

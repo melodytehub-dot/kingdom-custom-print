@@ -81,7 +81,7 @@
   font-size: 12.5px;
   font-weight: 700;
   letter-spacing: 0.07em;
-  text-transform: uppercase;
+  text-transform: capitalize;
   color: var(--muted);
   border-bottom: 2px solid transparent;
   white-space: nowrap;
@@ -136,7 +136,7 @@
   font-size: 11px;
   font-weight: 700;
   letter-spacing: 0.1em;
-  text-transform: uppercase;
+  text-transform: capitalize;
   color: var(--muted);
 }
 
@@ -208,7 +208,7 @@
   font-size: 11px;
   font-weight: 700;
   letter-spacing: 0.1em;
-  text-transform: uppercase;
+  text-transform: capitalize;
   color: var(--muted);
   background: var(--bone);
   white-space: nowrap;
@@ -273,7 +273,7 @@
   font-size: 11px;
   font-weight: 700;
   letter-spacing: 0.12em;
-  text-transform: uppercase;
+  text-transform: capitalize;
   color: var(--muted);
   margin: 16px 0 6px;
 }

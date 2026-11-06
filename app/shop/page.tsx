@@ -84,10 +84,10 @@ export default async function ShopPage({
     <div className="mm-shop-page" style={{ paddingBottom: "80px" }}>
       <div className="minimog-container" style={{ paddingTop: "30px", marginBottom: "30px" }}>
         <span className="mm-hero-tag" style={{ marginBottom: "12px" }}>
-          {activeCategoryName ?? "ALL PRODUCTS"}
+          {activeCategoryName ?? "All Products"}
         </span>
         <h1 style={{ fontSize: "36px", letterSpacing: "1px", margin: "6px 0 12px" }}>
-          {query ? `Results for “${query}”` : activeCategoryName ? `SHOP ${activeCategoryName.toUpperCase()}` : "FIND YOUR NEXT FAVORITE"}
+          {query ? `Results for “${query}”` : activeCategoryName ? `Shop ${activeCategoryName}` : "Find Your Next Favorite"}
         </h1>
         <p style={{ color: "var(--minimog-text)", maxWidth: "600px", margin: 0 }}>
           Shop ready-to-wear styles or choose a blank and make it your own.
@@ -104,7 +104,7 @@ export default async function ShopPage({
                 padding: "8px 18px",
                 fontSize: "13px",
                 fontWeight: 600,
-                textTransform: "uppercase",
+                textTransform: "capitalize",
                 background: !activeCategory && !activeKind ? "var(--minimog-black)" : "var(--minimog-bg-grey)",
                 color: !activeCategory && !activeKind ? "#fff" : "var(--minimog-black)",
                 borderRadius: 0,
@@ -126,7 +126,7 @@ export default async function ShopPage({
                     padding: "8px 18px",
                     fontSize: "13px",
                     fontWeight: 600,
-                    textTransform: "uppercase",
+                    textTransform: "capitalize",
                     background: active ? "var(--minimog-black)" : "var(--minimog-bg-grey)",
                     color: active ? "#fff" : "var(--minimog-black)",
                     borderRadius: 0,
@@ -150,7 +150,7 @@ export default async function ShopPage({
                     padding: "8px 18px",
                     fontSize: "13px",
                     fontWeight: 600,
-                    textTransform: "uppercase",
+                    textTransform: "capitalize",
                     background: active ? "var(--minimog-black)" : "var(--minimog-bg-grey)",
                     color: active ? "#fff" : "var(--minimog-black)",
                     borderRadius: 0,

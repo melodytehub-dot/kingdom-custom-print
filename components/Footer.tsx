@@ -10,7 +10,7 @@ export default async function Footer() {
   return (
     <footer className="mm-footer">
       <div className="minimog-container">
-        <div className="kcp-footer-lead"><div><span>MADE FOR YOUR IDEAS</span><p>Let&apos;s make something<br /><em>worth wearing.</em></p></div><Link href="/customize">Start designing <span aria-hidden="true">↗</span></Link></div>
+        <div className="kcp-footer-lead"><div><span>Made for Your Ideas</span><p>Let&apos;s make something<br /><em>worth wearing.</em></p></div><Link href="/customize">Start designing <span aria-hidden="true">↗</span></Link></div>
         <div className="mm-footer-grid">
           {/* Column 1: Subscribe & Brand */}
           <div className="mm-footer-col mm-footer-brand-info">
@@ -31,7 +31,7 @@ export default async function Footer() {
 
           {/* Column 2: COMPANY */}
           <div className="mm-footer-col">
-            <h2>COMPANY</h2>
+            <h2>Company</h2>
             <ul>
               <li><Link href="/contact">Contact</Link></li>
               <li><Link href="/shipping">Shipping & Return</Link></li>
@@ -42,7 +42,7 @@ export default async function Footer() {
 
           {/* Column 3: INFORMATION */}
           <div className="mm-footer-col">
-            <h2>INFORMATION</h2>
+            <h2>Information</h2>
             <ul>
               <li><Link href="/cart">My Cart</Link></li>
               <li><Link href="/wishlist">Wishlist</Link></li>
@@ -53,7 +53,7 @@ export default async function Footer() {
 
           {/* Column 4: CONTACT */}
           <div className="mm-footer-col">
-            <h2>CONTACT</h2>
+            <h2>Contact</h2>
             <ul>
               <li><Link href="/contact">Customer Service</Link></li>
               {settings.contactEmail ? <li><a href={`mailto:${settings.contactEmail}`}>{settings.contactEmail}</a></li> : null}
