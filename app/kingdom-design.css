@@ -57,17 +57,19 @@
 .mm-card .mm-card-media { aspect-ratio: 4 / 5; padding: 7px; background: #fff; }
 .mm-card .mm-card-media > a { position: relative; display: block; width: 100%; height: 100%; background: #f3f3f3; overflow: hidden; }
 .mm-card .mm-card-media .product-photography { position: absolute; inset: 0; }
-.mm-card .mm-card-actions-stack,.mm-card:hover .mm-card-actions-stack { top: auto; right: auto; bottom: 15px; left: 50%; transform: translateX(-50%); opacity: 1; }
+.mm-card .mm-card-actions-stack,.mm-card:hover .mm-card-actions-stack { top: 10px; right: 10px; bottom: auto; left: auto; transform: none; opacity: 1; }
 .mm-card .mm-quick-btn { width: 40px; height: 40px; border: 1px solid #e6e1df; border-radius: 7px; background: #fff; }
 .mm-card .mm-card-body { padding: 14px; gap: 9px; }
-.mm-card .mm-card-title { min-height: 2.7em; font-size: 15px; font-weight: 700; line-height: 1.35; }
+.mm-card .mm-card-title { min-height: 0; font-size: 15px; font-weight: 700; line-height: 1.35; }
 .mm-card .mm-card-price-row { color: #af263a; font-weight: 750; }
+.mm-card .mm-card-swatches { flex-wrap: nowrap; overflow-x: auto; padding: 2px; scrollbar-width: thin; }
 .mm-card .mm-card-bottom-btn { margin-top: auto; border: 1px solid #ded7d4; border-radius: 3px; background: #fff; color: #261b1c; }
 .mm-card .mm-card-bottom-btn:hover { border-color: #a91c31; background: #a91c31; color: #fff; }
 @media (max-width: 768px) {
  .mm-card .mm-card-media { padding: 5px; }
- .mm-card .mm-card-body { padding: 10px; gap: 7px; }
- .mm-card .mm-card-title { font-size: 14px; }
+ .mm-card .mm-card-body { padding: 10px; gap: 6px; }
+ .mm-card .mm-card-title { font-size: 12px; line-height: 1.45; }
+ .mm-card .mm-card-price-row { font-size: 13px; }
  .mm-card .mm-quick-btn { width: 36px; height: 36px; }
 }
 .kcp-collection-banner { position: relative; isolation: isolate; display: flex; align-items: center; min-height: clamp(220px,26vw,340px); margin-bottom: 36px; overflow: hidden; border-radius: 18px; background: linear-gradient(110deg,#f2dbd7,#ebe9e4); }
