@@ -3,19 +3,20 @@ import { InlineSkeleton } from "@/components/PageSkeleton";
 
 import { useEffect, useState } from "react";
 import type { Product } from "@/lib/types";
+import ProductPhotography from "@/components/ProductPhotography";
 
 type Count = { color_name: string; size_label: string; quantity: number; reserved: number };
 type Adjustment = { color_name: string; size_label: string; previous_quantity: number | null; new_quantity: number; created_at: string };
 const keyFor = (color: string, size: string) => JSON.stringify([color, size]);
 
 export default function InventoryPanel({ products }: { products: Product[] }) {
-  const [productId, setProductId] = useState(products[0]?.id ?? 0);
+  const [productId, setProductId] = useState(0);
   const [baseline, setBaseline] = useState<Record<string, number>>({});
   const [values, setValues] = useState<Record<string, string>>({});
   const [history, setHistory] = useState<Adjustment[]>([]);
   const [reserved, setReserved] = useState<Record<string, number>>({});
   const [enabled, setEnabled] = useState(false);
-  const [loading, setLoading] = useState(Boolean(products.length));
+  const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
   const [reload, setReload] = useState(0);
@@ -27,8 +28,6 @@ export default function InventoryPanel({ products }: { products: Product[] }) {
   const activeColor = product?.colors.find((color) => color.name === selectedColor) ?? product?.colors[0];
   const dirty = Object.entries(values).some(([key, value]) => value !== (baseline[key] === undefined ? "" : String(baseline[key])));
   const productOptions = products.filter(item => item.name.toLowerCase().includes(search.trim().toLowerCase()));
-  const totalOptions = product ? product.colors.length * product.sizes.length : 0;
-  const countedOptions = product ? product.colors.reduce((sum, color) => sum + product.sizes.filter(size => values[keyFor(color.name, size.label)] !== undefined && values[keyFor(color.name, size.label)] !== "").length, 0) : 0;
 
   useEffect(() => {
     if (!productId) return;
@@ -46,15 +45,16 @@ export default function InventoryPanel({ products }: { products: Product[] }) {
   useEffect(() => {
     const controller = new AbortController();
     fetch("/api/admin/inventory?summary=1", { cache: "no-store", signal: controller.signal })
-      .then(async res => { if (!res.ok) throw new Error(); return res.json() as Promise<{products: {id:number;total:number;counted:number}[]}>; })
-      .then(data => setSummary(data.products))
+      .then(async res => { if (!res.ok) throw new Error(); return res.json() as Promise<{products: {id:number;total:number;counted:number}[]; enabled: boolean}>; })
+      .then(data => { setSummary(data.products); setEnabled(data.enabled); })
       .catch(() => { if (!controller.signal.aborted) setSummary([]); });
     return () => controller.abort();
   }, [reload]);
 
   function choose(value: string) {
+    if (Number(value) === productId) return;
     if (dirty && !window.confirm("Discard your unsaved stock count changes?")) return;
-    setLoading(true); setBaseline({}); setReserved({}); setHistory([]); setValues({}); setMessage(""); setSelectedColor(""); setFillCount(""); setProductId(Number(value));
+    setLoading(Number(value) !== 0); setBaseline({}); setReserved({}); setHistory([]); setValues({}); setMessage(""); setSelectedColor(""); setFillCount(""); setProductId(Number(value));
   }
   async function toggleProtection() {
     if (dirty) { setMessage("Save or discard the current stock changes before changing protection."); return; }
@@ -92,13 +92,39 @@ export default function InventoryPanel({ products }: { products: Product[] }) {
     finally { setSaving(false); }
   }
 
-  return <section aria-label="Inventory"><div className="admin-block-head"><div><h2 className="h3">Inventory</h2><p className="small muted">Record how many items you have in each color and size.</p></div></div>
-    <div className="banner-note"><p>{enabled ? "Stock protection is on. Pending checkouts hold stock, and confirmed payments update counts. Uncounted options remain visible but cannot be ordered." : "Finished products always require stock. Protection for customizable products is off."}</p>{summary.length ? <p>{summary.reduce((sum, item) => sum + item.counted, 0)} of {summary.reduce((sum, item) => sum + item.total, 0)} active options have a stock count.</p> : null}<button type="button" className="btn btn-light btn-sm" disabled={saving || loading || !products.length} onClick={() => void toggleProtection()}>{enabled ? "Turn off stock protection" : "Enable stock protection"}</button></div>
+  return <section aria-label="Inventory" className="admin-inventory">
+    <div className="admin-block-head"><div><h2 className="h3">Inventory</h2><p className="small muted">Choose a product to update the quantities you have in stock.</p></div></div>
+    <div className="banner-note"><p>{enabled ? "Stock protection is on. Products remain visible, but customers can only order options with stock available." : "Stock protection is off for customizable products. Ready-made products still require stock."}</p><details><summary>Stock protection settings</summary><p className="hint">Pending payments hold stock until checkout is completed or closed.</p><button type="button" className="btn btn-light btn-sm" disabled={saving || loading || !products.length} onClick={() => void toggleProtection()}>{enabled ? "Turn off stock protection" : "Enable stock protection"}</button></details></div>
     {message ? <p className="banner-note" role="status">{message}</p> : null}
-    <PaymentHolds disabled={dirty} onChanged={() => { setLoading(true); setReload((n) => n + 1); }} />
-    {!products.length ? <p>No products yet.</p> : <><label className="field admin-inventory-product">Find a product<input className="input" type="search" value={search} onChange={event => setSearch(event.target.value)} placeholder="Search product name" /></label><label className="field admin-inventory-product">Product<select className="select" value={productId} disabled={saving} onChange={(event) => choose(event.target.value)}>{products.filter(item => item.id === productId || productOptions.some(match => match.id === item.id)).map((item) => { const progress = summary.find(entry => entry.id === item.id); return <option key={item.id} value={item.id}>{item.name}{item.active ? progress ? ` (${progress.counted}/${progress.total} counted)` : "" : " (hidden)"}</option>; })}</select></label>{search && !productOptions.length ? <p className="hint">No products match that search.</p> : null}
-      {loading ? <InlineSkeleton label="Loading stock counts" /> : product ? <><form onSubmit={save}><p className="hint">{countedOptions} of {totalOptions} options entered. Enter the total on hand, including held items. Leave unknown quantities blank; enter 0 for out of stock.</p><label className="field admin-inventory-product">Color<select className="select" value={activeColor?.name ?? ""} disabled={saving} onChange={(event) => { setSelectedColor(event.target.value); setFillCount(""); }}>{product.colors.map((color) => <option key={color.id} value={color.name}>{color.name}</option>)}</select></label>{activeColor ? [activeColor].map((color) => <fieldset className="admin-inventory-color" key={color.id}><legend><span className="admin-inventory-swatch" style={{ backgroundColor: color.hex }} aria-hidden="true" />{color.name}</legend><div className="admin-inventory-fill"><label className="field">Same count for every size in {color.name}<input className="input" type="number" min="0" max="1000000" step="1" inputMode="numeric" value={fillCount} onChange={event => setFillCount(event.target.value)} /></label><button type="button" className="btn btn-light btn-sm" disabled={saving || !/^\d+$/.test(fillCount) || Number(fillCount) > 1000000} onClick={() => { setValues(current => ({ ...current, ...Object.fromEntries(product.sizes.map(size => [keyFor(color.name, size.label), fillCount])) })); setMessage(""); }}>Fill sizes</button></div><div className="admin-inventory-grid">{product.sizes.map((size) => { const key = keyFor(color.name, size.label); return <label className="field" key={key}>{size.label}<input className="input" type="number" min={reserved[key] ?? 0} max="1000000" step="1" inputMode="numeric" required={baseline[key] !== undefined} disabled={saving} value={values[key] ?? ""} onChange={(event) => setValues((current) => ({ ...current, [key]: event.target.value }))} aria-label={`${color.name}, ${size.label} stock`} />{reserved[key] ? <span className="hint">{reserved[key]} held</span> : null}</label>; })}</div></fieldset>) : <p>No colors are available for this product.</p>}<button type="submit" className="btn" disabled={saving}>{saving ? "Saving…" : "Save counts"}</button></form><div className="admin-inventory-history"><h3 className="h3">Recent changes</h3>{history.length ? <ul>{history.map((entry, index) => <li key={index}>{entry.color_name} · {entry.size_label}: {entry.previous_quantity === null ? "not counted" : entry.previous_quantity} → {entry.new_quantity} <span className="muted">({new Date(entry.created_at).toLocaleString()})</span></li>)}</ul> : <p className="muted">No counts have been recorded for this product yet.</p>}</div></> : null}</>}
+    {!products.length ? <p>No products yet.</p> : !productId ? <>
+      <label className="field admin-inventory-product">Find a product<input className="input" type="search" value={search} onChange={event => setSearch(event.target.value)} placeholder="Search product name" /></label>
+      {productOptions.length ? <div className="admin-inventory-cards">{productOptions.map(item => {
+        const progress = summary.find(entry => entry.id === item.id);
+        const status = !item.active ? "Hidden product" : !progress ? "Stock status unavailable" : progress.counted === 0 ? "Add stock" : progress.counted < progress.total ? "Stock partly added" : "Stock added";
+        return <button className="admin-inventory-card" type="button" key={item.id} disabled={saving} onClick={() => choose(String(item.id))}>
+          <span className="admin-inventory-card-image"><ProductPhotography product={item} color={item.colors[0]} decorative /></span>
+          <span className="admin-inventory-card-details"><strong>{item.name}</strong><span className="admin-inventory-card-status">{status}</span><span className="admin-inventory-card-action">Manage stock <span aria-hidden="true">→</span></span></span>
+        </button>;
+      })}</div> : <p className="hint">No products match that search.</p>}
+    </> : <>
+      <button type="button" className="link admin-inventory-back" disabled={saving} onClick={() => choose("0")}>← All products</button>
+      {loading ? <InlineSkeleton label="Loading stock counts" /> : product ? <>
+        <div className="admin-inventory-selected"><span className="admin-inventory-selected-image"><ProductPhotography product={product} color={product.colors[0]} decorative /></span><div><h3>{product.name}</h3><p className="hint">Choose a color, enter the quantity for each size, then save.</p></div></div>
+        <form onSubmit={save}>
+          <p className="hint">Enter how many you have, including items held for pending orders. Leave unknown quantities blank; enter 0 when out of stock.</p>
+          <fieldset className="admin-inventory-color-picker"><legend>Choose a color</legend><div className="admin-inventory-color-options">{product.colors.map(color => <button key={color.id} type="button" className={`admin-inventory-color-option${activeColor?.id === color.id ? " is-selected" : ""}`} aria-label={color.name} aria-pressed={activeColor?.id === color.id} title={color.name} disabled={saving} onClick={() => { setSelectedColor(color.name); setFillCount(""); }}><span style={{ backgroundColor: color.hex }} aria-hidden="true" /></button>)}</div></fieldset>
+          {activeColor ? <fieldset className="admin-inventory-color" key={activeColor.id}><legend><span className="admin-inventory-swatch" style={{ backgroundColor: activeColor.hex }} aria-hidden="true" /><span className="sr-only">{activeColor.name}</span> Stock quantities</legend>
+            <div className="admin-inventory-fill"><label className="field">Same quantity for every size<input className="input" type="number" min="0" max="1000000" step="1" inputMode="numeric" value={fillCount} onChange={event => setFillCount(event.target.value)} /></label><button type="button" className="btn btn-light btn-sm" disabled={saving || !/^\d+$/.test(fillCount) || Number(fillCount) > 1000000} onClick={() => { setValues(current => ({ ...current, ...Object.fromEntries(product.sizes.map(size => [keyFor(activeColor.name, size.label), fillCount])) })); setMessage(""); }}>Apply to all sizes</button></div>
+            <div className="admin-inventory-grid">{product.sizes.map(size => { const key = keyFor(activeColor.name, size.label); return <label className="field" key={key}>{size.label}<input className="input" type="number" min={reserved[key] ?? 0} max="1000000" step="1" inputMode="numeric" required={baseline[key] !== undefined} disabled={saving} value={values[key] ?? ""} onChange={event => setValues(current => ({ ...current, [key]: event.target.value }))} aria-label={`${activeColor.name}, ${size.label} stock`} />{reserved[key] ? <span className="hint">{reserved[key]} held</span> : null}</label>; })}</div>
+          </fieldset> : <p>No colors are available for this product.</p>}
+          <button type="submit" className="btn" disabled={saving}>{saving ? "Saving…" : "Save stock"}</button>
+        </form>
+        <details className="admin-inventory-history"><summary>Recent stock changes</summary>{history.length ? <ul>{history.map((entry, index) => { const color = product.colors.find(item => item.name === entry.color_name); return <li key={index}><span className="admin-inventory-swatch" style={{ backgroundColor: color?.hex ?? "transparent" }} title={entry.color_name} aria-label={entry.color_name} role="img" />{entry.size_label}: {entry.previous_quantity === null ? "not entered" : entry.previous_quantity} → {entry.new_quantity} <span className="muted">({new Date(entry.created_at).toLocaleString()})</span></li>; })}</ul> : <p className="muted">No stock changes yet.</p>}</details>
+      </> : null}
+    </>}
+    <details className="admin-inventory-advanced"><summary>Pending payment holds</summary><PaymentHolds disabled={dirty} onChanged={() => { if (productId) setLoading(true); setReload(n => n + 1); }} /></details>
   </section>;
+
 }
 
 type HeldOrder = { reference: string; status: string; created_at: string; provider: string };

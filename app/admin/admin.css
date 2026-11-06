@@ -753,6 +753,30 @@
 .admin-quote-line { display: grid; grid-template-columns: minmax(0, 2fr) minmax(80px, 1fr) minmax(100px, 1fr) auto; align-items: end; gap: 10px; margin-bottom: 14px; }
 @media (max-width: 640px) { .admin-quote-card { align-items: flex-start; flex-direction: column; } .admin-quote-line { grid-template-columns: 1fr 1fr; } .admin-quote-line .field:first-child { grid-column: 1 / -1; } }
 .admin-inventory-product { max-width: 440px; margin-bottom: 24px; }
+.admin-inventory-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(225px, 1fr)); gap: 12px; }
+.admin-inventory-card { display: flex; align-items: center; gap: 14px; width: 100%; min-width: 0; padding: 12px; border: 1px solid var(--line); border-radius: 12px; background: #fff; color: var(--ink); text-align: left; cursor: pointer; }
+.admin-inventory-card:hover { border-color: #ae2436; box-shadow: 0 3px 14px #2610140d; }
+.admin-inventory-card:focus-visible, .admin-inventory-color-option:focus-visible { outline: 3px solid #b62539; outline-offset: 3px; }
+.admin-inventory-card-image, .admin-inventory-selected-image { position: relative; flex: 0 0 76px; width: 76px; height: 76px; overflow: hidden; border-radius: 9px; background: #f4f1ef; }
+.admin-inventory-card-image .product-photography, .admin-inventory-selected-image .product-photography { position: absolute; inset: 0; }
+.admin-inventory-card-details { display: grid; min-width: 0; gap: 5px; }
+.admin-inventory-card-details strong { overflow-wrap: anywhere; line-height: 1.3; }
+.admin-inventory-card-status { color: #6b5e5e; font-size: 12px; }
+.admin-inventory-card-action { color: #a91c31; font-size: 12px; font-weight: 700; }
+.admin-inventory-back { display: inline-block; margin: 4px 0 18px; }
+.admin-inventory-selected { display: flex; gap: 16px; align-items: center; margin-bottom: 20px; }
+.admin-inventory-selected h3 { margin: 0 0 5px; font-size: 20px; }
+.admin-inventory-selected p { margin: 0; }
+.admin-inventory-color-picker { border: 0; padding: 0; margin: 20px 0; }
+.admin-inventory-color-picker legend { margin-bottom: 10px; font-weight: 700; }
+.admin-inventory-color-options { display: flex; flex-wrap: wrap; gap: 10px; }
+.admin-inventory-color-option { display: grid; place-items: center; width: 44px; height: 44px; padding: 4px; border: 2px solid transparent; border-radius: 50%; background: transparent; cursor: pointer; }
+.admin-inventory-color-option.is-selected { border-color: #b62539; }
+.admin-inventory-color-option > span { display: block; width: 100%; height: 100%; border: 1px solid #aaa; border-radius: 50%; }
+.admin-inventory-history summary, .admin-inventory-advanced > summary { cursor: pointer; font-weight: 700; }
+.admin-inventory-advanced { margin-top: 32px; }
+.admin-inventory .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
+@media (max-width: 520px) { .admin-inventory-cards { grid-template-columns: 1fr; } .admin-inventory-card-image { flex-basis: 70px; width: 70px; height: 70px; } }
 .admin-inventory-color { border: 1px solid var(--line); padding: 16px; margin: 0 0 18px; }
 .admin-inventory-color legend { padding: 0 6px; font-weight: 700; }
 .admin-inventory-swatch { display: inline-block; width: 16px; height: 16px; margin-right: 8px; border: 1px solid #aaa; border-radius: 50%; vertical-align: middle; }
