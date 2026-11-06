@@ -4,25 +4,15 @@ import { useWishlist } from "@/lib/wishlist-context";
 import { useState } from "react";
 import Link from "next/link";
 import ProductPhotography from "./ProductPhotography";
-import { brandForProduct } from "@/lib/product-brands";
 import Garment from "./Garment";
 import { formatUSD, lowestPrintedUnit, lowestUnitPrice } from "@/lib/pricing";
 import type { Product } from "@/lib/types";
 
 
-function StarActionIcon() {
+function HeartActionIcon() {
   return (
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
-    </svg>
-  );
-}
-
-function EyeActionIcon() {
-  return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
-      <circle cx="12" cy="12" r="3" />
+      <path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1.1-1.1a5.5 5.5 0 0 0-7.8 7.8l1.1 1.1L12 21l7.8-7.5 1.1-1.1a5.5 5.5 0 0 0-.1-7.8Z" />
     </svg>
   );
 }
@@ -64,17 +54,8 @@ export default function ProductCard({
             aria-pressed={saved}
             onClick={() => toggle(product.slug)}
           >
-            <StarActionIcon />
+            <HeartActionIcon />
           </button>
-          <Link
-            prefetch={false}
-            href={`/product/${product.slug}?color=${encodeURIComponent(selectedColor?.slug ?? "")}`}
-            className="mm-quick-btn"
-            title="Quick View"
-            aria-label="Quick View"
-          >
-            <EyeActionIcon />
-          </Link>
         </div>
 
 
@@ -82,11 +63,6 @@ export default function ProductCard({
 
       {/* 2. Card Body Details */}
       <div className="mm-card-body">
-        <span className="mm-card-cat">
-          {brandForProduct(product)?.name ?? product.categoryName ?? "Print on Demand"}
-          {product.styleCode ? ` · ${product.styleCode}` : ""}
-        </span>
-
         <h3 className="mm-card-title">
           <Link prefetch={false} href={`/product/${product.slug}?color=${encodeURIComponent(selectedColor?.slug ?? "")}`}>{product.name}</Link>
         </h3>
