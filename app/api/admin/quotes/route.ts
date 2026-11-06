@@ -32,8 +32,8 @@ export async function PATCH(req: Request) {
   if (!/^[1-9][0-9]{0,15}$/.test(id)) return NextResponse.json({ error: "Quote not found." }, { status: 422 });
   try {
     if (body.action === "invoice") {
-      const rows = await sql`UPDATE admin_quotes SET status = 'invoice', invoiced_at = now(), updated_at = now() WHERE id = ${id}::bigint AND status = 'quote' RETURNING id`;
-      return rows.length ? NextResponse.json({ ok: true }) : NextResponse.json({ error: "Quote not found or already converted." }, { status: 409 });
+      const rows = await sql`UPDATE admin_quotes SET status = 'invoice', invoiced_at = now(), updated_at = now() WHERE id = ${id}::bigint AND status = 'quote' AND customer_email ~ '^[^[:space:]@]+@[^[:space:]@]+\\.[^[:space:]@]+$' RETURNING id`;
+      return rows.length ? NextResponse.json({ ok: true }) : NextResponse.json({ error: "Quote not found, already converted, or missing a valid customer email. Edit the quote and add an email first." }, { status: 409 });
     }
     const result = validateQuote(body);
     if (!result.value) return NextResponse.json({ error: result.error }, { status: 422 });

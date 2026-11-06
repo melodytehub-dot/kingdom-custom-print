@@ -18,6 +18,7 @@ export interface ProductColor {
   hex: string;
   frontImage?: string | null;
   backImage?: string | null;
+  photos?: string[];
 }
 
 export interface ProductSize {

@@ -26,19 +26,18 @@ export default async function HomePage() {
     <div className="kcp-home">
       <ResumeDesignPrompt />
       <section className="kcp-hero" aria-labelledby="home-title">
+        <div className="kcp-hero-image"><HeroImageSlider slides={[heroImage(settings.heroImage1), heroImage(settings.heroImage2), heroImage(settings.heroImage3)]} /></div>
         <div className="kcp-hero-shade" aria-hidden="true" />
         <div className="kcp-wrap kcp-hero-content">
           <span className="kcp-eyebrow kcp-eyebrow-light"><span aria-hidden="true" />{settings.heroLabel}</span>
           <h1 id="home-title">{settings.heroHeadlineTop}<br />{settings.heroHeadlineBottom}</h1>
           <p>{settings.heroDescription}</p>
-          <div className="kcp-hero-actions">
-            <Link href="/shop" className="kcp-button kcp-button-light">Shop products <ArrowRight size={17} /></Link>
-            <Link href="/customize" className="kcp-button kcp-button-glass">Design your own <ArrowRight size={17} /></Link>
-          </div>
-          <div className="kcp-hero-notes"><span>For your ideas</span><span>For your people</span><span>Made to wear</span></div>
         </div>
-        <div className="kcp-hero-image"><HeroImageSlider slides={[heroImage(settings.heroImage1), heroImage(settings.heroImage2), heroImage(settings.heroImage3)]} /></div>
       </section>
+      <div className="kcp-hero-actions kcp-wrap">
+        <Link href="/shop" className="kcp-button kcp-button-dark">Shop now <ArrowRight size={17} /></Link>
+        <Link href="/customize" className="kcp-button kcp-button-outline">Design your own <ArrowRight size={17} /></Link>
+      </div>
 
       <section className="kcp-categories kcp-wrap" aria-labelledby="category-title">
         <div className="kcp-heading"><div><span className="kcp-eyebrow">FIND YOUR FAVORITE</span><h2 id="category-title">Start with a blank canvas.</h2></div><Link href="/shop" className="kcp-text-link">Shop all products <ArrowRight size={17} /></Link></div>

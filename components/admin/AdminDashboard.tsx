@@ -668,7 +668,7 @@ interface DraftProduct {
   backH: string;
   featured: boolean;
   active: boolean;
-  colors: { slug: string; name: string; hex: string; frontImage?: string | null; backImage?: string | null; autoSlug?: boolean }[];
+  colors: { slug: string; name: string; hex: string; frontImage?: string | null; backImage?: string | null; photos?: string[]; autoSlug?: boolean }[];
   sizes: { label: string; surcharge: string }[];
   priceBreaks: { minQty: number; amountOff: string }[];
 }
@@ -678,7 +678,7 @@ function emptyProduct(saleMode: DraftProduct["saleMode"]): DraftProduct {
     name: "",
     slug: "",
     styleCode: "",
-    kind: "tee",
+    kind: saleMode === "ready-made" ? "other" : "tee",
     saleMode,
     categoryId: "",
     blurb: "",
@@ -693,8 +693,8 @@ function emptyProduct(saleMode: DraftProduct["saleMode"]): DraftProduct {
     backH: "0.66",
     featured: false,
     active: false,
-    colors: [{ slug: "black", name: "Black", hex: "#141414", autoSlug: true }],
-    sizes: [
+    colors: saleMode === "ready-made" ? [{ slug: "standard", name: "Standard", hex: "#aaaaaa", photos: [], autoSlug: true }] : [{ slug: "black", name: "Black", hex: "#141414", autoSlug: true }],
+    sizes: saleMode === "ready-made" ? [{ label: "One size", surcharge: "0" }] : [
       { label: "S", surcharge: "0" },
       { label: "M", surcharge: "0" },
       { label: "L", surcharge: "0" },
@@ -725,7 +725,7 @@ function toDraft(p: Product): DraftProduct {
     backH: String(p.printArea.backH),
     featured: p.featured,
     active: p.active,
-    colors: p.colors.map((c) => ({ slug: c.slug, name: c.name, hex: c.hex, frontImage: c.frontImage, backImage: c.backImage })),
+    colors: p.colors.map((c) => ({ slug: c.slug, name: c.name, hex: c.hex, frontImage: c.frontImage, backImage: c.backImage, photos: c.photos?.length ? c.photos : [c.frontImage, c.backImage].filter((url): url is string => Boolean(url)) })),
     sizes: p.sizes.map((s) => ({ label: s.label, surcharge: String(s.surcharge) })),
     priceBreaks: p.priceBreaks.map((b) => ({ minQty: b.minQty, amountOff: String(b.amountOff) })),
   };
@@ -773,7 +773,7 @@ function ProductsPanel({ data, editingProduct }: { data: AdminData; editingProdu
       },
       featured: draft.featured,
       active: draft.active,
-      colors: draft.colors,
+      colors: draft.colors.map(color => draft.saleMode === "ready-made" ? { ...color, photos: color.photos ?? [] } : color),
       sizes: draft.sizes.map((s) => ({ label: s.label, surcharge: Number(s.surcharge) })),
       priceBreaks: draft.priceBreaks.map((b) => ({
         minQty: b.minQty,
@@ -1012,6 +1012,41 @@ function ProductColorPhotos({ color, onChange, onUploading }: { color: DraftProd
   </div>;
 }
 
+function ProductGallery({ photos, onChange, onUploading }: { photos: string[]; onChange: (photos: string[]) => void; onUploading: (delta: number) => void }) {
+  const [uploading, setUploading] = useState(false);
+  const [error, setError] = useState("");
+  async function upload(files: FileList | null) {
+    if (!files?.length) return;
+    if (photos.length + files.length > 12) { setError("Choose up to 12 photos for this option."); return; }
+    setError(""); setUploading(true); onUploading(1);
+    const next = [...photos];
+    try {
+      for (const file of Array.from(files)) {
+        if (file.size > 4 * 1024 * 1024) throw new Error("Each photo must be under 4 MB.");
+        const url = URL.createObjectURL(file);
+        try { await new Promise<void>((resolve, reject) => { const image = new window.Image(); image.onload = () => image.naturalWidth && image.naturalHeight ? resolve() : reject(new Error("Choose a valid image.")); image.onerror = () => reject(new Error("Choose a valid JPG, PNG or WebP photo.")); image.src = url; }); }
+        finally { URL.revokeObjectURL(url); }
+        const form = new FormData(); form.set("image", file);
+        const response = await fetch("/api/admin/product-media", { method: "POST", body: form });
+        const result = await response.json() as { url?: string; error?: string };
+        if (!response.ok || !result.url) throw new Error(result.error || "The photo could not be uploaded.");
+        next.push(result.url); onChange([...next]);
+      }
+    } catch (err) { setError(err instanceof Error ? err.message : "The photo could not be uploaded."); }
+    finally { setUploading(false); onUploading(-1); }
+  }
+  return <div className="admin-color-photos"><label className="small">Product photos<input type="file" accept="image/jpeg,image/png,image/webp" multiple disabled={uploading} onChange={e => { void upload(e.target.files); e.target.value = ""; }} /></label>
+    <p className="hint">The first photo is the cover. Add up to 12 photos in any order.</p>
+    <div className="admin-gallery-list">{photos.map((src, index) => <div key={src} className="admin-gallery-item">
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src={src} alt={`Photo ${index + 1}`} /><span>{index === 0 ? "Cover" : `Photo ${index + 1}`}</span>
+      {index > 0 ? <button type="button" className="link" disabled={uploading} onClick={() => { const next = [...photos]; [next[index - 1], next[index]] = [next[index], next[index - 1]]; onChange(next); }} aria-label={`Move photo ${index + 1} earlier`}>Move earlier</button> : null}
+      <button type="button" className="link" disabled={uploading} onClick={() => onChange(photos.filter((_, i) => i !== index))} aria-label={`Remove photo ${index + 1}`}>Remove</button>
+    </div>)}</div>
+    {uploading ? <p role="status">Uploading photos…</p> : null}{error ? <p role="alert">{error}</p> : null}
+  </div>;
+}
+
 function ProductForm({
   draft,
   categories,
@@ -1218,8 +1253,8 @@ function ProductForm({
       </details> : null}
 
       <fieldset className="fieldset">
-        <legend className="label">Colors</legend>
-        <p className="hint">Add each color, choose its swatch and upload matching photos. {draft.saleMode === "ready-made" ? "Add a front photo for every color before publishing. " : ""}Photos can be JPG, PNG or WebP, up to 4 MB each.</p>
+        <legend className="label">{draft.saleMode === "ready-made" ? "Product options and photos" : "Colors"}</legend>
+        <p className="hint">{draft.saleMode === "ready-made" ? "Use Standard for an item with no color options, or add each color with its matching photos. Add at least one photo per option before publishing." : "Add each color, choose its swatch and upload matching photos."} Photos can be JPG, PNG or WebP, up to 4 MB each.</p>
         {draft.saleMode === "customizable" ? <p className="hint">Upload both front and back photos to use them in the design studio.</p> : null}
         {draft.colors.length > 8 ? <label className="field">Find a color<input className="input" type="search" value={colorSearch} onChange={(e) => setColorSearch(e.target.value)} placeholder="Search colors" /></label> : null}
         <div className="repeat-list">
@@ -1267,7 +1302,7 @@ function ProductForm({
               >
                 Remove
               </button>
-              <ProductColorPhotos color={c} onUploading={(delta) => setUploads(count => count + delta)} onChange={(patch) => onChange(previous => ({ colors: previous.colors.map((entry, index) => index === i ? { ...entry, ...patch } : entry) }))} />
+              {draft.saleMode === "ready-made" ? <ProductGallery photos={c.photos ?? []} onUploading={(delta) => setUploads(count => count + delta)} onChange={(photos) => onChange(previous => ({ colors: previous.colors.map((entry, index) => index === i ? { ...entry, photos, frontImage: photos[0] ?? null, backImage: photos[1] ?? null } : entry) }))} /> : <ProductColorPhotos color={c} onUploading={(delta) => setUploads(count => count + delta)} onChange={(patch) => onChange(previous => ({ colors: previous.colors.map((entry, index) => index === i ? { ...entry, ...patch } : entry) }))} />}
             </div>
           ))}
         </div>
@@ -1286,7 +1321,7 @@ function ProductForm({
       </fieldset>
 
       <fieldset className="fieldset">
-        <legend className="label">Sizes</legend>
+        <legend className="label">{draft.saleMode === "ready-made" ? "Sizes or options" : "Sizes"}</legend>
         <p className="hint">For an item without sizes, use one option named “One size.”</p>
         <div className="repeat-list">
           {draft.sizes.map((s, i) => (

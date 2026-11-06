@@ -18,7 +18,7 @@ export async function generateMetadata({ params }: Params): Promise<Metadata> {
   const product = await getProductBySlug(slug);
   if (!product) return { title: "Product not found" };
   return {
-    title: `${product.name} — custom printed`,
+    title: product.saleMode === "ready-made" ? product.name : `${product.name} — custom printed`,
     description: product.blurb,
     openGraph: {
       title: `${product.name} | Kingdom Custom Print`,
@@ -44,15 +44,15 @@ export default async function ProductPage({ params, searchParams }: Params) {
     <div className="mm-pdp-page" style={{ paddingBottom: "80px" }}>
       <div className="minimog-container" style={{ paddingTop: "20px" }}>
         <ProductDetail key={`${product.slug}-${initialColor}`} product={product} initialColor={initialColor} />
-        <p className="pdp-from small muted" style={{ marginTop: "14px" }}>
+        {product.saleMode !== "ready-made" ? <p className="pdp-from small muted" style={{ marginTop: "14px" }}>
           Blank priced from {formatUSD(product.basePrice)} before custom decoration.
-        </p>
+        </p> : null}
       </div>
 
       {product.description ? (
         <section className="minimog-container" style={{ paddingBlock: "50px", borderTop: "1px solid var(--minimog-border)", marginTop: "40px" }}>
           <div style={{ maxWidth: "800px" }}>
-            <h2 style={{ fontSize: "24px", marginBottom: "14px", fontFamily: "var(--font-body)", fontWeight: 700 }}>About this garment blank</h2>
+            <h2 style={{ fontSize: "24px", marginBottom: "14px", fontFamily: "var(--font-body)", fontWeight: 700 }}>{product.saleMode === "ready-made" ? "About this product" : "About this garment blank"}</h2>
             <div style={{ color: "var(--minimog-text)", lineHeight: "1.7", fontSize: "15px" }}>
               <p>{product.description}</p>
             </div>
@@ -64,11 +64,11 @@ export default async function ProductPage({ params, searchParams }: Params) {
         <section className="minimog-container" style={{ paddingBlock: "60px", borderTop: "1px solid var(--minimog-border)" }}>
           <div className="mm-section-head" style={{ textAlign: "left", display: "flex", justifyContent: "space-between", alignItems: "flex-end", marginBottom: "30px" }}>
             <div>
-              <span className="mm-card-cat">SIMILAR FIT & STYLES</span>
-              <h2 className="mm-section-title" style={{ margin: "4px 0 0" }}>RELATED BLANKS</h2>
+              <span className="mm-card-cat">YOU MAY ALSO LIKE</span>
+              <h2 className="mm-section-title" style={{ margin: "4px 0 0" }}>RELATED PRODUCTS</h2>
             </div>
             <Link href="/shop" className="mm-btn mm-btn-outline" style={{ height: "38px", padding: "0 20px" }}>
-              Shop all blanks
+              Shop all products
             </Link>
           </div>
           <ul className="mm-product-grid">

@@ -360,9 +360,9 @@ CREATE INDEX IF NOT EXISTS order_items_order_idx ON order_items (order_id);
 -- provider confirms cancellation; time alone is not proof of cancellation.
 CREATE TABLE IF NOT EXISTS inventory_control (
   id boolean PRIMARY KEY DEFAULT true CHECK (id),
-  enabled boolean NOT NULL DEFAULT false
+  enabled boolean NOT NULL DEFAULT true
 );
-INSERT INTO inventory_control (id, enabled) VALUES (true, false) ON CONFLICT (id) DO NOTHING;
+INSERT INTO inventory_control (id, enabled) VALUES (true, true) ON CONFLICT (id) DO NOTHING;
 CREATE TABLE IF NOT EXISTS inventory_reservations (
   order_id int NOT NULL REFERENCES orders(id) ON DELETE RESTRICT,
   product_id int NOT NULL,

@@ -8,8 +8,9 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
   try {
     const [product] = await sql<{ sale_mode: string }[]>`SELECT sale_mode FROM products WHERE id = ${id} AND active = true`;
     if (!product || product.sale_mode !== "ready-made") return NextResponse.json({ error: "Product not found." }, { status: 404 });
-    const rows = await sql<{ color: string; size: string; available: number }[]>`
+    const rows = await sql<{ color: string; size: string; available: number; counted: boolean }[]>`
       SELECT c.slug AS color, s.label AS size,
+        (stock.product_id IS NOT NULL) AS counted,
         GREATEST(0, COALESCE(stock.quantity, 0) - COALESCE((
           SELECT sum(r.quantity) FROM inventory_reservations r
           WHERE r.product_id = c.product_id AND r.color_name = c.name AND r.size_label = s.label

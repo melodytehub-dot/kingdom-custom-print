@@ -154,7 +154,7 @@ export default function CheckoutForm({ settings, paymentsReady, paypalReady, acc
       <div className="wrap section">
         <div className="state">
           <h2 className="h3">There is nothing to check out</h2>
-          <p>Add a customized garment to your cart first.</p>
+          <p>Add a product to your cart first.</p>
           <Link href="/customize" className="btn">
             Start designing
           </Link>
@@ -173,7 +173,7 @@ export default function CheckoutForm({ settings, paymentsReady, paypalReady, acc
           <strong>US shipping only:</strong> Online checkout currently supports United States delivery. <Link href="/contact" style={{ textDecoration: "underline" }}>Contact us</Link> for international quotes.
         </div>
 
-        {!paymentsReady && !paypalReady ? <p className="banner-note" role="alert">Online checkout is temporarily unavailable. Your design stays saved in your cart. Please check back soon.</p> : null}
+        {!paymentsReady && !paypalReady ? <p className="banner-note" role="alert">Online checkout is temporarily unavailable. Your items stay saved in your cart. Please check back soon.</p> : null}
 
         {formError ? (
           <p className="banner-note is-error" role="alert">

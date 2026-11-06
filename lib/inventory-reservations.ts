@@ -20,7 +20,7 @@ export async function reserveInventory(tx: Tx, orderId: number, items: CartItem[
   const [control] = await tx<{ enabled: boolean }[]>`SELECT enabled FROM inventory_control WHERE id = true FOR SHARE`;
   // Finished goods always require an explicit stock count. Existing customizable
   // blanks continue to follow the shop-wide inventory setting.
-  const stockItems = control?.enabled ? items : items.filter(item => item.saleMode === "ready-made");
+  const stockItems = control?.enabled !== false ? items : items.filter(item => item.saleMode === "ready-made");
   if (!stockItems.length) return;
   const grouped = new Map<string, Variant>();
   for (const item of stockItems) for (const line of item.lines) {

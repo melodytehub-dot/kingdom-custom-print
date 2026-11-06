@@ -8,7 +8,7 @@ export function validateQuote(input: unknown): { value?: { name: string; email: 
   const email = String(raw.email ?? "").trim().toLowerCase().slice(0, 254);
   const notes = String(raw.notes ?? "").trim().slice(0, 2000);
   if (!name) return { error: "Enter the customer's name." };
-  if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return { error: "Enter a valid email address." };
+  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return { error: "Enter a valid customer email address." };
   if (!Array.isArray(raw.lines) || !raw.lines.length || raw.lines.length > 50) return { error: "Add between 1 and 50 items." };
   const lines: QuoteLine[] = [];
   for (const entry of raw.lines) {

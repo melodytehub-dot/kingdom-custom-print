@@ -236,3 +236,21 @@
 }
 @media (max-width: 420px) { .kcp-products-heading { display: block; } .kcp-products-heading .kcp-text-link { margin-top: 16px; } .kcp-category { flex-basis: 42%; } }
 @media (prefers-reduced-motion: reduce) { .kcp-storefront-page *, .mm-header-wrapper *, .mobile-panel, .nav-scrim, .modal-overlay, .modal-content, .rot-resume-backdrop, .rot-resume-dialog { scroll-behavior: auto !important; transition-duration: .01ms !important; animation-duration: .01ms !important; } }
+/* Photo-led hero with the shopping actions directly beneath it. */
+.kcp-home .kcp-hero { display: flex; position: relative; align-items: end; min-height: clamp(430px,48vw,690px); padding: 0; text-align: left; background: #1e1014; }
+.kcp-home .kcp-hero-image { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; border: 0; border-radius: 0; box-shadow: none; animation: none; }
+.kcp-home .kcp-hero-shade { z-index: 1; background: linear-gradient(90deg,rgba(18,12,14,.78),rgba(22,13,16,.2) 75%),linear-gradient(0deg,rgba(18,12,14,.72),transparent 65%); }
+.kcp-home .kcp-hero-content { z-index: 2; padding-block: 130px 45px; }
+.kcp-home .kcp-hero h1 { margin: 18px 0; max-width: 850px; font-size: clamp(48px,6vw,90px); }
+.kcp-home .kcp-hero-content > p { margin-inline: 0; }
+.kcp-home > .kcp-hero-actions { justify-content: center; margin: 0 auto; padding-block: 20px 24px; }
+.kcp-hero-actions .kcp-button { min-width: 230px; }
+.kcp-button-outline { background: transparent; color: #21191a; border-color: #21191a; }
+.kcp-button-outline:hover { background: #f0e4e2; }
+@media(max-width:768px) {
+ .kcp-home .kcp-hero { min-height: clamp(420px,105vw,560px); }
+ .kcp-home .kcp-hero-content { padding-block: 100px 30px; }
+ .kcp-home .kcp-hero h1 { font-size: clamp(39px,10vw,60px); }
+ .kcp-home > .kcp-hero-actions { gap: 10px; }
+ .kcp-hero-actions .kcp-button { min-width: 0; flex: 1 1 0; }
+}

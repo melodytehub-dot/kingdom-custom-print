@@ -118,6 +118,7 @@ function hydrate(row: ProductRow, variants: Awaited<ReturnType<typeof loadVarian
       hex: c.hex,
       frontImage: c.front_image,
       backImage: c.back_image,
+      photos: (images.get(row.id) ?? []).filter(i => i.alt === `__color_gallery__:${c.slug}`).map(i => i.url),
     })),
     sizes: (sizes.get(row.id) ?? []).map((s) => ({
       id: s.id,
@@ -263,7 +264,7 @@ export interface ProductInput {
   printArea: PrintArea;
   featured: boolean;
   active: boolean;
-  colors: { slug: string; name: string; hex: string; frontImage?: string | null; backImage?: string | null }[];
+  colors: { slug: string; name: string; hex: string; frontImage?: string | null; backImage?: string | null; photos?: string[] }[];
   sizes: { label: string; surcharge: number }[];
   priceBreaks: { minQty: number; amountOff: number }[];
 }
@@ -311,11 +312,16 @@ async function replaceVariants(productId: number, input: ProductInput, tx: Tx) {
   await tx`DELETE FROM product_colors WHERE product_id = ${productId}`;
   await tx`DELETE FROM product_sizes WHERE product_id = ${productId}`;
   await tx`DELETE FROM price_breaks WHERE product_id = ${productId}`;
+  const updateGalleries = input.saleMode === "ready-made" && input.colors.some(color => color.photos !== undefined);
+  if (updateGalleries) await tx`DELETE FROM product_images WHERE product_id = ${productId} AND left(alt, 18) = '__color_gallery__:'`;
 
   for (const [i, c] of input.colors.entries()) {
     await tx`
       INSERT INTO product_colors (product_id, slug, name, hex, sort_order, front_image, back_image)
       VALUES (${productId}, ${c.slug}, ${c.name}, ${c.hex}, ${i}, ${c.frontImage ?? null}, ${c.backImage ?? null})`;
+    if (updateGalleries) for (const [index, url] of (c.photos ?? []).entries()) {
+      await tx`INSERT INTO product_images (product_id, url, alt, sort_order) VALUES (${productId}, ${url}, ${`__color_gallery__:${c.slug}`}, ${index})`;
+    }
   }
   for (const [i, s] of input.sizes.entries()) {
     await tx`

@@ -34,7 +34,8 @@ try {
     const protection = (enabled) => new Request("https://example.test/api/admin/inventory", { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify({ enabled }) });
     const payload = { productId: variant.id, counts: [{ color: variant.color, size: variant.size, quantity: 7, expected: null }] };
     deny = true; assert.equal((await exports.PUT(request(payload))).status, 401); deny = false;
-    assert.equal((await exports.PATCH(protection(true))).status, 409, "unknown counts cannot activate protection");
+    assert.equal((await exports.PATCH(protection(true))).status, 200, "protection can be enabled with unknown counts");
+    assert.equal((await exports.PATCH(protection(false))).status, 200);
     assert.equal((await exports.PUT(request(payload))).status, 200);
     assert.equal((await exports.PUT(request(payload))).status, 409);
     assert.equal((await exports.PUT(request({ ...payload, counts: [{ ...payload.counts[0], quantity: -1 }] }))).status, 422);
@@ -48,6 +49,11 @@ try {
     const inventoryCode = ts.transpileModule(fs.readFileSync("lib/inventory-reservations.ts", "utf8"), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
     vm.runInNewContext(inventoryCode, { exports: inventory });
     const item = { productId: variant.id, colorName: variant.color, lines: [{ label: variant.size, qty: 2 }] };
+    await tx`DELETE FROM inventory_stock`;
+    assert.equal((await exports.PATCH(protection(true))).status, 200);
+    await assert.rejects(tx.savepoint(async (inner) => inventory.reserveInventory(inner, 105, [item])), /no longer available/, "unknown stock cannot be ordered");
+    assert.equal((await exports.PATCH(protection(false))).status, 200);
+    await tx`INSERT INTO inventory_stock (product_id, color_name, size_label, quantity) VALUES (${variant.id}, ${variant.color}, ${variant.size}, 0)`;
     await tx.savepoint(async (inner) => inventory.reserveInventory(inner, 100, [item]));
     assert.equal((await tx`SELECT * FROM inventory_reservations`).length, 0, "disabled protection does not reserve stock");
     assert.equal((await exports.PUT(request({ ...payload, counts: [{ ...payload.counts[0], expected: 0, quantity: 3 }] }))).status, 200);

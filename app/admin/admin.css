@@ -757,6 +757,12 @@
 .admin-inventory-color legend { padding: 0 6px; font-weight: 700; }
 .admin-inventory-swatch { display: inline-block; width: 16px; height: 16px; margin-right: 8px; border: 1px solid #aaa; border-radius: 50%; vertical-align: middle; }
 .admin-inventory-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(100px, 1fr)); gap: 12px; }
+.admin-inventory-fill { display: flex; align-items: end; gap: 12px; margin-bottom: 18px; flex-wrap: wrap; }
+.admin-inventory-fill .field { flex: 1 1 180px; margin: 0; }
+.admin-gallery-list { display: flex; flex-wrap: wrap; gap: 10px; grid-column: 1 / -1; }
+.admin-gallery-item { display: grid; align-content: start; gap: 6px; width: 115px; padding: 8px; border: 1px solid #e2d8d5; border-radius: 10px; background: #fff; font-size: 12px; }
+.admin-gallery-item img { width: 100%; aspect-ratio: 1; object-fit: contain; background: #f7f5f4; border-radius: 6px; }
+.admin-gallery-item button { text-align: left; min-height: 32px; }
 .admin-inventory-history { margin-top: 32px; }
 .admin-inventory-history li { padding: 6px 0; }
 .admin-section-preview { display: grid; gap: 8px; padding: 24px; border: 1px solid var(--line); background: #faf9f8; text-align: center; }

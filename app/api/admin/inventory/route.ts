@@ -6,7 +6,17 @@ export const dynamic = "force-dynamic";
 
 export async function GET(req: Request) {
   const denied = await requireAdmin(req); if (denied) return denied;
-  const id = Number(new URL(req.url).searchParams.get("product"));
+  const params = new URL(req.url).searchParams;
+  if (params.get("summary") === "1") {
+    try {
+      const [rows, controls] = await Promise.all([
+        sql`SELECT p.id, count(*)::int AS total, count(i.product_id)::int AS counted FROM products p JOIN product_colors c ON c.product_id = p.id JOIN product_sizes s ON s.product_id = p.id LEFT JOIN inventory_stock i ON i.product_id = p.id AND i.color_name = c.name AND i.size_label = s.label WHERE p.active = true GROUP BY p.id ORDER BY p.id`,
+        sql`SELECT enabled FROM inventory_control WHERE id = true`,
+      ]);
+      return NextResponse.json({ products: rows, enabled: controls[0]?.enabled === true }, { headers: { "Cache-Control": "no-store" } });
+    } catch { return NextResponse.json({ error: "Inventory summary is temporarily unavailable." }, { status: 503 }); }
+  }
+  const id = Number(params.get("product"));
   if (!Number.isSafeInteger(id) || id < 1) return NextResponse.json({ error: "Choose a product." }, { status: 422 });
   try {
     const [rows, history, controls] = await Promise.all([
@@ -32,8 +42,6 @@ export async function PATCH(req: Request) {
       if (enabled) {
         const duplicateColors = await tx`SELECT 1 FROM product_colors c JOIN products p ON p.id = c.product_id WHERE p.active = true GROUP BY c.product_id, c.name HAVING count(*) > 1 LIMIT 1`;
         if (duplicateColors.length) throw new Error("duplicates");
-        const [coverage] = await tx<{ total: number; missing: number }[]>`SELECT count(*)::int AS total, count(*) FILTER (WHERE i.product_id IS NULL)::int AS missing FROM products p JOIN product_colors c ON c.product_id = p.id JOIN product_sizes s ON s.product_id = p.id LEFT JOIN inventory_stock i ON i.product_id = p.id AND i.color_name = c.name AND i.size_label = s.label WHERE p.active = true`;
-        if (!coverage.total || coverage.missing) throw new Error("counts");
         const [pending] = await tx<{ count: number }[]>`SELECT count(*)::int AS count FROM orders WHERE status = 'pending' OR (status = 'cancelled' AND (stripe_session_id IS NOT NULL OR paypal_order_id IS NOT NULL) AND NOT inventory_provider_closed)`;
         if (pending.count) throw new Error("pending");
       } else {
@@ -45,7 +53,6 @@ export async function PATCH(req: Request) {
     return NextResponse.json({ ok: true });
   } catch (error) {
     const reason = error instanceof Error ? error.message : "";
-    if (reason === "counts") return NextResponse.json({ error: "Enter a stock count for every color and size of each active product before enabling protection." }, { status: 409 });
     if (reason === "duplicates") return NextResponse.json({ error: "Active products need distinct color names before stock protection can be enabled." }, { status: 409 });
     if (reason === "pending") return NextResponse.json({ error: "Existing pending or cancelled payment sessions need reconciliation before stock protection can be enabled. Contact the site administrator." }, { status: 409 });
     if (reason === "held") return NextResponse.json({ error: "Stock is held for pending orders. Resolve those orders before turning protection off." }, { status: 409 });

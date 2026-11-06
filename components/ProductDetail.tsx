@@ -3,6 +3,7 @@
 import { Suspense, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import Image from "next/image";
 import ProductPhotography from "./ProductPhotography";
 import { brandForProduct } from "@/lib/product-brands";
 import ProductColorQuery from "./ProductColorQuery";
@@ -19,7 +20,7 @@ export default function ProductDetail({ product, initialColor = "" }: { product:
   const { addItem } = useCart();
   const [cartError, setCartError] = useState("");
   const readyMade = product.saleMode === "ready-made";
-  const [availability, setAvailability] = useState<{ color: string; size: string; available: number }[] | null>(null);
+  const [availability, setAvailability] = useState<{ color: string; size: string; available: number; counted: boolean }[] | null>(null);
   const [availabilityError, setAvailabilityError] = useState(false);
   useEffect(() => {
     if (!readyMade) return;
@@ -27,7 +28,7 @@ export default function ProductDetail({ product, initialColor = "" }: { product:
     fetch(`/api/products/${product.id}/availability`, { cache: "no-store", signal: controller.signal })
       .then(async response => {
         if (!response.ok) throw new Error("Availability unavailable");
-        const data = await response.json() as { options: { color: string; size: string; available: number }[] };
+        const data = await response.json() as { options: { color: string; size: string; available: number; counted: boolean }[] };
         setAvailability(data.options);
       }).catch(() => { if (!controller.signal.aborted) setAvailabilityError(true); });
     return () => controller.abort();
@@ -36,6 +37,7 @@ export default function ProductDetail({ product, initialColor = "" }: { product:
 
   const [colorSlug, setColorSlug] = useState(product.colors.find(c => c.slug === initialColor)?.slug ?? firstColor?.slug ?? "");
   const [view, setView] = useState<ProductView>("front");
+  const [photoIndex, setPhotoIndex] = useState(0);
   const colorSlugs = useMemo(() => product.colors.map(c => c.slug), [product.colors]);
   const [showSizeChart, setShowSizeChart] = useState(false);
   const [lines, setLines] = useState<Record<string, number>>(() => {
@@ -53,6 +55,7 @@ export default function ProductDetail({ product, initialColor = "" }: { product:
 
   function pickColor(c: ProductColor) {
     setColorSlug(c.slug);
+    setPhotoIndex(0);
     if (readyMade && !c.backImage) setView("front");
   }
 
@@ -66,6 +69,7 @@ export default function ProductDetail({ product, initialColor = "" }: { product:
   // Default configuration is a single front print; the back is an add-on.
   const quote = quoteProduct(product, { sides: readyMade ? [] : ["front"], lines: sizeLines });
   const productViews = readyMade ? PRODUCT_VIEWS.filter((angle) => angle === "front" || (angle === "back" && !!color?.backImage)) : product.kind === "polo" ? PRODUCT_VIEWS.filter((angle) => angle !== "side") : PRODUCT_VIEWS;
+  const photos = color?.photos?.length ? color.photos : [color?.frontImage, color?.backImage].filter((url): url is string => Boolean(url));
   const tier = resolveBreak(product.priceBreaks, totalQty);
 
   const floor = readyMade ? lowestUnitPrice(product) : lowestPrintedUnit(product);
@@ -90,6 +94,7 @@ export default function ProductDetail({ product, initialColor = "" }: { product:
   );
 
   const availableFor = (label: string) => availability?.find(option => option.color === color?.slug && option.size === label)?.available ?? 0;
+  const countedFor = (label: string) => availability?.find(option => option.color === color?.slug && option.size === label)?.counted ?? false;
   const canCustomize = totalQty > 0 && (!readyMade || Boolean(availability && sizeLines.every(line => line.qty <= availableFor(line.label))));
 
   function setQty(label: string, value: number) {
@@ -113,15 +118,15 @@ export default function ProductDetail({ product, initialColor = "" }: { product:
       <Suspense fallback={null}><ProductColorQuery allowed={colorSlugs} onColor={setColorSlug} /></Suspense>
       <div className="pdp-media">
         <div className="pdp-photo-stage">
-          <ProductPhotography key={`${color?.slug}:${view}`} product={product} color={color} view={view} priority />
+          {readyMade && photos.length ? <span className="product-photography"><Image unoptimized src={photos[photoIndex] ?? photos[0]} alt={`${product.name}, ${color?.name ?? ""}, photo ${photoIndex + 1}`} fill sizes="(max-width: 640px) 100vw, 600px" style={{objectFit:"contain"}} /></span> : <ProductPhotography key={`${color?.slug}:${view}`} product={product} color={color} view={view} priority />}
           <button type="button" className="pdp-gallery-arrow pdp-gallery-prev" aria-label="Previous product view"
-            onClick={() => setView(productViews[(productViews.indexOf(view) + productViews.length - 1) % productViews.length])}>‹</button>
+            onClick={() => readyMade ? setPhotoIndex((photoIndex + photos.length - 1) % photos.length) : setView(productViews[(productViews.indexOf(view) + productViews.length - 1) % productViews.length])}>‹</button>
           <button type="button" className="pdp-gallery-arrow pdp-gallery-next" aria-label="Next product view"
-            onClick={() => setView(productViews[(productViews.indexOf(view) + 1) % productViews.length])}>›</button>
+            onClick={() => readyMade ? setPhotoIndex((photoIndex + 1) % photos.length) : setView(productViews[(productViews.indexOf(view) + 1) % productViews.length])}>›</button>
         </div>
-        <p className="pdp-view-caption" aria-live="polite">{color?.name} · {view} view</p>
+        <p className="pdp-view-caption" aria-live="polite">{color?.name} · {readyMade ? `Photo ${photoIndex + 1} of ${photos.length}` : `${view} view`}</p>
         <ul className="pdp-thumbs" aria-label="Product views">
-          {productViews.map(angle => (
+          {readyMade ? photos.map((src, index) => <li key={src}><button type="button" className={`pdp-thumb${index === photoIndex ? " is-active" : ""}`} onClick={() => setPhotoIndex(index)} aria-label={`View photo ${index + 1}`} aria-pressed={index === photoIndex}><span className="product-photography"><Image unoptimized src={src} alt="" fill sizes="80px" style={{objectFit:"contain"}} /></span><span>{index + 1}</span></button></li>) : productViews.map(angle => (
             <li key={angle}>
               <button type="button" className={`pdp-thumb${angle === view ? " is-active" : ""}`}
                 onClick={() => setView(angle)} aria-label={`View ${angle}`} aria-pressed={angle === view}>
@@ -135,7 +140,7 @@ export default function ProductDetail({ product, initialColor = "" }: { product:
 
       <div className="pdp-panel">
         <p className="eyebrow">
-          {brandForProduct(product)?.name ?? product.categoryName ?? "Blank"}
+          {brandForProduct(product)?.name ?? product.categoryName ?? (readyMade ? "Shop" : "Blank")}
           {product.styleCode ? ` · Style ${product.styleCode}` : ""}
         </p>
         <h1 className="h2 pdp-title wrap-anywhere">{product.name}</h1>
@@ -178,7 +183,7 @@ export default function ProductDetail({ product, initialColor = "" }: { product:
         {/* Size run */}
         <fieldset className="opt-group">
           <legend className="label">
-            Size run
+            {readyMade ? "Choose options and quantity" : "Size run"}
             <span className="opt-hint">
               {totalQty > 0
                 ? `${totalQty} ${readyMade ? "item" : "garment"}${totalQty === 1 ? "" : "s"}`
@@ -186,7 +191,7 @@ export default function ProductDetail({ product, initialColor = "" }: { product:
             </span>
           </legend>
 
-          {product.kind !== "other" ? <button
+          {!readyMade && product.kind !== "other" ? <button
             type="button"
             className="link"
             onClick={() => setShowSizeChart(true)}
@@ -203,7 +208,7 @@ export default function ProductDetail({ product, initialColor = "" }: { product:
               >
                 <label htmlFor={`qty-${s.label}`} className="size-label">
                   {s.label}
-                  {readyMade && availability && availableFor(s.label) === 0 ? <span className="size-add">Sold out</span> : null}
+                  {readyMade && availability && availableFor(s.label) === 0 ? <span className="size-add">{countedFor(s.label) ? "Sold out" : "Not yet available"}</span> : null}
                   {s.surcharge > 0 ? (
                     <span className="size-add">+{formatUSD(s.surcharge)}</span>
                   ) : null}

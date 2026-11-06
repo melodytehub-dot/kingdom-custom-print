@@ -20,9 +20,15 @@ export default function InventoryPanel({ products }: { products: Product[] }) {
   const [message, setMessage] = useState("");
   const [reload, setReload] = useState(0);
   const [selectedColor, setSelectedColor] = useState("");
+  const [search, setSearch] = useState("");
+  const [fillCount, setFillCount] = useState("");
+  const [summary, setSummary] = useState<{id:number;total:number;counted:number}[]>([]);
   const product = products.find((item) => item.id === productId);
   const activeColor = product?.colors.find((color) => color.name === selectedColor) ?? product?.colors[0];
   const dirty = Object.entries(values).some(([key, value]) => value !== (baseline[key] === undefined ? "" : String(baseline[key])));
+  const productOptions = products.filter(item => item.name.toLowerCase().includes(search.trim().toLowerCase()));
+  const totalOptions = product ? product.colors.length * product.sizes.length : 0;
+  const countedOptions = product ? product.colors.reduce((sum, color) => sum + product.sizes.filter(size => values[keyFor(color.name, size.label)] !== undefined && values[keyFor(color.name, size.label)] !== "").length, 0) : 0;
 
   useEffect(() => {
     if (!productId) return;
@@ -37,14 +43,22 @@ export default function InventoryPanel({ products }: { products: Product[] }) {
       .catch((error: unknown) => { if (!controller.signal.aborted) { setMessage(error instanceof Error ? error.message : "Could not load inventory."); setLoading(false); } });
     return () => controller.abort();
   }, [productId, reload]);
+  useEffect(() => {
+    const controller = new AbortController();
+    fetch("/api/admin/inventory?summary=1", { cache: "no-store", signal: controller.signal })
+      .then(async res => { if (!res.ok) throw new Error(); return res.json() as Promise<{products: {id:number;total:number;counted:number}[]}>; })
+      .then(data => setSummary(data.products))
+      .catch(() => { if (!controller.signal.aborted) setSummary([]); });
+    return () => controller.abort();
+  }, [reload]);
 
   function choose(value: string) {
     if (dirty && !window.confirm("Discard your unsaved stock count changes?")) return;
-    setLoading(true); setBaseline({}); setReserved({}); setHistory([]); setValues({}); setMessage(""); setSelectedColor(""); setProductId(Number(value));
+    setLoading(true); setBaseline({}); setReserved({}); setHistory([]); setValues({}); setMessage(""); setSelectedColor(""); setFillCount(""); setProductId(Number(value));
   }
   async function toggleProtection() {
     if (dirty) { setMessage("Save or discard the current stock changes before changing protection."); return; }
-    const prompt = enabled ? "Turn off stock protection? Customers can order beyond the recorded counts." : "Enable stock protection? All active product options need a reviewed count, and items without available stock cannot be ordered.";
+    const prompt = enabled ? "Turn off stock protection? Customers can order beyond the recorded counts." : "Enable stock protection? Products remain visible, but options without an available stock count cannot be ordered.";
     if (!window.confirm(prompt)) return;
     setSaving(true); setMessage("");
     try {
@@ -79,11 +93,11 @@ export default function InventoryPanel({ products }: { products: Product[] }) {
   }
 
   return <section aria-label="Inventory"><div className="admin-block-head"><div><h2 className="h3">Inventory</h2><p className="small muted">Record how many items you have in each color and size.</p></div></div>
-    <div className="banner-note"><p>{enabled ? "Stock protection is on. Pending checkouts hold stock, and confirmed payments update counts." : "Finished products always require stock. Protection for customizable products is off."}</p><button type="button" className="btn btn-light btn-sm" disabled={saving || loading || !products.length} onClick={() => void toggleProtection()}>{enabled ? "Turn off stock protection" : "Enable stock protection"}</button></div>
+    <div className="banner-note"><p>{enabled ? "Stock protection is on. Pending checkouts hold stock, and confirmed payments update counts. Uncounted options remain visible but cannot be ordered." : "Finished products always require stock. Protection for customizable products is off."}</p>{summary.length ? <p>{summary.reduce((sum, item) => sum + item.counted, 0)} of {summary.reduce((sum, item) => sum + item.total, 0)} active options have a stock count.</p> : null}<button type="button" className="btn btn-light btn-sm" disabled={saving || loading || !products.length} onClick={() => void toggleProtection()}>{enabled ? "Turn off stock protection" : "Enable stock protection"}</button></div>
     {message ? <p className="banner-note" role="status">{message}</p> : null}
     <PaymentHolds disabled={dirty} onChanged={() => { setLoading(true); setReload((n) => n + 1); }} />
-    {!products.length ? <p>No products yet.</p> : <><label className="field admin-inventory-product">Product<select className="select" value={productId} disabled={saving} onChange={(event) => choose(event.target.value)}>{products.map((item) => <option key={item.id} value={item.id}>{item.name}{item.active ? "" : " (hidden)"}</option>)}</select></label>
-      {loading ? <InlineSkeleton label="Loading stock counts" /> : product ? <><form onSubmit={save}><p className="hint">Enter the total you have on hand. Leave uncounted options blank; enter 0 for out of stock. Held stock is part of the total.</p><label className="field admin-inventory-product">Color<select className="select" value={activeColor?.name ?? ""} disabled={saving} onChange={(event) => setSelectedColor(event.target.value)}>{product.colors.map((color) => <option key={color.id} value={color.name}>{color.name}</option>)}</select></label>{activeColor ? [activeColor].map((color) => <fieldset className="admin-inventory-color" key={color.id}><legend><span className="admin-inventory-swatch" style={{ backgroundColor: color.hex }} aria-hidden="true" />{color.name}</legend><div className="admin-inventory-grid">{product.sizes.map((size) => { const key = keyFor(color.name, size.label); return <label className="field" key={key}>{size.label}<input className="input" type="number" min={reserved[key] ?? 0} max="1000000" step="1" inputMode="numeric" required={baseline[key] !== undefined} disabled={saving} value={values[key] ?? ""} onChange={(event) => setValues((current) => ({ ...current, [key]: event.target.value }))} aria-label={`${color.name}, ${size.label} stock`} />{reserved[key] ? <span className="hint">{reserved[key]} held</span> : null}</label>; })}</div></fieldset>) : <p>No colors are available for this product.</p>}<button type="submit" className="btn" disabled={saving}>{saving ? "Saving…" : "Save counts"}</button></form><div className="admin-inventory-history"><h3 className="h3">Recent changes</h3>{history.length ? <ul>{history.map((entry, index) => <li key={index}>{entry.color_name} · {entry.size_label}: {entry.previous_quantity === null ? "not counted" : entry.previous_quantity} → {entry.new_quantity} <span className="muted">({new Date(entry.created_at).toLocaleString()})</span></li>)}</ul> : <p className="muted">No counts have been recorded for this product yet.</p>}</div></> : null}</>}
+    {!products.length ? <p>No products yet.</p> : <><label className="field admin-inventory-product">Find a product<input className="input" type="search" value={search} onChange={event => setSearch(event.target.value)} placeholder="Search product name" /></label><label className="field admin-inventory-product">Product<select className="select" value={productId} disabled={saving} onChange={(event) => choose(event.target.value)}>{products.filter(item => item.id === productId || productOptions.some(match => match.id === item.id)).map((item) => { const progress = summary.find(entry => entry.id === item.id); return <option key={item.id} value={item.id}>{item.name}{item.active ? progress ? ` (${progress.counted}/${progress.total} counted)` : "" : " (hidden)"}</option>; })}</select></label>{search && !productOptions.length ? <p className="hint">No products match that search.</p> : null}
+      {loading ? <InlineSkeleton label="Loading stock counts" /> : product ? <><form onSubmit={save}><p className="hint">{countedOptions} of {totalOptions} options entered. Enter the total on hand, including held items. Leave unknown quantities blank; enter 0 for out of stock.</p><label className="field admin-inventory-product">Color<select className="select" value={activeColor?.name ?? ""} disabled={saving} onChange={(event) => { setSelectedColor(event.target.value); setFillCount(""); }}>{product.colors.map((color) => <option key={color.id} value={color.name}>{color.name}</option>)}</select></label>{activeColor ? [activeColor].map((color) => <fieldset className="admin-inventory-color" key={color.id}><legend><span className="admin-inventory-swatch" style={{ backgroundColor: color.hex }} aria-hidden="true" />{color.name}</legend><div className="admin-inventory-fill"><label className="field">Same count for every size in {color.name}<input className="input" type="number" min="0" max="1000000" step="1" inputMode="numeric" value={fillCount} onChange={event => setFillCount(event.target.value)} /></label><button type="button" className="btn btn-light btn-sm" disabled={saving || !/^\d+$/.test(fillCount) || Number(fillCount) > 1000000} onClick={() => { setValues(current => ({ ...current, ...Object.fromEntries(product.sizes.map(size => [keyFor(color.name, size.label), fillCount])) })); setMessage(""); }}>Fill sizes</button></div><div className="admin-inventory-grid">{product.sizes.map((size) => { const key = keyFor(color.name, size.label); return <label className="field" key={key}>{size.label}<input className="input" type="number" min={reserved[key] ?? 0} max="1000000" step="1" inputMode="numeric" required={baseline[key] !== undefined} disabled={saving} value={values[key] ?? ""} onChange={(event) => setValues((current) => ({ ...current, [key]: event.target.value }))} aria-label={`${color.name}, ${size.label} stock`} />{reserved[key] ? <span className="hint">{reserved[key]} held</span> : null}</label>; })}</div></fieldset>) : <p>No colors are available for this product.</p>}<button type="submit" className="btn" disabled={saving}>{saving ? "Saving…" : "Save counts"}</button></form><div className="admin-inventory-history"><h3 className="h3">Recent changes</h3>{history.length ? <ul>{history.map((entry, index) => <li key={index}>{entry.color_name} · {entry.size_label}: {entry.previous_quantity === null ? "not counted" : entry.previous_quantity} → {entry.new_quantity} <span className="muted">({new Date(entry.created_at).toLocaleString()})</span></li>)}</ul> : <p className="muted">No counts have been recorded for this product yet.</p>}</div></> : null}</>}
   </section>;
 }
 
