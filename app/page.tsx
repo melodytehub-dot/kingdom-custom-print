@@ -56,6 +56,10 @@ export default async function HomePage() {
 
       <section className="kcp-products" aria-labelledby="products-title"><div className="kcp-wrap">
         <div className="kcp-heading kcp-products-heading"><div><span className="kcp-eyebrow">Made for Your Ideas</span><h2 id="products-title">{displayTitle(settings.homeProductsTitle)}</h2><p>{settings.homeProductsDescription}</p></div><Link href="/shop" className="kcp-text-link">View all products <ArrowRight size={17} /></Link></div>
+        <div className="kcp-collection-banner">
+          <div className="kcp-collection-copy"><span className="kcp-eyebrow">Made for you</span><h3>Your next idea starts here.</h3><p>Choose a style and make it your own.</p><Link href="/customize" className="kcp-collection-link">Start designing <ArrowRight size={16} /></Link></div>
+          <div className="kcp-collection-image"><Image src="/img/category-prints/shirts.webp" alt="" fill sizes="(max-width: 768px) 45vw, 420px" /></div>
+        </div>
         <HomeProducts products={products} />
       </div></section>
 

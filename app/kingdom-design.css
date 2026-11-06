@@ -52,6 +52,15 @@
 .kcp-products .mm-card { overflow: hidden; border-radius: 16px; border-color: #e8dfdd; background: #fff; transition: transform .2s ease, box-shadow .2s ease; }
 .kcp-products .mm-card:hover { transform: translateY(-3px); box-shadow: 0 16px 32px rgba(62,35,38,.09); }
 .kcp-products .mm-card-bottom-btn { border-radius: 8px; }
+.kcp-collection-banner { position: relative; isolation: isolate; display: flex; align-items: center; min-height: clamp(220px,26vw,340px); margin-bottom: 36px; overflow: hidden; border-radius: 18px; background: linear-gradient(110deg,#f2dbd7,#ebe9e4); }
+.kcp-collection-copy { position: relative; z-index: 1; width: 55%; padding: clamp(22px,4vw,52px); }
+.kcp-collection-copy h3 { max-width: 500px; margin: 10px 0; font-size: clamp(27px,3.8vw,52px); font-weight: 750; line-height: 1.06; letter-spacing: -.045em; }
+.kcp-collection-copy p { margin: 0 0 18px; color: #5f5152; line-height: 1.5; }
+.kcp-collection-link { display: inline-flex; align-items: center; justify-content: center; gap: 10px; min-height: 44px; padding: 10px 16px; border-radius: 8px; background: #21191a; color: #fff; font-size: 13px; font-weight: 700; text-decoration: none; }
+.kcp-collection-link:hover { background: #a91c31; }
+.kcp-collection-link:focus-visible { outline: 3px solid #b62539; outline-offset: 3px; }
+.kcp-collection-image { position: absolute; inset: 2% 3% 2% 53%; }
+.kcp-collection-image img { object-fit: contain; mix-blend-mode: multiply; }
 .kcp-project-intro { max-width: 700px; margin-bottom: 38px; }
 .kcp-project h2 em,.kcp-process h2 em { color: #bd273b; font-style: normal; }
 .kcp-project-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
@@ -218,6 +227,12 @@
  .kcp-category > span:last-child { justify-content: center; gap: 8px; min-height: 38px; max-width: 100%; padding: 8px 14px; border-radius: 9px; background: #fff; text-align: center; line-height: 1.2; }
  .kcp-category > span:last-child svg { flex-shrink: 0; }
  .kcp-products .mm-tabs-inner { justify-content: flex-start; }
+ .kcp-collection-banner { min-height: 210px; margin-bottom: 24px; }
+ .kcp-collection-copy { width: 62%; padding: 20px 16px; }
+ .kcp-collection-copy h3 { font-size: clamp(23px,6vw,34px); }
+ .kcp-collection-copy p { font-size: 13px; }
+ .kcp-collection-link { gap: 5px; padding-inline: 11px; font-size: 12px; }
+ .kcp-collection-image { inset: 16% -4% 4% 57%; }
  .kcp-project-card { min-height: 310px; }
  .kcp-project-grid { gap: 10px; }
  .kcp-project-image { inset: 44% 4% 2%; }
