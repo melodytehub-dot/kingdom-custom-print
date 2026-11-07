@@ -2,7 +2,7 @@ import Link from "next/link";
 import Image from "next/image";
 import HeroImageSlider from "@/components/HeroImageSlider";
 import HomeProducts from "@/components/HomeProducts";
-import DesignStory from "@/components/DesignStory";
+import ProductCard from "@/components/ProductCard";
 import ResumeDesignPrompt from "@/components/ResumeDesignPrompt";
 import ArrowRight from "@/components/icons/ArrowRight";
 import { getProducts, getSettings, DEFAULT_SETTINGS } from "@/lib/catalog";
@@ -29,6 +29,8 @@ function displayTitle(value: string) {
 
 export default async function HomePage() {
   const [products, settings] = await Promise.all([getProducts().catch(() => []), getSettings().catch(() => DEFAULT_SETTINGS)]);
+  const readyToShip = products.filter(product => product.saleMode === "ready-made" && product.featured).slice(0, 4);
+  const samples = [categories[0], categories[1], categories[3], categories[5]];
   return (
     <div className="kcp-home">
       <ResumeDesignPrompt />
@@ -46,20 +48,27 @@ export default async function HomePage() {
         <Link href="/customize" className="kcp-button kcp-button-outline">Design your own <ArrowRight size={17} /></Link>
       </div>
 
+      <nav className="kcp-category-strip kcp-wrap" aria-label="Browse product categories">
+        {categories.map(category => <Link key={category.name} href={category.href}><span><Image src={category.image} alt="" fill sizes="80px" /></span><small>{category.name}</small></Link>)}
+      </nav>
+
+      <section className="kcp-featured kcp-wrap" aria-labelledby="ready-title">
+        <div className="kcp-heading"><div><span className="kcp-eyebrow">Shop the collection</span><h2 id="ready-title">Ready to ship</h2></div><Link href="/shop" className="kcp-text-link">View all products <ArrowRight size={17} /></Link></div>
+        {readyToShip.length ? <ul className="mm-product-grid">{readyToShip.map(product => <li key={product.id}><ProductCard product={product} /></li>)}</ul> : <><p className="kcp-sample-note">Ready-to-ship products are coming soon. These are sample previews.</p><div className="kcp-sample-grid">{samples.map(item => <div className="kcp-sample-card" key={item.name}><span className="kcp-sample-image"><Image src={item.image} alt="" fill sizes="(max-width: 768px) 45vw, 23vw" /></span><strong>{item.name}</strong><small>Sample · Not for sale</small></div>)}</div></>}
+      </section>
+
+      <section className="kcp-feature-banner kcp-wrap" aria-label="Start a custom design">
+        <div className="kcp-collection-banner"><div className="kcp-collection-copy"><span className="kcp-eyebrow">Made for you</span><h2>Your next idea starts here.</h2><p>Choose a style and make it your own.</p><Link href="/customize" className="kcp-collection-link">Start designing <ArrowRight size={16} /></Link></div><div className="kcp-collection-image"><Image src="/img/category-prints/shirts.webp" alt="" fill sizes="(max-width: 768px) 45vw, 420px" /></div></div>
+      </section>
+
       <section className="kcp-categories kcp-wrap" aria-label="Shop by category">
         <nav className="kcp-category-grid" aria-label="Shop by category">
           {categories.map(category => <Link key={category.name} href={category.href} className="kcp-category"><span className="kcp-category-image"><Image src={category.image} alt="" fill sizes="(max-width: 600px) 42vw, 14vw" /></span><span>{category.name}<ArrowRight size={15} /></span></Link>)}
         </nav>
       </section>
 
-      <DesignStory />
-
       <section className="kcp-products" aria-labelledby="products-title"><div className="kcp-wrap">
         <div className="kcp-heading kcp-products-heading"><div><span className="kcp-eyebrow">Made for Your Ideas</span><h2 id="products-title">{displayTitle(settings.homeProductsTitle)}</h2><p>{settings.homeProductsDescription}</p></div><Link href="/shop" className="kcp-text-link">View all products <ArrowRight size={17} /></Link></div>
-        <div className="kcp-collection-banner">
-          <div className="kcp-collection-copy"><span className="kcp-eyebrow">Made for you</span><h3>Your next idea starts here.</h3><p>Choose a style and make it your own.</p><Link href="/customize" className="kcp-collection-link">Start designing <ArrowRight size={16} /></Link></div>
-          <div className="kcp-collection-image"><Image src="/img/category-prints/shirts.webp" alt="" fill sizes="(max-width: 768px) 45vw, 420px" /></div>
-        </div>
         <HomeProducts products={products} />
       </div></section>
 

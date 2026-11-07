@@ -112,14 +112,14 @@
 
 .rot-next {
   min-width: 86px;
-  background: var(--rot-accent);
+  background: #1688d4;
   color: #fff;
   font-weight: 500;
   transition: background 0.15s ease;
 }
 
 .rot-next:hover:not(:disabled) {
-  background: #333;
+  background: #096cae;
 }
 
 .rot-next:disabled {

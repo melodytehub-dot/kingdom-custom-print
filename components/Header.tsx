@@ -29,8 +29,10 @@ export default async function Header({
     <header className="mm-header-wrapper">
       {announcement.trim() ? (
         <div className="mm-announcement" role="status">
-          <span className="mm-announcement-dot" aria-hidden="true" />
-          {announcement}
+          <div className="mm-announcement-track">
+            <span className="mm-announcement-item"><span className="mm-announcement-dot" aria-hidden="true" />{announcement}</span>
+            <span className="mm-announcement-item" aria-hidden="true"><span className="mm-announcement-dot" />{announcement}</span>
+          </div>
         </div>
       ) : null}
       {/* Main header */}

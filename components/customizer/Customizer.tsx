@@ -10,7 +10,7 @@ import {
 import Link from "next/link";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import DesignCanvas, { printAreaView } from "./DesignCanvas";
+import DesignCanvas, { fitSelectionToPrintArea, printAreaView } from "./DesignCanvas";
 import { GarmentPreview } from "./GarmentPreview";
 import SupportPanel from "./SupportPanel";
 import { measureTextLayer } from "./textGeometry";
@@ -571,9 +571,17 @@ export default function Customizer({
 
   const patchActive = useCallback(
     (id: string, changes: Partial<DesignLayer>) => {
-      setDesign((prev) => updateLayer(prev, side, id, changes));
+      setDesign((prev) => {
+        const next = updateLayer(prev, side, id, changes);
+        if (product.kind !== "longsleeve") return next;
+        const layer = next[side].find(item => item.id === id);
+        if (!layer) return next;
+        const area = printAreaView(side, product.printArea, product.kind);
+        const [fitted] = fitSelectionToPrintArea([layer], area, { x: area.x, y: area.y });
+        return { ...next, [side]: next[side].map(item => item.id === id ? fitted : item) };
+      });
     },
-    [side]
+    [side, product.kind, product.printArea]
   );
 
   /* ---- selection + panel routing ---- */
@@ -684,7 +692,9 @@ export default function Customizer({
   /* ---- adding things ---- */
   const addText = (style: Partial<TextLayer> = {}) => {
     const layer = newTextLayer({ ...(darkShirt ? { color: "#FFFFFF" } : {}), ...style });
-    setDesign((prev) => ({ ...prev, [side]: [...prev[side], layer] }));
+    const area = printAreaView(side, product.printArea, product.kind);
+    const [fitted] = product.kind === "longsleeve" ? fitSelectionToPrintArea([layer], area, { x: area.x, y: area.y }) : [layer];
+    setDesign((prev) => ({ ...prev, [side]: [...prev[side], fitted] }));
     setSelectedIds([layer.id]);
     setPanel("text");
   };
@@ -756,7 +766,8 @@ export default function Customizer({
     }
 
     if (!additions.length) return;
-    setDesign((prev) => ({ ...prev, [side]: [...prev[side], ...additions] }));
+    const fitted = product.kind === "longsleeve" ? fitSelectionToPrintArea(additions, area, { x: area.x, y: area.y }) : additions;
+    setDesign((prev) => ({ ...prev, [side]: [...prev[side], ...fitted] }));
     setSelectedIds([]);
     setPanel("none");
     setNotice({ tone: "ok", text: `${template.name} added to the ${side}. Tap a part to edit it.` });
@@ -1168,7 +1179,9 @@ export default function Customizer({
   };
 
   const addTextIdeaLayers = (created: DesignLayer[], summary: string) => {
-    setDesign((prev) => ({ ...prev, [side]: [...prev[side], ...created] }));
+    const area = printAreaView(side, product.printArea, product.kind);
+    const fitted = product.kind === "longsleeve" ? fitSelectionToPrintArea(created, area, { x: area.x, y: area.y }) : created;
+    setDesign((prev) => ({ ...prev, [side]: [...prev[side], ...fitted] }));
     setSelectedIds([]);
     setPanel("none");
     setNotice({ tone: "ok", text: `Added ${summary}. You can edit each layer now.` });
@@ -2108,7 +2121,17 @@ export default function Customizer({
                     setTransforming(true);
                     if (compact && SPLIT_PANELS.includes(panel)) setPanel("none");
                   }}
-                  onCommit={() => setTransforming(false)}
+                  onCommit={() => {
+                    setTransforming(false);
+                    if (product.kind !== "longsleeve" || !selectedIds.length) return;
+                    const area = printAreaView(side, product.printArea, product.kind);
+                    setDesign(prev => {
+                      const picked = prev[side].filter(layer => selectedIds.includes(layer.id));
+                      if (!picked.length || picked.some(layer => layer.locked)) return prev;
+                      const fitted = new Map(fitSelectionToPrintArea(picked, area, { x: area.x, y: area.y }).map(layer => [layer.id, layer]));
+                      return { ...prev, [side]: prev[side].map(layer => fitted.get(layer.id) ?? layer) };
+                    });
+                  }}
                   onDelete={deleteLayers}
                   onEdit={editLayer}
                   onUngroup={ungroupSelected}

@@ -72,7 +72,7 @@ const react = {
   useState(initial) { const i = cursor++; if (!(i in slots)) slots[i] = typeof initial === "function" ? initial() : initial; return [slots[i], value => { slots[i] = typeof value === "function" ? value(slots[i]) : value; }]; },
   useEffect(fn) { effects.push(fn); },
 };
-const { default: Canvas } = load("components/customizer/DesignCanvas.tsx", {
+const { default: Canvas, fitSelectionToPrintArea, selectionFrame } = load("components/customizer/DesignCanvas.tsx", {
   react, "react/jsx-runtime": jsx,
   "@/lib/design": { printableArea: () => ({ w: .4, h: .5, cx: .5, cy: .47 }), layerBox: () => ({ w: 100, h: 60 }) },
   "@/lib/fonts": { svgFontStack: () => "sans-serif" },
@@ -83,6 +83,18 @@ const { default: Canvas } = load("components/customizer/DesignCanvas.tsx", {
 } });
 
 const layer = { id: "selected", type: "image", src: "test.png", x: 50, y: 50, scaleX: 1, scaleY: 1, rotation: 0, opacity: 1 };
+for (const selection of [
+  [{ ...layer, x: -30, y: 130 }],
+  [{ ...layer, x: 25, y: 25, scaleX: 7, scaleY: 7, rotation: 37 }],
+  [{ ...layer, x: -20, y: 10, rotation: 25 }, { ...layer, id: "second", x: 160, y: 120, rotation: -30 }],
+]) {
+  const area = { w: 360, h: 450 }, origin = { x: 200, y: 150 };
+  const fitted = fitSelectionToPrintArea(selection, area, origin);
+  const frame = selectionFrame(fitted, area, origin);
+  assert.ok(frame.x >= origin.x - 1e-7 && frame.y >= origin.y - 1e-7 && frame.x + frame.w <= origin.x + area.w + 1e-7 && frame.y + frame.h <= origin.y + area.h + 1e-7, "transformed selection fits within print area");
+  if (selection.length > 1) assert.ok(Math.sign(fitted[1].x - fitted[0].x) === Math.sign(selection[1].x - selection[0].x), "group layout is preserved");
+}
+console.log("PASS long-sleeve selection fitting, including rotated and grouped artwork");
 let selections = [], changes = [], taps = [], commits = 0, ungroups = [];
 const props = {
   frontSrc: "front.png", backSrc: "back.png", side: "front", compact: true, renderSize: 200,

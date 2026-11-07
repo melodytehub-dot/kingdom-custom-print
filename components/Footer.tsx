@@ -48,6 +48,8 @@ export default async function Footer() {
               <li><Link href="/wishlist">Wishlist</Link></li>
               <li><Link href="/checkout">Checkout</Link></li>
               <li><Link href="/account">My Account</Link></li>
+              <li><Link href="/contact">Printing Enquiries</Link></li>
+              <li><Link href="/terms">Terms of Service</Link></li>
             </ul>
           </div>
 
@@ -58,8 +60,6 @@ export default async function Footer() {
               <li><Link href="/contact">Customer Service</Link></li>
               {settings.contactEmail ? <li><a href={`mailto:${settings.contactEmail}`}>{settings.contactEmail}</a></li> : null}
               {settings.contactPhone ? <li><a href={`tel:${settings.contactPhone.replace(/[^+0-9]/g, "")}`}>{settings.contactPhone}</a></li> : null}
-              <li><Link href="/contact">Printing Enquiries</Link></li>
-              <li><Link href="/terms">Terms of Service</Link></li>
             </ul>
           </div>
 

@@ -66,6 +66,7 @@ interface Box {
 /** One layer caught in a gesture, frozen at the moment the gesture began. */
 interface MemberState {
   id: string;
+  layer: DesignLayer;
   x: number;
   y: number;
   scaleX: number;
@@ -186,6 +187,22 @@ export function selectionFrame(
   const w = maxX - minX;
   const h = maxY - minY;
   return { x: minX, y: minY, w, h, cx: minX + w / 2, cy: minY + h / 2 };
+}
+
+/** Fit a selection as a unit so templates retain their relative layout. */
+export function fitSelectionToPrintArea(layers: DesignLayer[], area: Box, origin: { x: number; y: number }): DesignLayer[] {
+  const frame = selectionFrame(layers, area, origin);
+  if (!frame || !Number.isFinite(frame.w) || !Number.isFinite(frame.h)) return layers;
+  const scale = Math.min(1, area.w / (frame.w || 1), area.h / (frame.h || 1));
+  const scaled = scale < 1 ? layers.map(layer => {
+    const centre = centreOf(layer, area, origin);
+    return { ...layer, x: ((frame.cx + (centre.x - frame.cx) * scale - origin.x) / area.w) * 100, y: ((frame.cy + (centre.y - frame.cy) * scale - origin.y) / area.h) * 100, scaleX: layer.scaleX * scale, scaleY: layer.scaleY * scale };
+  }) : layers;
+  const fitted = selectionFrame(scaled, area, origin);
+  if (!fitted) return scaled;
+  const dx = fitted.x < origin.x ? origin.x - fitted.x : fitted.x + fitted.w > origin.x + area.w ? origin.x + area.w - fitted.x - fitted.w : 0;
+  const dy = fitted.y < origin.y ? origin.y - fitted.y : fitted.y + fitted.h > origin.y + area.h ? origin.y + area.h - fitted.y - fitted.h : 0;
+  return scaled.map(layer => ({ ...layer, x: layer.x + dx / area.w * 100, y: layer.y + dy / area.h * 100 }));
 }
 
 /**
@@ -323,6 +340,7 @@ export default function DesignCanvas({
       edge,
       members: picked.map((l) => ({
         id: l.id,
+        layer: l,
         x: l.x,
         y: l.y,
         scaleX: l.scaleX,
@@ -393,6 +411,16 @@ export default function DesignCanvas({
         y: ((e.clientY - s.rect.top) / s.rect.height) * VIEW,
       };
       const solo = s.members.length === 1 ? s.members[0] : null;
+      const publish = (patches: { id: string; changes: Partial<DesignLayer> }[]) => {
+        if (productKind !== "longsleeve") {
+          for (const patch of patches) onChange(side, patch.id, patch.changes);
+          return;
+        }
+        const candidates = patches.map(patch => ({ ...s.members.find(member => member.id === patch.id)!.layer, ...patch.changes } as DesignLayer));
+        for (const layer of fitSelectionToPrintArea(candidates, area, areaOrigin)) {
+          onChange(side, layer.id, { x: layer.x, y: layer.y, scaleX: layer.scaleX, scaleY: layer.scaleY, rotation: layer.rotation });
+        }
+      };
 
       if (s.tool === "move") {
         // One shared delta, clamped so the whole selection stays reachable: a
@@ -406,14 +434,14 @@ export default function DesignCanvas({
         // Keep snapping equally precise at every zoom and screen size.
         const toleranceX = (5 * VIEW * 100) / (s.rect.width * area.w);
         const toleranceY = (5 * VIEW * 100) / (s.rect.height * area.h);
-        for (const m of s.members) {
+        publish(s.members.map((m) => {
           const x = m.x + ddx;
           const y = m.y + ddy;
-          onChange(side, m.id, {
+          return { id: m.id, changes: {
             x: round2(!e.altKey && solo && Math.abs(x - 50) < toleranceX ? 50 : x),
             y: round2(!e.altKey && solo && Math.abs(y - 50) < toleranceY ? 50 : y),
-          });
-        }
+          } };
+        }));
         return;
       }
 
@@ -427,9 +455,9 @@ export default function DesignCanvas({
           const lx = vx * Math.cos(rad) - vy * Math.sin(rad);
           const ly = vx * Math.sin(rad) + vy * Math.cos(rad);
           if (s.edge === "e" || s.edge === "w") {
-            onChange(side, solo.id, { scaleX: round2(clamp(Math.abs(lx) / (solo.base.w / 2), 0.05, 8)) });
+            publish([{ id: solo.id, changes: { scaleX: round2(clamp(Math.abs(lx) / (solo.base.w / 2), 0.05, 8)) } }]);
           } else {
-            onChange(side, solo.id, { scaleY: round2(clamp(Math.abs(ly) / (solo.base.h / 2), 0.05, 8)) });
+            publish([{ id: solo.id, changes: { scaleY: round2(clamp(Math.abs(ly) / (solo.base.h / 2), 0.05, 8)) } }]);
           }
           return;
         }
@@ -447,17 +475,17 @@ export default function DesignCanvas({
           kx = Math.hypot(pt.x - s.pivot.x, pt.y - s.pivot.y) / s.startDist;
           ky = kx;
         }
-        for (const m of s.members) {
+        publish(s.members.map((m) => {
           const c = centreOf(m, area, areaOrigin);
           const nx = s.pivot.x + (c.x - s.pivot.x) * kx;
           const ny = s.pivot.y + (c.y - s.pivot.y) * ky;
-          onChange(side, m.id, {
+          return { id: m.id, changes: {
             x: round2(((nx - areaOrigin.x) / area.w) * 100),
             y: round2(((ny - areaOrigin.y) / area.h) * 100),
             scaleX: round2(clamp(m.scaleX * kx, 0.05, 8)),
             scaleY: round2(clamp(m.scaleY * ky, 0.05, 8)),
-          });
-        }
+          } };
+        }));
         return;
       }
 
@@ -473,7 +501,7 @@ export default function DesignCanvas({
         for (const snap of [-180, -90, 0, 90, 180]) {
           if (Math.abs(deg - snap) < 3) deg = snap;
         }
-        onChange(side, solo.id, { rotation: Math.round(deg) });
+        publish([{ id: solo.id, changes: { rotation: Math.round(deg) } }]);
         return;
       }
 
@@ -481,7 +509,7 @@ export default function DesignCanvas({
       const rad = (delta * Math.PI) / 180;
       const cos = Math.cos(rad);
       const sin = Math.sin(rad);
-      for (const m of s.members) {
+      publish(s.members.map((m) => {
         const c = centreOf(m, area, areaOrigin);
         const vx = c.x - s.pivot.x;
         const vy = c.y - s.pivot.y;
@@ -489,12 +517,12 @@ export default function DesignCanvas({
         const ny = s.pivot.y + vx * sin + vy * cos;
         let rot = m.rotation + delta;
         rot = ((((rot + 180) % 360) + 360) % 360) - 180;
-        onChange(side, m.id, {
+        return { id: m.id, changes: {
           x: round2(((nx - areaOrigin.x) / area.w) * 100),
           y: round2(((ny - areaOrigin.y) / area.h) * 100),
           rotation: Math.round(rot),
-        });
-      }
+        } };
+      }));
     };
 
     const onUp = (e: PointerEvent) => {
@@ -517,7 +545,7 @@ export default function DesignCanvas({
       window.removeEventListener("pointerup", onUp);
       window.removeEventListener("pointercancel", onUp);
     };
-  }, [dragging, side, area, areaOrigin, onChange, onCommit, onSelect, onTap, onGestureStart]);
+  }, [dragging, side, area, areaOrigin, productKind, onChange, onCommit, onSelect, onTap, onGestureStart]);
 
   useEffect(() => {
     if (!marquee) return;
