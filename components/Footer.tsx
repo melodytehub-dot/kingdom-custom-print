@@ -68,6 +68,7 @@ export default async function Footer() {
         {/* Bottom Bar */}
         <div className="mm-footer-bottom">
           <p>© {year}, Kingdom Custom Print. All Rights Reserved.</p>
+          <p>Developed by <a href="https://melodytehub.com.ng" style={{ textDecoration: "underline", textUnderlineOffset: "3px" }}>Melodyte Hub</a></p>
           <Link href="/shipping">Shipping & returns</Link>
         </div>
       </div>
