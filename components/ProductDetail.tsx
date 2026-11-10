@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
 import ProductPhotography from "./ProductPhotography";
+import { swatchBackground } from "@/lib/product-variants";
 import { brandForProduct } from "@/lib/product-brands";
 import ProductColorQuery from "./ProductColorQuery";
 import SizeChart from "./SizeChart";
@@ -168,7 +169,7 @@ export default function ProductDetail({ product, initialColor = "" }: { product:
                 <button
                   type="button"
                   className={`swatch${c.slug === color?.slug ? " is-active" : ""}`}
-                  style={{ background: c.hex }}
+                  style={{ background: swatchBackground(product.slug, c.slug, c.hex) }}
                   onClick={() => pickColor(c)}
                   aria-pressed={c.slug === color?.slug}
                   title={c.name}

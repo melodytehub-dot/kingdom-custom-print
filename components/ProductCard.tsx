@@ -4,6 +4,7 @@ import { useWishlist } from "@/lib/wishlist-context";
 import { useState } from "react";
 import Link from "next/link";
 import ProductPhotography from "./ProductPhotography";
+import { swatchBackground } from "@/lib/product-variants";
 import Garment from "./Garment";
 import { formatUSD, lowestPrintedUnit, lowestUnitPrice } from "@/lib/pricing";
 import type { Product } from "@/lib/types";
@@ -81,7 +82,7 @@ export default function ProductCard({
                 key={c.slug}
                 type="button"
                 className={`mm-swatch-dot ${selectedColorIdx === idx ? "active" : ""}`}
-                style={{ backgroundColor: c.hex }}
+                style={{ background: swatchBackground(product.slug, c.slug, c.hex) }}
                 title={c.name}
                 aria-label={`Select ${c.name}`}
                 aria-pressed={selectedColorIdx === idx}

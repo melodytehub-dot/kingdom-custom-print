@@ -30,6 +30,7 @@ export default async function Footer() {
           </div>
 
           {/* Column 2: COMPANY */}
+          <div className="mm-footer-company-contact">
           <div className="mm-footer-col">
             <h2>Company</h2>
             <ul>
@@ -40,8 +41,19 @@ export default async function Footer() {
             </ul>
           </div>
 
+          {/* Contact follows Company on narrow screens. */}
+          <div className="mm-footer-col mm-footer-contact">
+            <h2>Contact</h2>
+            <ul>
+              <li><Link href="/contact">Customer Service</Link></li>
+              {settings.contactEmail ? <li><a href={`mailto:${settings.contactEmail}`}>{settings.contactEmail}</a></li> : null}
+              {settings.contactPhone ? <li><a href={`tel:${settings.contactPhone.replace(/[^+0-9]/g, "")}`}>{settings.contactPhone}</a></li> : null}
+            </ul>
+          </div>
+          </div>
+
           {/* Column 3: INFORMATION */}
-          <div className="mm-footer-col">
+          <div className="mm-footer-col mm-footer-information">
             <h2>Information</h2>
             <ul>
               <li><Link href="/cart">My Cart</Link></li>
@@ -50,16 +62,6 @@ export default async function Footer() {
               <li><Link href="/account">My Account</Link></li>
               <li><Link href="/contact">Printing Enquiries</Link></li>
               <li><Link href="/terms">Terms of Service</Link></li>
-            </ul>
-          </div>
-
-          {/* Column 4: CONTACT */}
-          <div className="mm-footer-col">
-            <h2>Contact</h2>
-            <ul>
-              <li><Link href="/contact">Customer Service</Link></li>
-              {settings.contactEmail ? <li><a href={`mailto:${settings.contactEmail}`}>{settings.contactEmail}</a></li> : null}
-              {settings.contactPhone ? <li><a href={`tel:${settings.contactPhone.replace(/[^+0-9]/g, "")}`}>{settings.contactPhone}</a></li> : null}
             </ul>
           </div>
 

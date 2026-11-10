@@ -69,7 +69,7 @@ export default async function HomePage() {
 
       <section className="kcp-products" aria-labelledby="products-title"><div className="kcp-wrap">
         <div className="kcp-heading kcp-products-heading"><div><span className="kcp-eyebrow">Made for Your Ideas</span><h2 id="products-title">{displayTitle(settings.homeProductsTitle)}</h2><p>{settings.homeProductsDescription}</p></div><Link href="/shop" className="kcp-text-link">View all products <ArrowRight size={17} /></Link></div>
-        <HomeProducts products={products} />
+        <HomeProducts products={products.filter(product => !readyToShip.some(featured => featured.id === product.id))} />
       </div></section>
 
       <section className="kcp-project kcp-wrap" aria-labelledby="project-title">

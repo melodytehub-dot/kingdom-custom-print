@@ -82,6 +82,9 @@ a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible
 .mm-card-swatches { gap: 6px; flex-wrap: wrap; margin: 0; }
 .mm-swatch-dot { width: 32px; height: 32px; flex-shrink: 0; border: 3px solid #fff; outline: 1px solid #ddd; }
 .mm-swatch-dot.active, .mm-swatch-dot:hover { transform: none; box-shadow: none; outline-color: #171717; }
+@media (hover: none) and (pointer: coarse) {
+  .mm-swatch-dot { width: 44px; height: 44px; min-width: 44px; min-height: 44px; }
+}
 .mm-card-bottom-btn {
   position: static;
   opacity: 1;
@@ -108,6 +111,8 @@ a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible
 .mm-category-thumb img { object-fit: contain !important; }
 .mm-category-name { font-size: 13px; }
 .mm-footer-grid { grid-template-columns: 1.5fr repeat(3, minmax(0, 1fr)); gap: 32px; }
+.mm-footer-company-contact { display: contents; }
+.mm-footer-contact { order: 1; }
 .mm-footer-col h2 { font-family: var(--font-body); font-weight: 600; font-size: 13px; }
 .mm-footer-col li a { display: inline-flex; align-items: center; min-height: 30px; }
 .mm-footer-studio { display: inline-flex; margin-top: 12px; min-height: 44px; align-items: center; color: #171717; font-weight: 600; }
@@ -184,6 +189,9 @@ a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible
   .mm-category-name { font-size: 10px; }
   .mm-footer-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 28px 20px; }
   .mm-footer-brand-info { grid-column: 1 / -1; }
+  .mm-footer-company-contact { display: grid; align-content: start; gap: 28px; grid-column: 1; grid-row: 2; }
+  .mm-footer-contact { order: initial; }
+  .mm-footer-information { grid-column: 2; grid-row: 2; }
   .mm-footer-bottom { padding-bottom: calc(80px + env(safe-area-inset-bottom)); font-size: 12px; }
   .pdp-media { position: static; }
   .mm-shop-page h1 { font-size: 30px !important; }

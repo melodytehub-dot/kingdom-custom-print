@@ -10,6 +10,7 @@ import type { SavedDraft } from "@/lib/design";
 import { PERSONALIZATION_FEE, formatUSD, lowestPrintedUnit, type PriceQuote } from "@/lib/pricing";
 import { sizeSummary } from "@/lib/sizes";
 import { mockupBaseForProduct, TEE_MOCKUPS, type TeeMockup } from "@/lib/mockups";
+import { swatchBackground } from "@/lib/product-variants";
 import { GarmentPreview } from "./GarmentPreview";
 import DesignPreviewImage from "@/components/DesignPreviewImage";
 import { InlineSkeleton } from "@/components/PageSkeleton";
@@ -101,7 +102,7 @@ export function ProductsPanel({
             data-color-slug={m.slug}
             title={m.name}
           >
-            <span style={{ background: m.hex }} />
+            <span style={{ background: swatchBackground(product.slug, m.slug, m.hex) }} />
             <span className="rot-sr">{m.name}</span>
           </button>
         ))}

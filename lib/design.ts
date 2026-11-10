@@ -72,6 +72,10 @@ export function teeArea(side: GarmentSide): TeeArea {
 // The family mockups are not all centred within their square images. Keep the
 // placement guide and flattened proofs on the same printable part of each one.
 const FAMILY_PRINT_AREA: Partial<Record<ProductKind, Record<GarmentSide, TeeArea>>> = {
+  cap: {
+    front: { cx: 0.46, cy: 0.43, w: 0.32, h: 0.22 },
+    back: { cx: 0.5, cy: 0.39, w: 0.3, h: 0.12 },
+  },
   hoodie: {
     front: { cx: 0.56, cy: 0.42, w: 0.42, h: 0.32 },
     back: { cx: 0.46, cy: 0.45, w: 0.48, h: 0.48 },

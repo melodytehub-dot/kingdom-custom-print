@@ -261,6 +261,7 @@ const { TextIdeasPanel } = load("components/customizer/panels.tsx", {
   "next/link": {}, "next/image": {},
   "@/lib/design": { newTextLayer: values => ({ type: "text", ...values }) },
   "@/lib/sizes": {}, "@/lib/pricing": {}, "@/lib/mockups": {}, "@/lib/fonts": {},
+  "@/lib/product-variants": { swatchBackground: (_product, _slug, hex) => hex },
   "./GarmentPreview": { GarmentPreview: () => null },
   "./SupportPanel": { default: () => null },
   "@/components/DesignPreviewImage": { default: () => null },

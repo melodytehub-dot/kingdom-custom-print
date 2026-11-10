@@ -149,8 +149,12 @@
 }
 
 .swatch {
-  width: 34px;
-  height: 34px;
+  width: 44px;
+  height: 44px;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0;
+  aspect-ratio: 1;
   border-radius: 50%;
   border: 1px solid rgba(20, 20, 20, 0.2);
   cursor: pointer;
