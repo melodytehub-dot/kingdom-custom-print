@@ -33,6 +33,7 @@ interface CanvasProps {
   side: GarmentSide;
   printArea?: PrintArea;
   productKind?: ProductKind;
+  productSlug?: string;
   design: Design;
   selectedIds: string[];
   compact?: boolean;
@@ -244,8 +245,8 @@ export function marqueeSelectionIds(
 }
 
 /** Geometry of the printable area in view units, shared with the stage. */
-export function printAreaView(side: GarmentSide, printArea?: PrintArea, productKind?: ProductKind) {
-  const frac = printableArea(side, printArea, productKind);
+export function printAreaView(side: GarmentSide, printArea?: PrintArea, productKind?: ProductKind, productSlug?: string) {
+  const frac = printableArea(side, printArea, productKind, productSlug);
   const w = VIEW * frac.w;
   const h = VIEW * frac.h;
   return { w, h, x: VIEW * frac.cx - w / 2, y: VIEW * frac.cy - h / 2 };
@@ -260,6 +261,7 @@ export default function DesignCanvas({
   side,
   printArea,
   productKind,
+  productSlug,
   design,
   selectedIds,
   compact = false,
@@ -282,7 +284,7 @@ export default function DesignCanvas({
   const [marquee, setMarquee] = useState<MarqueeState | null>(null);
   const uid = useId().replace(/:/g, "");
 
-  const pa = useMemo(() => printAreaView(side, printArea, productKind), [side, printArea, productKind]);
+  const pa = useMemo(() => printAreaView(side, printArea, productKind, productSlug), [side, printArea, productKind, productSlug]);
   const area = useMemo(() => ({ w: pa.w, h: pa.h }), [pa.w, pa.h]);
   const areaOrigin = useMemo(() => ({ x: pa.x, y: pa.y }), [pa.x, pa.y]);
 

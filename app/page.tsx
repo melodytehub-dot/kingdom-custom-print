@@ -30,6 +30,12 @@ function displayTitle(value: string) {
 export default async function HomePage() {
   const [products, settings] = await Promise.all([getProducts().catch(() => []), getSettings().catch(() => DEFAULT_SETTINGS)]);
   const readyToShip = products.filter(product => product.saleMode === "ready-made" && product.featured).slice(0, 4);
+  const featuredBlanks = products.filter(product => product.saleMode !== "ready-made" && product.featured);
+  const featuredProducts = [...new Set([
+    ...["tee", "polo", "hoodie", "cap", "crew", "tote", "mug", "longsleeve"].map(kind => featuredBlanks.find(product => product.kind === kind)).filter(product => product !== undefined),
+    ...featuredBlanks,
+  ])].slice(0, 4);
+  const shownIds = new Set([...readyToShip, ...featuredProducts].map(product => product.id));
   const samples = [categories[0], categories[1], categories[3], categories[5]];
   return (
     <div className="kcp-home">
@@ -43,6 +49,7 @@ export default async function HomePage() {
           <p>{settings.heroDescription}</p>
         </div>
       </section>
+
       <div className="kcp-hero-actions kcp-wrap">
         <Link href="/shop" className="kcp-button kcp-button-dark">Shop now <ArrowRight size={17} /></Link>
         <Link href="/customize" className="kcp-button kcp-button-outline">Design your own <ArrowRight size={17} /></Link>
@@ -57,6 +64,11 @@ export default async function HomePage() {
         {readyToShip.length ? <ul className="mm-product-grid">{readyToShip.map(product => <li key={product.id}><ProductCard product={product} /></li>)}</ul> : <><p className="kcp-sample-note">Ready-to-ship products are coming soon. These are sample previews.</p><div className="kcp-sample-grid">{samples.map(item => <div className="kcp-sample-card" key={item.name}><span className="kcp-sample-image"><Image src={item.image} alt="" fill sizes="(max-width: 768px) 45vw, 23vw" /></span><strong>{item.name}</strong><small>Sample · Not for sale</small></div>)}</div></>}
       </section>
 
+      {featuredProducts.length > 0 && <section className="kcp-featured kcp-wrap" aria-labelledby="featured-title">
+        <div className="kcp-heading"><div><span className="kcp-eyebrow">Made for your ideas</span><h2 id="featured-title">Featured products</h2></div><Link href="/shop" className="kcp-text-link">View all products <ArrowRight size={17} /></Link></div>
+        <ul className="mm-product-grid">{featuredProducts.map(product => <li key={product.id}><ProductCard product={product} /></li>)}</ul>
+      </section>}
+
       <section className="kcp-feature-banner kcp-wrap" aria-label="Start a custom design">
         <div className="kcp-collection-banner"><div className="kcp-collection-copy"><span className="kcp-eyebrow">Made for you</span><h2>Your next idea starts here.</h2><p>Choose a style and make it your own.</p><Link href="/customize" className="kcp-collection-link">Start designing <ArrowRight size={16} /></Link></div><div className="kcp-collection-image"><Image src="/img/category-prints/shirts.webp" alt="" fill sizes="(max-width: 768px) 45vw, 420px" /></div></div>
       </section>
@@ -69,7 +81,7 @@ export default async function HomePage() {
 
       <section className="kcp-products" aria-labelledby="products-title"><div className="kcp-wrap">
         <div className="kcp-heading kcp-products-heading"><div><span className="kcp-eyebrow">Made for Your Ideas</span><h2 id="products-title">{displayTitle(settings.homeProductsTitle)}</h2><p>{settings.homeProductsDescription}</p></div><Link href="/shop" className="kcp-text-link">View all products <ArrowRight size={17} /></Link></div>
-        <HomeProducts products={products.filter(product => !readyToShip.some(featured => featured.id === product.id))} />
+        <HomeProducts products={products.filter(product => !shownIds.has(product.id))} />
       </div></section>
 
       <section className="kcp-project kcp-wrap" aria-labelledby="project-title">

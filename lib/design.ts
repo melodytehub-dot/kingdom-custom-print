@@ -72,13 +72,25 @@ export function teeArea(side: GarmentSide): TeeArea {
 // The family mockups are not all centred within their square images. Keep the
 // placement guide and flattened proofs on the same printable part of each one.
 const FAMILY_PRINT_AREA: Partial<Record<ProductKind, Record<GarmentSide, TeeArea>>> = {
+  tee: {
+    front: { cx: 0.5, cy: 0.47, w: 0.42, h: 0.50 },
+    back: { cx: 0.50, cy: 0.50, w: 0.40, h: 0.46 },
+  },
+  polo: {
+    front: { cx: 0.50, cy: 0.48, w: 0.42, h: 0.48 },
+    back: { cx: 0.50, cy: 0.50, w: 0.42, h: 0.46 },
+  },
+  longsleeve: {
+    front: { cx: 0.53, cy: 0.49, w: 0.38, h: 0.46 },
+    back: { cx: 0.46, cy: 0.49, w: 0.38, h: 0.46 },
+  },
   cap: {
-    front: { cx: 0.46, cy: 0.43, w: 0.32, h: 0.22 },
+    front: { cx: 0.50, cy: 0.40, w: 0.36, h: 0.22 },
     back: { cx: 0.5, cy: 0.39, w: 0.3, h: 0.12 },
   },
   hoodie: {
     front: { cx: 0.56, cy: 0.42, w: 0.42, h: 0.32 },
-    back: { cx: 0.46, cy: 0.45, w: 0.48, h: 0.48 },
+    back: { cx: 0.46, cy: 0.54, w: 0.42, h: 0.32 },
   },
   crew: {
     front: { cx: 0.53, cy: 0.48, w: 0.46, h: 0.48 },
@@ -88,10 +100,25 @@ const FAMILY_PRINT_AREA: Partial<Record<ProductKind, Record<GarmentSide, TeeArea
     front: { cx: 0.604, cy: 0.69, w: 0.48, h: 0.43 },
     back: { cx: 0.399, cy: 0.69, w: 0.48, h: 0.43 },
   },
+  mug: {
+    front: { cx: 0.43, cy: 0.48, w: 0.46, h: 0.38 },
+    back: { cx: 0.57, cy: 0.48, w: 0.46, h: 0.38 },
+  },
 };
 
-export function printableArea(side: GarmentSide, printArea?: PrintArea, kind?: ProductKind): TeeArea {
-  const family = kind ? FAMILY_PRINT_AREA[kind]?.[side] : undefined;
+const PRODUCT_PRINT_AREA: Record<string, Partial<Record<GarmentSide, TeeArea>>> = {
+  "v-neck-tee": {
+    front: { cx: 0.50, cy: 0.49, w: 0.27, h: 0.34 },
+    back: { cx: 0.50, cy: 0.50, w: 0.27, h: 0.38 },
+  },
+  "womens-fitted-tee": {
+    front: { cx: 0.50, cy: 0.47, w: 0.34, h: 0.45 },
+    back: { cx: 0.47, cy: 0.50, w: 0.32, h: 0.43 },
+  },
+};
+
+export function printableArea(side: GarmentSide, printArea?: PrintArea, kind?: ProductKind, slug?: string): TeeArea {
+  const family = (slug ? PRODUCT_PRINT_AREA[slug]?.[side] : undefined) ?? (kind ? FAMILY_PRINT_AREA[kind]?.[side] : undefined);
   const configured = printArea ? areaFor(printArea, side) : undefined;
   if (family) {
     return {

@@ -19,7 +19,7 @@ export function swatchBackground(productSlug: string, colorSlug: string, hex: st
 /** Return an image only while it matches the current catalog color. */
 export function productVariantImage(productSlug: string, colorSlug: string, hex: string, view: "front" | "back"): string | null {
   if (productSlug === "five-panel-cap" && capColors[colorSlug]?.toLowerCase() === hex.toLowerCase()) {
-    return `/img/mockups/112fp/${colorSlug}-${view}.webp`;
+    return `/img/mockups/112fp/${colorSlug}-${view}${view === "front" ? "-v2" : ""}.webp`;
   }
   const expected = (variants as Record<string, Record<string, string>>)[productSlug]?.[colorSlug];
   if (!expected || expected.toLowerCase() !== hex.toLowerCase()) return null;

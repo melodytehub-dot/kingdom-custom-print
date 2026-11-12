@@ -63,6 +63,25 @@
 .mm-card .mm-card-title { min-height: 0; font-size: 15px; font-weight: 700; line-height: 1.35; }
 .mm-card .mm-card-price-row { color: #af263a; font-weight: 750; }
 .mm-card .mm-card-swatches { flex-wrap: nowrap; overflow-x: auto; padding: 2px; scrollbar-width: thin; }
+.mm-card .mm-card-swatches { gap: 0; }
+.mm-card .mm-swatch-dot, .swatches .swatch {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 44px; height: 44px; min-width: 44px; min-height: 44px;
+  padding: 0; border: 0; outline: 0; border-radius: 50%;
+  background: transparent; box-shadow: none; flex: 0 0 44px;
+}
+.mm-card .mm-swatch-color, .swatches .swatch-color {
+  display: block; width: 20px; height: 20px; border-radius: 50%;
+  border: 1px solid rgba(20, 20, 20, .2); box-sizing: border-box;
+}
+.swatches .swatch-color { width: 27px; height: 27px; }
+.mm-card .mm-swatch-dot.active .mm-swatch-color,
+.mm-card .mm-swatch-dot:hover .mm-swatch-color,
+.swatches .swatch.is-active .swatch-color,
+.swatches .swatch:hover .swatch-color { box-shadow: 0 0 0 2px #fff, 0 0 0 3px #222; }
+.mm-card .mm-swatch-dot:hover, .mm-card .mm-swatch-dot.active,
+.swatches .swatch:hover, .swatches .swatch.is-active { transform: none; box-shadow: none; outline: 0; }
+.mm-card .mm-swatch-dot:focus-visible, .swatches .swatch:focus-visible { outline: 2px solid #a91c31; outline-offset: -2px; }
 .mm-card .mm-card-bottom-btn { margin-top: auto; border: 1px solid #ded7d4; border-radius: 3px; background: #fff; color: #261b1c; }
 .mm-card .mm-card-bottom-btn:hover { border-color: #a91c31; background: #a91c31; color: #fff; }
 @media (max-width: 768px) {

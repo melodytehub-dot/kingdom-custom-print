@@ -82,12 +82,11 @@ export default function ProductCard({
                 key={c.slug}
                 type="button"
                 className={`mm-swatch-dot ${selectedColorIdx === idx ? "active" : ""}`}
-                style={{ background: swatchBackground(product.slug, c.slug, c.hex) }}
                 title={c.name}
                 aria-label={`Select ${c.name}`}
                 aria-pressed={selectedColorIdx === idx}
                 onClick={() => setSelectedColorIdx(idx)}
-              />
+              ><span className="mm-swatch-color" style={{ background: swatchBackground(product.slug, c.slug, c.hex) }} aria-hidden="true" /></button>
             ))}
             {product.colors.length > 6 ? (
               <span style={{ fontSize: "11px", color: "#666", marginLeft: "2px" }}>

@@ -169,11 +169,11 @@ export default function ProductDetail({ product, initialColor = "" }: { product:
                 <button
                   type="button"
                   className={`swatch${c.slug === color?.slug ? " is-active" : ""}`}
-                  style={{ background: swatchBackground(product.slug, c.slug, c.hex) }}
                   onClick={() => pickColor(c)}
                   aria-pressed={c.slug === color?.slug}
                   title={c.name}
                 >
+                  <span className="swatch-color" style={{ background: swatchBackground(product.slug, c.slug, c.hex) }} aria-hidden="true" />
                   <span className="sr-only">{c.name}</span>
                 </button>
               </li>

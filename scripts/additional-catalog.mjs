@@ -140,7 +140,7 @@ export const additionalProducts = [
     ],
     sizes: ONE_SIZE,
     breaks: BREAKS,
-    images: [{ url: "/img/mockups/112fp/white-front.webp", alt: "Five-Panel Trucker Cap in White" }],
+    images: [{ url: "/img/mockups/112fp/white-front-v2.webp", alt: "Five-Panel Trucker Cap in White" }],
   },
   {
     slug: "canvas-tote",

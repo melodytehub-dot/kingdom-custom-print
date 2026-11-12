@@ -97,7 +97,8 @@ async function renderSide(
   photo: string,
   layers: DesignLayer[],
   printArea?: PrintArea,
-  productKind?: ProductKind
+  productKind?: ProductKind,
+  productSlug?: string
 ): Promise<string | null> {
   const canvas = document.createElement("canvas");
   canvas.width = SIZE;
@@ -109,7 +110,7 @@ async function renderSide(
   const garment = await loadImage(photo);
   ctx.drawImage(garment, 0, 0, SIZE, SIZE);
 
-  const frac = printableArea(side, printArea, productKind);
+  const frac = printableArea(side, printArea, productKind, productSlug);
   const aw = SIZE * frac.w;
   const ah = SIZE * frac.h;
   const ax = SIZE * frac.cx - aw / 2;
@@ -165,11 +166,12 @@ export async function drawPreview(
   backSrc: string,
   design: Design,
   printArea?: PrintArea,
-  productKind?: ProductKind
+  productKind?: ProductKind,
+  productSlug?: string
 ): Promise<{ front: string | null; back: string | null }> {
   const [front, back] = await Promise.all([
-    renderSide("front", frontSrc, design.front, printArea, productKind),
-    renderSide("back", backSrc, design.back, printArea, productKind),
+    renderSide("front", frontSrc, design.front, printArea, productKind, productSlug),
+    renderSide("back", backSrc, design.back, printArea, productKind, productSlug),
   ]);
   return { front, back };
 }
