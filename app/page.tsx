@@ -87,8 +87,8 @@ export default async function HomePage() {
       <section className="kcp-project kcp-wrap" aria-labelledby="project-title">
         <div className="kcp-project-intro"><span className="kcp-eyebrow">Your Idea, Your Way</span><h2 id="project-title">Make it personal.<br /><em>Make it yours.</em></h2><p>Design something for yourself, or tell us what you need for your team, event or business.</p></div>
         <div className="kcp-project-grid">
-          <Link href="/customize" className="kcp-project-card"><span className="kcp-project-copy"><small>Create Your Own</small><strong>Design online</strong><span>Start designing <ArrowRight size={16} /></span></span><span className="kcp-project-image"><Image src="/img/category-prints/shirts.webp" alt="" fill sizes="(max-width: 700px) 48vw, 30vw" /></span></Link>
-          <Link href="/contact" className="kcp-project-card"><span className="kcp-project-copy"><small>For Teams & Events</small><strong>Plan a group order</strong><span>Request a quote <ArrowRight size={16} /></span></span><span className="kcp-project-image"><Image src="/img/category-prints/hoodies.webp" alt="" fill sizes="(max-width: 700px) 48vw, 30vw" /></span></Link>
+          <Link href="/customize" className="kcp-project-card"><span className="kcp-project-image"><Image src="/img/loyalty-group.webp" alt="" fill sizes="(max-width: 700px) 48vw, 600px" /></span><span className="kcp-project-copy"><small>Create Your Own</small><strong>Design online</strong><span>Start designing <ArrowRight size={16} /></span></span></Link>
+          <Link href="/contact" className="kcp-project-card"><span className="kcp-project-image"><Image src="/img/kingdom-team.webp" alt="" fill sizes="(max-width: 700px) 48vw, 600px" /></span><span className="kcp-project-copy"><small>For Teams & Events</small><strong>Plan a group order</strong><span>Request a quote <ArrowRight size={16} /></span></span></Link>
         </div>
       </section>
 
