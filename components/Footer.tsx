@@ -10,7 +10,7 @@ export default async function Footer() {
   return (
     <footer className="mm-footer">
       <div className="minimog-container">
-        <div className="kcp-footer-lead"><div><span>Made for Your Ideas</span><p>Let&apos;s make something<br /><em>worth wearing.</em></p></div><Link href="/customize">Start designing <span aria-hidden="true">↗</span></Link></div>
+        <div className="kcp-footer-lead"><div><span>Made for Your Ideas</span><p>Let&apos;s make something<br /><em>worth wearing.</em></p></div><div className="kcp-spot-action kcp-footer-lead-action"><Link href="/customize">Start designing <span aria-hidden="true">↗</span></Link><span className="kcp-spot-photo"><Image src="/img/kingdom-team.webp" alt="" fill sizes="(max-width: 700px) 42vw, 230px" /></span></div></div>
         <div className="mm-footer-grid">
           {/* Column 1: Subscribe & Brand */}
           <div className="mm-footer-col mm-footer-brand-info">

@@ -87,8 +87,8 @@ export default async function HomePage() {
       <section className="kcp-project kcp-wrap" aria-labelledby="project-title">
         <div className="kcp-project-intro"><span className="kcp-eyebrow">Your Idea, Your Way</span><h2 id="project-title">Make it personal.<br /><em>Make it yours.</em></h2><p>Design something for yourself, or tell us what you need for your team, event or business.</p></div>
         <div className="kcp-project-grid">
-          <Link href="/customize" className="kcp-project-card"><span className="kcp-project-image"><Image src="/img/loyalty-group.webp" alt="" fill sizes="(max-width: 700px) 48vw, 600px" /></span><span className="kcp-project-copy"><small>Create Your Own</small><strong>Design online</strong><span>Start designing <ArrowRight size={16} /></span></span></Link>
-          <Link href="/contact" className="kcp-project-card"><span className="kcp-project-image"><Image src="/img/kingdom-team.webp" alt="" fill sizes="(max-width: 700px) 48vw, 600px" /></span><span className="kcp-project-copy"><small>For Teams & Events</small><strong>Plan a group order</strong><span>Request a quote <ArrowRight size={16} /></span></span></Link>
+          <Link href="/customize" className="kcp-project-card"><span className="kcp-project-copy"><small>Create Your Own</small><strong>Design online</strong><span>Start designing <ArrowRight size={16} /></span></span><span className="kcp-project-image"><Image src="/img/category-prints/shirts.webp" alt="" fill sizes="(max-width: 700px) 48vw, 30vw" /></span></Link>
+          <Link href="/contact" className="kcp-project-card"><span className="kcp-project-copy"><small>For Teams & Events</small><strong>Plan a group order</strong><span>Request a quote <ArrowRight size={16} /></span></span><span className="kcp-project-image"><Image src="/img/category-prints/hoodies.webp" alt="" fill sizes="(max-width: 700px) 48vw, 30vw" /></span></Link>
         </div>
       </section>
 
@@ -106,7 +106,7 @@ export default async function HomePage() {
         </div>
       </div></section>
 
-      <section className="kcp-contact kcp-wrap"><div><span className="kcp-eyebrow">Let&apos;s Make Something</span><h2>{displayTitle(settings.homeContactTitle)}</h2><p>{settings.homeContactDescription}</p></div><Link href="/contact" className="kcp-button kcp-button-dark">Get in touch <ArrowRight size={17} /></Link></section>
+      <section className="kcp-contact kcp-wrap"><div><span className="kcp-eyebrow">Let&apos;s Make Something</span><h2>{displayTitle(settings.homeContactTitle)}</h2><p>{settings.homeContactDescription}</p></div><div className="kcp-spot-action"><Link href="/contact" className="kcp-button kcp-button-dark">Get in touch <ArrowRight size={17} /></Link><span className="kcp-spot-photo"><Image src="/img/loyalty-group.webp" alt="" fill sizes="(max-width: 700px) 42vw, 230px" /></span></div></section>
     </div>
   );
 }
