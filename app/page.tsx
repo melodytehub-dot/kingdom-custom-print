@@ -18,7 +18,7 @@ const categories = [
   { name: "Caps", href: "/shop?kind=cap", image: "/img/category-prints/caps.webp" },
   { name: "Totes", href: "/shop?kind=tote", image: "/img/category-prints/totes.webp" },
   { name: "Merch", href: "/shop?kind=mug", image: "/img/category-prints/merch.webp" },
-  { name: "Active Wear", href: "/product/performance-tee", image: "/img/products/performance-tee.jpg" },
+  { name: "Active Wear", href: "/product/performance-tee", image: "/img/category-prints/active-wear.webp" },
 ];
 
 // Keep mixed-case content entered by the store owner unchanged.
