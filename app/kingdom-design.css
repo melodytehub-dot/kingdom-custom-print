@@ -39,7 +39,7 @@
 .kcp-heading p,.kcp-project-intro > p,.kcp-contact p { max-width: 500px; margin: 16px 0 0; color: #716668; line-height: 1.7; }
 .kcp-text-link { display: inline-flex; align-items: center; gap: 15px; padding-block: 10px; border-bottom: 1px solid #c9b7b8; color: #3c2b2c; font-size: 13px; font-weight: 700; text-decoration: none; white-space: nowrap; }
 .kcp-text-link:hover { color: #bd1e35; border-color: #bd1e35; }
-.kcp-category-grid { display: grid; grid-template-columns: repeat(7,minmax(0,1fr)); gap: 12px; }
+.kcp-category-grid { display: grid; grid-template-columns: repeat(8,minmax(0,1fr)); gap: 12px; }
 .kcp-category { min-width: 0; color: inherit; font-size: 13px; font-weight: 700; text-decoration: none; }
 .kcp-category-image { display: block; position: relative; aspect-ratio: 1; overflow: hidden; border-radius: 18px; background: #f0e9e6; }
 .kcp-category:nth-child(3n + 2) .kcp-category-image { background: #f6e5e2; }
