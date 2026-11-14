@@ -31,6 +31,15 @@
   height: auto;
 }
 
+.pdp-product-label {
+  align-self: stretch;
+  margin: 0;
+  padding: 4px 4px 0;
+  color: var(--ink-2);
+  font-size: 14px;
+  font-weight: 600;
+}
+
 .pdp-media > img {
   max-height: 460px;
   object-fit: contain;

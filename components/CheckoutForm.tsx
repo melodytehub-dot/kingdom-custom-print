@@ -347,9 +347,9 @@ export default function CheckoutForm({ settings, paymentsReady, paypalReady, acc
             </div>
           </dl>
 
-          <fieldset className="fieldset"><legend className="label">Payment method</legend>
-            {paymentsReady ? <label><input type="radio" name="paymentMethod" checked={paymentMethod === "stripe"} onChange={() => { setPaymentMethod("stripe"); checkoutAttempt.current = null; }} /> Credit or debit card (Stripe)</label> : null}
-            {paypalReady ? <label><input type="radio" name="paymentMethod" checked={paymentMethod === "paypal"} onChange={() => { setPaymentMethod("paypal"); checkoutAttempt.current = null; }} /> PayPal</label> : null}
+          <fieldset className="checkout-payment"><legend className="label">Payment method</legend>
+            {paymentsReady ? <label className="checkout-payment-option"><input type="radio" name="paymentMethod" checked={paymentMethod === "stripe"} onChange={() => { setPaymentMethod("stripe"); checkoutAttempt.current = null; }} /><span>Credit or debit card (Stripe)</span></label> : null}
+            {paypalReady ? <label className="checkout-payment-option"><input type="radio" name="paymentMethod" checked={paymentMethod === "paypal"} onChange={() => { setPaymentMethod("paypal"); checkoutAttempt.current = null; }} /><span>PayPal</span></label> : null}
           </fieldset>
           <button type="submit" className="btn btn-lg btn-block" disabled={submitting || !selectedReady}>
             {submitting ? "Starting checkout…" : !selectedReady ? "Checkout unavailable" : "Continue to payment"}

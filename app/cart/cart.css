@@ -293,6 +293,35 @@
   margin-bottom: 22px;
 }
 
+.checkout-payment {
+  min-width: 0;
+  margin: 20px 0;
+  padding: 8px 14px 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+}
+
+.checkout-payment legend {
+  padding: 0 6px;
+}
+
+.checkout-payment-option {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  cursor: pointer;
+  line-height: 1.4;
+}
+
+.checkout-payment-option input {
+  flex: 0 0 auto;
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  accent-color: var(--red);
+}
+
 .field-group {
   border: 1px solid var(--line);
   border-radius: var(--r);

@@ -118,6 +118,7 @@ export default function ProductDetail({ product, initialColor = "" }: { product:
     <div className="pdp">
       <Suspense fallback={null}><ProductColorQuery allowed={colorSlugs} onColor={setColorSlug} /></Suspense>
       <div className="pdp-media">
+        {product.styleCode.trim().toUpperCase() === "N3142" && !readyMade ? <p className="pdp-product-label">Active Wear</p> : null}
         <div className="pdp-photo-stage">
           {readyMade && photos.length ? <span className="product-photography"><Image unoptimized src={photos[photoIndex] ?? photos[0]} alt={`${product.name}, ${color?.name ?? ""}, photo ${photoIndex + 1}`} fill sizes="(max-width: 640px) 100vw, 600px" style={{objectFit:"contain"}} /></span> : <ProductPhotography key={`${color?.slug}:${view}`} product={product} color={color} view={view} priority />}
           <button type="button" className="pdp-gallery-arrow pdp-gallery-prev" aria-label="Previous product view"
