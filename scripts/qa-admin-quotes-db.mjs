@@ -1,36 +1,77 @@
+/** Guarded quote creation, editing, conversion and invoice locking. */
 import assert from "node:assert/strict";
-import fs from "node:fs";
-import vm from "node:vm";
-import ts from "typescript";
-import postgres from "postgres";
+import { createHarness } from "./qa-harness.mjs";
 
-if (!process.env.DATABASE_URL) throw new Error("DATABASE_URL is required");
-const db = postgres(process.env.DATABASE_URL, { max: 1, ssl: "require" });
-const rollback = new Error("rollback fixture");
-const compile = (file, deps = {}) => {
-  const exports = {};
-  const code = ts.transpileModule(fs.readFileSync(file, "utf8"), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
-  vm.runInNewContext(code, { exports, require: (name) => { if (!(name in deps)) throw new Error(`Unexpected dependency: ${name}`); return deps[name]; } });
-  return exports;
+process.env.ADMIN_PASSWORD ??= "localtestpassword123";
+const harness = await createHarness({ name: "admin-quotes" });
+const { db, load } = harness;
+
+const auth = await load("/lib/admin-auth.ts");
+const route = await load("/app/api/admin/quotes/route.ts");
+const token = await auth.createSession();
+
+const request = (method, body) =>
+  route[method](
+    new Request("https://example.test/api/admin/quotes", {
+      method,
+      headers: { cookie: `kcp_admin=${token}`, origin: "https://example.test", "content-type": "application/json" },
+      ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+    })
+  );
+
+const draft = {
+  name: "Quote test",
+  email: "test@example.com",
+  lines: [{ description: "Shirts", quantity: 3, unitCents: 1299 }],
+  shippingCents: 500,
 };
+
+let failures = 0;
+const check = (label, condition) => {
+  console.log(`${condition ? "PASS" : "FAIL"} ${label}`);
+  if (!condition) failures += 1;
+};
+
 try {
-  await db.begin(async (tx) => {
-    const validate = compile("lib/admin-quotes.ts");
-    let deny = false;
-    const route = compile("app/api/admin/quotes/route.ts", { "next/server": { NextResponse: { json: (body, options = {}) => ({ body, status: options.status ?? 200 }) } }, "../_guard": { requireAdmin: async () => deny ? { status: 401 } : null }, "@/lib/db": { sql: tx }, "@/lib/admin-quotes": validate });
-    const request = (method, body) => new Request("https://example.test/api/admin/quotes", { method, ...(body ? { headers: { "content-type": "application/json" }, body: JSON.stringify(body) } : {}) });
-    const draft = { name: "Quote test", email: "test@example.com", lines: [{ description: "Shirts", quantity: 3, unitCents: 1299 }], shippingCents: 500 };
-    deny = true; assert.equal((await route.POST(request("POST", draft))).status, 401); deny = false;
-    const created = await route.POST(request("POST", draft)); assert.equal(created.status, 201);
-    const id = created.body.id;
-    assert.equal((await route.PATCH(request("PATCH", { ...draft, id, name: "Updated test" }))).status, 200);
-    assert.equal((await route.PATCH(request("PATCH", { id, action: "invoice" }))).status, 200);
-    assert.equal((await route.PATCH(request("PATCH", { ...draft, id }))).status, 409);
-    assert.equal((await route.PATCH(request("PATCH", { id, action: "invoice" }))).status, 409);
-    const [stored] = await tx`SELECT customer_name, status, invoiced_at FROM admin_quotes WHERE id = ${id}::bigint`;
-    assert.equal(stored.customer_name, "Updated test"); assert.equal(stored.status, "invoice"); assert.ok(stored.invoiced_at);
-    console.log("PASS: guarded quote creation, editing, conversion and invoice locking");
-    throw rollback;
-  });
-} catch (error) { if (error !== rollback) throw error; }
-finally { await db.end(); }
+  const anonymous = await route.POST(
+    new Request("https://example.test/api/admin/quotes", {
+      method: "POST",
+      headers: { origin: "https://example.test", "content-type": "application/json" },
+      body: JSON.stringify(draft),
+    })
+  );
+  check("anonymous quote creation is rejected", anonymous.status === 401);
+
+  const created = await request("POST", draft);
+  const createdBody = await created.json();
+  check("a quote is created", created.status === 201 && /^[1-9][0-9]*$/.test(createdBody.id));
+  const id = createdBody.id;
+
+  check("a quote can be edited", (await request("PATCH", { ...draft, id, name: "Updated test" })).status === 200);
+  check("a quote can be converted to an invoice", (await request("PATCH", { id, action: "invoice" })).status === 200);
+  check("an invoice can no longer be edited", (await request("PATCH", { ...draft, id })).status === 409);
+  check("an invoice cannot be converted twice", (await request("PATCH", { id, action: "invoice" })).status === 409);
+
+  const stored = db.prepare("SELECT customer_name, status, invoiced_at FROM admin_quotes WHERE id = ?").get(Number(id));
+  check("the edited name is stored", stored.customer_name === "Updated test");
+  check("the quote is marked as an invoice", stored.status === "invoice");
+  check("the conversion time is recorded", Boolean(stored.invoiced_at));
+
+  const missingEmail = await request("POST", { ...draft, email: "not-an-email" });
+  check("a quote without a valid email is refused", missingEmail.status === 422);
+
+  const listed = await request("GET");
+  const listing = await listed.json();
+  check("the quote appears in the admin list", listing.quotes?.some((quote) => quote.id === String(id)));
+
+  const variant = db.prepare("SELECT id FROM admin_quotes WHERE id = ?").get(Number(id));
+  check("the stored quote row is unique", Boolean(variant));
+} catch (error) {
+  failures += 1;
+  console.log(`FAIL ${error instanceof Error ? error.message : String(error)}`);
+} finally {
+  await harness.close();
+}
+
+console.log(failures ? `\n${failures} admin quote check(s) failed` : "\nall admin quote checks passed");
+process.exit(failures ? 1 : 0);

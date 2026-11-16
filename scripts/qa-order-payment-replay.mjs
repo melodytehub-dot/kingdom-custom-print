@@ -1,70 +1,91 @@
-/** Database integration check, rolled back in full after verification. */
+/**
+ * Payment replay must preserve fulfilment, refunds must be recorded once, and
+ * expiration must release a hold without touching on-hand stock.
+ */
 import assert from "node:assert/strict";
-import fs from "node:fs";
-import vm from "node:vm";
-import ts from "typescript";
-import postgres from "postgres";
-if (!process.env.DATABASE_URL) throw new Error("Run with --env-file=.env.local");
-const sql = postgres(process.env.DATABASE_URL, { ssl: "require", max: 1 });
-const rollback = new Error("QA transaction rollback");
+import { createHarness, enableInventory, seededVariant, setStock, stockCount } from "./qa-harness.mjs";
+
+const harness = await createHarness({ name: "payment-replay" });
+const { db, load, all } = harness;
+const orders = await load("/lib/orders.ts");
+
+const variant = seededVariant(db);
+enableInventory(db, true);
+setStock(db, variant, 2);
+
+const stamp = Date.now().toString(36).toUpperCase();
+const reference = `KCP-QA${stamp}`;
+const session = `cs_test_qa_${Date.now()}`;
+
+const insertOrder = (ref, extra = {}) => {
+  const columns = ["reference", "email", "name", "status", ...Object.keys(extra)];
+  const values = [ref, "qa-replay@example.com", "Temporary QA fixture", "pending", ...Object.values(extra)];
+  const info = db
+    .prepare(`INSERT INTO orders (${columns.join(", ")}) VALUES (${columns.map(() => "?").join(", ")})`)
+    .run(...values);
+  return Number(info.lastInsertRowid);
+};
+const hold = (orderId) =>
+  db
+    .prepare("INSERT INTO inventory_reservations (order_id, product_id, color_name, size_label, quantity) VALUES (?, ?, ?, ?, 1)")
+    .run(orderId, variant.product_id, variant.color_name, variant.size_label);
+
+let failures = 0;
+const check = (label, condition) => {
+  console.log(`${condition ? "PASS" : "FAIL"} ${label}`);
+  if (!condition) failures += 1;
+};
+
 try {
-  await sql.begin(async tx => {
-    await tx`CREATE TEMP TABLE inventory_stock (product_id int, color_name text, size_label text, quantity int, updated_at timestamptz DEFAULT now(), PRIMARY KEY(product_id, color_name, size_label)) ON COMMIT DROP`;
-    await tx`CREATE TEMP TABLE inventory_reservations (order_id int, product_id int, color_name text, size_label text, quantity int) ON COMMIT DROP`;
-    await tx`CREATE TEMP TABLE inventory_control (id boolean PRIMARY KEY, enabled boolean NOT NULL) ON COMMIT DROP`;
-    await tx`CREATE TEMP TABLE inventory_adjustments (product_id int, product_name text, color_name text, size_label text, previous_quantity int, new_quantity int) ON COMMIT DROP`;
-    await tx`INSERT INTO inventory_control VALUES (true, true)`;
-    const [variant] = await tx`SELECT p.id, c.name AS color, s.label AS size FROM products p JOIN product_colors c ON c.product_id = p.id JOIN product_sizes s ON s.product_id = p.id WHERE p.active = true LIMIT 1`;
-    assert.ok(variant);
-    await tx`INSERT INTO inventory_stock (product_id, color_name, size_label, quantity) VALUES (${variant.id}, ${variant.color}, ${variant.size}, 2)`;
-    const reference = `KCP-QA${Date.now().toString(36).toUpperCase()}`;
-    const session = `cs_test_qa_${Date.now()}`;
-    const [order] = await tx`INSERT INTO orders (reference, email, name, stripe_session_id, status) VALUES (${reference}, ${"qa-replay@example.com"}, ${"Temporary QA fixture"}, ${session}, ${"pending"}) RETURNING id`;
-    await tx`INSERT INTO inventory_reservations VALUES (${order.id}, ${variant.id}, ${variant.color}, ${variant.size}, 1)`;
-    const exports = {};
-    tx.begin = async callback => callback(tx);
-    const inventory = {};
-    const inventoryCode = ts.transpileModule(fs.readFileSync("lib/inventory-reservations.ts", "utf8"), { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS } }).outputText;
-    vm.runInNewContext(inventoryCode, { exports: inventory });
-    const deps = { "./db": { sql: tx, num: Number }, "./catalog": {}, "./pricing": {}, "./types": { ADMIN_ORDER_TRANSITIONS: {} }, "./inventory-reservations": inventory };
-    const source = ts.transpileModule(fs.readFileSync("lib/orders.ts", "utf8"), { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS } }).outputText;
-    vm.runInNewContext(source, { exports, require: name => deps[name] });
-    await exports.markOrderPaid(session, "pi_test_fixture");
-    const [paid] = await tx`SELECT status, paid_at FROM orders WHERE reference = ${reference}`;
-    assert.equal(paid.status, "paid");
-    assert.ok(paid.paid_at);
-    assert.equal((await tx`SELECT quantity FROM inventory_stock`)[0].quantity, 1);
-    await tx`UPDATE orders SET status = ${"shipped"} WHERE reference = ${reference}`;
-    await exports.markOrderPaid(session, "pi_test_fixture");
-    const [replayed] = await tx`SELECT status, paid_at FROM orders WHERE reference = ${reference}`;
-    assert.equal(replayed.status, "shipped");
-    assert.equal(replayed.paid_at.getTime(), paid.paid_at.getTime());
-    assert.equal((await tx`SELECT quantity FROM inventory_stock`)[0].quantity, 1);
-    await exports.markOrderRefunded("pi_test_fixture", "evt_refund_fixture");
-    const [refunded] = await tx`SELECT status, paid_at FROM orders WHERE reference = ${reference}`;
-    assert.equal(refunded.status, "refunded");
-    assert.equal(refunded.paid_at.getTime(), paid.paid_at.getTime());
-    await exports.markOrderRefunded("pi_test_fixture", "evt_refund_fixture");
-    const [refundEvents] = await tx`SELECT count(*)::int AS count FROM order_status_events WHERE order_id = (SELECT id FROM orders WHERE reference = ${reference}) AND to_status = 'refunded'`;
-    assert.equal(refundEvents.count, 1);
-    const paypalId = `QA${Date.now()}`;
-    const captureId = `${paypalId}C`;
-    const [paypalOrder] = await tx`INSERT INTO orders (reference, email, name, paypal_order_id, status, total) VALUES (${reference + "P"}, ${"qa-replay@example.com"}, ${"Temporary QA fixture"}, ${paypalId}, 'pending', 10) RETURNING id`;
-    await tx`INSERT INTO inventory_reservations VALUES (${paypalOrder.id}, ${variant.id}, ${variant.color}, ${variant.size}, 1)`;
-    assert.ok(await exports.recordPayPalCapture(paypalId, captureId, "10.00", "USD"));
-    assert.ok(await exports.recordPayPalCapture(paypalId, captureId, "10.00", "USD"));
-    assert.equal((await tx`SELECT quantity FROM inventory_stock`)[0].quantity, 0, "PayPal capture and replay consume stock once");
-    await tx`UPDATE inventory_stock SET quantity = 1`;
-    const [expiredOrder] = await tx`INSERT INTO orders (reference, email, name, status) VALUES (${reference + "E"}, ${"qa-replay@example.com"}, ${"Temporary QA fixture"}, 'pending') RETURNING id`;
-    await tx`INSERT INTO inventory_reservations VALUES (${expiredOrder.id}, ${variant.id}, ${variant.color}, ${variant.size}, 1)`;
-    assert.equal(await exports.cancelOrder(reference + "E"), true);
-    assert.equal(await exports.cancelOrder(reference + "E"), false);
-    assert.equal((await tx`SELECT count(*)::int AS count FROM inventory_reservations`)[0].count, 0);
-    assert.equal((await tx`SELECT quantity FROM inventory_stock`)[0].quantity, 1, "expiration releases a hold without changing on-hand stock");
-    console.log("PASS payment replay preserves fulfillment; a signed full refund is recorded once without changing paid_at");
-    throw rollback;
-  });
+  const orderId = insertOrder(reference, { stripe_session_id: session });
+  hold(orderId);
+
+  await orders.markOrderPaid(session, "pi_test_fixture");
+  const paid = all("SELECT status, paid_at FROM orders WHERE reference = ?", reference)[0];
+  check("the payment marks the order paid", paid.status === "paid" && Boolean(paid.paid_at));
+  check("payment consumes the held unit", stockCount(db, variant) === 1);
+
+  db.prepare("UPDATE orders SET status = 'shipped' WHERE reference = ?").run(reference);
+  await orders.markOrderPaid(session, "pi_test_fixture");
+  const replayed = all("SELECT status, paid_at FROM orders WHERE reference = ?", reference)[0];
+  check("a replayed payment does not reopen a shipped order", replayed.status === "shipped");
+  check("a replayed payment keeps the original paid time", replayed.paid_at === paid.paid_at);
+  check("a replayed payment does not consume stock again", stockCount(db, variant) === 1);
+
+  await orders.markOrderRefunded("pi_test_fixture", "evt_refund_fixture");
+  const refunded = all("SELECT status, paid_at FROM orders WHERE reference = ?", reference)[0];
+  check("a full refund is recorded", refunded.status === "refunded");
+  check("a refund keeps the original paid time", refunded.paid_at === paid.paid_at);
+  await orders.markOrderRefunded("pi_test_fixture", "evt_refund_fixture");
+  const refundEvents = all("SELECT * FROM order_status_events WHERE to_status = 'refunded'");
+  check("a replayed refund is recorded once", refundEvents.length === 1);
+
+  const paypalId = `QA${Date.now()}`;
+  const captureId = `${paypalId}C`;
+  const paypalOrderId = insertOrder(`${reference}P`, { paypal_order_id: paypalId, total: 10 });
+  hold(paypalOrderId);
+  const captured = await orders.recordPayPalCapture(paypalId, captureId, "10.00", "USD");
+  const capturedAgain = await orders.recordPayPalCapture(paypalId, captureId, "10.00", "USD");
+  check("PayPal capture is accepted", captured?.reference === `${reference}P`);
+  check("PayPal capture replay returns the same order", capturedAgain?.reference === `${reference}P`);
+  check("PayPal capture and replay consume stock once", stockCount(db, variant) === 0);
+
+  db.prepare("UPDATE inventory_stock SET quantity = 1").run();
+  const expiredId = insertOrder(`${reference}E`);
+  hold(expiredId);
+  check("expiration cancels a pending order", (await orders.cancelOrder(`${reference}E`)) === true);
+  check("a second expiration is a no-op", (await orders.cancelOrder(`${reference}E`)) === false);
+  check("expiration releases the hold", all("SELECT * FROM inventory_reservations").length === 0);
+  check("expiration leaves on-hand stock unchanged", stockCount(db, variant) === 1);
+
+  const wrongAmount = await orders.recordPayPalCapture(paypalId, `${captureId}X`, "0.01", "USD");
+  check("a mismatched PayPal amount is refused", wrongAmount === null);
 } catch (error) {
-  if (error !== rollback) throw error;
-  console.log("PASS temporary payment fixture rolled back; no test order persists");
-} finally { await sql.end(); }
+  failures += 1;
+  console.log(`FAIL ${error instanceof Error ? error.message : String(error)}`);
+} finally {
+  await harness.close();
+}
+
+console.log(failures ? `\n${failures} payment replay check(s) failed` : "\nall payment replay checks passed");
+process.exit(failures ? 1 : 0);

@@ -1,44 +1,31 @@
-/** Database integration check for duplicate checkout submissions. */
+/** Duplicate checkout submissions must resolve to one order and one set of items. */
 import assert from "node:assert/strict";
-import fs from "node:fs";
-import vm from "node:vm";
-import ts from "typescript";
-import postgres from "postgres";
+import { randomUUID } from "node:crypto";
+import { createHarness, enableInventory } from "./qa-harness.mjs";
 
-if (!process.env.DATABASE_URL) throw new Error("Run with --env-file=.env.local");
-const sql = postgres(process.env.DATABASE_URL, { ssl: "require", max: 1 });
-const stamp = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
-const attempt = crypto.randomUUID();
-const email = `qa-checkout-${stamp}@example.test`;
+const harness = await createHarness({ name: "checkout-idempotency" });
+const { db, load, all } = harness;
+enableInventory(db, false);
+const orders = await load("/lib/orders.ts");
 
-try {
-  const exports = {};
-  const source = ts.transpileModule(fs.readFileSync("lib/orders.ts", "utf8"), {
-    compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS },
-  }).outputText;
-  const deps = {
-    "./db": { sql, num: Number },
-    "./catalog": { getSettings: async () => ({ shippingFlat: 6.95, freeShippingThreshold: 75 }) },
-    "./pricing": { round2: value => Math.round((value + Number.EPSILON) * 100) / 100 },
-    "./types": { ADMIN_ORDER_TRANSITIONS: {} },
-    "./inventory-reservations": { reserveInventory: async () => {}, consumeInventory: async () => {}, releaseInventory: async () => {} },
-  };
-  vm.runInNewContext(source, { exports, require: name => deps[name], crypto });
+const attempt = randomUUID();
+const email = `qa-checkout-${Date.now()}@example.test`;
 
-  const input = {
-    checkoutAttemptId: attempt,
-    accountId: null,
-    email,
-    name: "QA Checkout Retry",
-    phone: "",
-    addressLine1: "1 QA Lane",
-    addressLine2: "",
-    city: "Austin",
-    region: "TX",
-    postal: "78701",
-    country: "US",
-    notes: "",
-    items: [{
+const input = {
+  checkoutAttemptId: attempt,
+  accountId: null,
+  email,
+  name: "QA Checkout Retry",
+  phone: "",
+  addressLine1: "1 QA Lane",
+  addressLine2: "",
+  city: "Austin",
+  region: "TX",
+  postal: "78701",
+  country: "US",
+  notes: "",
+  items: [
+    {
       productId: null,
       productName: "QA Tee",
       productKind: "tee",
@@ -52,28 +39,63 @@ try {
       previewFront: null,
       previewBack: null,
       designNotes: "",
-    }],
+    },
+  ],
+};
+
+let failures = 0;
+const check = (label, condition) => {
+  console.log(`${condition ? "PASS" : "FAIL"} ${label}`);
+  if (!condition) failures += 1;
+};
+
+const isConflict = (error) => error instanceof orders.CheckoutAttemptConflictError;
+
+try {
+  const first = await orders.createOrder(input);
+  const retry = await orders.createOrder(input);
+  check("the first attempt creates an order", first.reused === false);
+  check("a repeated attempt reuses it", retry.reused === true && retry.reference === first.reference);
+
+  const rejected = async (changes) => {
+    try {
+      await orders.createOrder({ ...input, ...changes });
+      return false;
+    } catch (error) {
+      return isConflict(error);
+    }
   };
 
-  const first = await exports.createOrder(input);
-  const retry = await exports.createOrder(input);
-  assert.equal(first.reused, false);
-  assert.equal(retry.reused, true);
-  assert.equal(retry.reference, first.reference);
-  const conflict = (err) => err instanceof exports.CheckoutAttemptConflictError;
-  await assert.rejects(() => exports.createOrder({ ...input, addressLine1: "2 Different Street" }), conflict);
-  await assert.rejects(() => exports.createOrder({ ...input, items: [{ ...input.items[0], designNotes: "Changed artwork instructions" }] }), conflict);
-  await assert.rejects(() => exports.createOrder({ ...input, items: [{ ...input.items[0], lines: [{ label: "L", qty: 2 }] }] }), conflict);
-  await assert.rejects(() => exports.createOrder({ ...input, items: [{ ...input.items[0], design: { front: [{ type: "text", text: "Different" }], back: [] } }] }), conflict);
-  const [counts] = await sql`
-    SELECT count(DISTINCT o.id)::int AS orders, count(oi.id)::int AS items
-    FROM orders o LEFT JOIN order_items oi ON oi.order_id = o.id
-    WHERE o.checkout_attempt_id = ${attempt}`;
-  assert.equal(counts.orders, 1);
-  assert.equal(counts.items, 1);
-  console.log("PASS a repeated checkout attempt reuses one order and one set of line items");
+  check("a changed address is rejected", await rejected({ addressLine1: "2 Different Street" }));
+  check(
+    "changed artwork instructions are rejected",
+    await rejected({ items: [{ ...input.items[0], designNotes: "Changed artwork instructions" }] })
+  );
+  check(
+    "a changed size breakdown is rejected",
+    await rejected({ items: [{ ...input.items[0], lines: [{ label: "L", qty: 2 }] }] })
+  );
+  check(
+    "changed design layers are rejected",
+    await rejected({ items: [{ ...input.items[0], design: { front: [{ type: "text", text: "Different" }], back: [] } }] })
+  );
+
+  const counts = db
+    .prepare(
+      `SELECT count(DISTINCT o.id) AS orders, count(oi.id) AS items
+       FROM orders o LEFT JOIN order_items oi ON oi.order_id = o.id
+       WHERE o.checkout_attempt_id = ?`
+    )
+    .get(attempt);
+  check("only one order row exists for the attempt", counts.orders === 1);
+  check("only one set of line items exists", counts.items === 1);
+  check("only one customer row exists", all("SELECT * FROM customers WHERE email = ?", email).length === 1);
+} catch (error) {
+  failures += 1;
+  console.log(`FAIL ${error instanceof Error ? error.message : String(error)}`);
 } finally {
-  await sql`DELETE FROM orders WHERE checkout_attempt_id = ${attempt}`;
-  await sql`DELETE FROM customers WHERE email = ${email}`;
-  await sql.end();
+  await harness.close();
 }
+
+console.log(failures ? `\n${failures} idempotency check(s) failed` : "\nall checkout idempotency checks passed");
+process.exit(failures ? 1 : 0);

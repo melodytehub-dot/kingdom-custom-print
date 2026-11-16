@@ -74,22 +74,36 @@ function openLocalDatabase(file: string): DatabaseLike {
     return make([]);
   };
 
+  // SQLite has one writer, so overlapping batches must queue. D1 gives each
+  // batch its own transaction; this keeps local concurrency behaving the same
+  // instead of interleaving BEGIN/COMMIT on a single connection.
+  let batchQueue = Promise.resolve();
+
   return {
     prepare: statement,
+    close: () => db.close(),
     // SQLite is synchronous locally, so a batch is a plain transaction loop.
     async batch(statements: PreparedStatementLike[]) {
-      db.exec("BEGIN IMMEDIATE");
-      try {
-        const results: SqlResult[] = [];
-        for (const item of statements) {
-          results.push((await item.all()) as SqlResult);
+      const run = async () => {
+        db.exec("BEGIN IMMEDIATE");
+        try {
+          const results: SqlResult[] = [];
+          for (const item of statements) {
+            results.push((await item.all()) as SqlResult);
+          }
+          db.exec("COMMIT");
+          return results;
+        } catch (error) {
+          db.exec("ROLLBACK");
+          throw error;
         }
-        db.exec("COMMIT");
-        return results;
-      } catch (error) {
-        db.exec("ROLLBACK");
-        throw error;
-      }
+      };
+      const queued = batchQueue.then(run, run);
+      batchQueue = queued.then(
+        () => undefined,
+        () => undefined
+      );
+      return queued;
     },
   };
 }

@@ -1,85 +1,149 @@
+/**
+ * Inventory permissions, conflict handling, stock holds and payment replay.
+ * Runs against a disposable seeded SQLite database and the real admin route.
+ */
 import assert from "node:assert/strict";
-import fs from "node:fs";
-import vm from "node:vm";
-import ts from "typescript";
-import postgres from "postgres";
+import { createHarness, seededVariant, setStock, stockCount } from "./qa-harness.mjs";
 
-if (!process.env.DATABASE_URL) throw new Error("DATABASE_URL is required");
-const db = postgres(process.env.DATABASE_URL, { max: 1, ssl: "require" });
-const rollback = new Error("rollback fixture");
+process.env.ADMIN_PASSWORD ??= "localtestpassword123";
+const harness = await createHarness({ name: "inventory" });
+const { db, load, one, all, run } = harness;
+
+const { sql } = await load("/lib/db.ts");
+const inventory = await load("/lib/inventory-reservations.ts");
+const auth = await load("/lib/admin-auth.ts");
+const route = await load("/app/api/admin/inventory/route.ts");
+
+const token = await auth.createSession();
+const call = (method, body, query = "") =>
+  route[method](
+    new Request(`https://example.test/api/admin/inventory${query}`, {
+      method,
+      headers: { cookie: `kcp_admin=${token}`, origin: "https://example.test", "content-type": "application/json" },
+      ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+    })
+  );
+
+const insertOrder = (status = "pending") => {
+  const info = db
+    .prepare("INSERT INTO orders (reference, email, name, status) VALUES (?, ?, ?, ?)")
+    .run(`KCP-QA${Math.random().toString(36).slice(2, 9).toUpperCase()}`, "qa-inventory@example.test", "QA", status);
+  return Number(info.lastInsertRowid);
+};
+
+const reserve = async (orderId, items, enabled) => {
+  const statements = inventory.reserveInventoryStatements(orderId, items, enabled);
+  if (!statements.length) return;
+  try {
+    await sql.batch(statements);
+  } catch (error) {
+    if (inventory.isGuardFailure(error)) throw new inventory.InsufficientStockError();
+    throw error;
+  }
+};
+const consume = async (orderId) => {
+  const statements = await inventory.consumeInventoryStatements(orderId);
+  if (statements.length) await sql.batch(statements);
+};
+const release = async (orderId) => {
+  const statements = await inventory.releaseInventoryStatements(orderId);
+  if (statements.length) await sql.batch(statements);
+};
+
+const variant = seededVariant(db);
+const payload = { productId: variant.product_id, counts: [{ color: variant.color_name, size: variant.size_label, quantity: 7, expected: null }] };
+const item = { productId: variant.product_id, colorName: variant.color_name, lines: [{ label: variant.size_label, qty: 2 }] };
+
+let failures = 0;
+const check = (label, condition) => {
+  console.log(`${condition ? "PASS" : "FAIL"} ${label}`);
+  if (!condition) failures += 1;
+};
+
 try {
-  await db.begin(async (tx) => {
-    // Temporary tables shadow production tables for the duration of this transaction.
-    await tx`CREATE TEMP TABLE inventory_stock (product_id int NOT NULL, color_name text NOT NULL, size_label text NOT NULL, quantity int NOT NULL, updated_at timestamptz DEFAULT now(), PRIMARY KEY(product_id, color_name, size_label)) ON COMMIT DROP`;
-    await tx`CREATE TEMP TABLE inventory_adjustments (id bigserial PRIMARY KEY, product_id int, product_name text, color_name text, size_label text, previous_quantity int, new_quantity int, created_at timestamptz DEFAULT now()) ON COMMIT DROP`;
-    await tx`CREATE TEMP TABLE inventory_reservations (order_id int, product_id int, color_name text, size_label text, quantity int) ON COMMIT DROP`;
-    await tx`CREATE TEMP TABLE inventory_control (id boolean PRIMARY KEY, enabled boolean NOT NULL) ON COMMIT DROP`;
-    await tx`INSERT INTO inventory_control VALUES (true, false)`;
-    const [variant] = await tx`SELECT p.id, p.name, c.name AS color, s.label AS size FROM products p JOIN product_colors c ON c.product_id = p.id JOIN product_sizes s ON s.product_id = p.id WHERE p.active = true LIMIT 1`;
-    assert.ok(variant, "A product variant is required for this test");
-    await tx`CREATE TEMP TABLE products (id int PRIMARY KEY, name text NOT NULL, active boolean NOT NULL) ON COMMIT DROP`;
-    await tx`CREATE TEMP TABLE product_colors (product_id int, name text) ON COMMIT DROP`;
-    await tx`CREATE TEMP TABLE product_sizes (product_id int, label text) ON COMMIT DROP`;
-    await tx`CREATE TEMP TABLE orders (status text, stripe_session_id text, paypal_order_id text, inventory_provider_closed boolean NOT NULL DEFAULT false) ON COMMIT DROP`;
-    await tx`INSERT INTO products VALUES (${variant.id}, ${variant.name}, true)`;
-    await tx`INSERT INTO product_colors VALUES (${variant.id}, ${variant.color})`;
-    await tx`INSERT INTO product_sizes VALUES (${variant.id}, ${variant.size})`;
-    const exports = {};
-    let deny = false;
-    const sql = new Proxy(tx, { get(target, property) { return property === "begin" ? (fn) => tx.savepoint(fn) : Reflect.get(target, property); } });
-    const deps = { "next/server": { NextResponse: { json: (body, options = {}) => ({ body, status: options.status ?? 200 }) } }, "../_guard": { requireAdmin: async () => deny ? { status: 401 } : null }, "@/lib/db": { sql } };
-    const code = ts.transpileModule(fs.readFileSync("app/api/admin/inventory/route.ts", "utf8"), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
-    vm.runInNewContext(code, { exports, require: (name) => deps[name], URL });
-    const request = (body) => new Request("https://example.test/api/admin/inventory", { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
-    const protection = (enabled) => new Request("https://example.test/api/admin/inventory", { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify({ enabled }) });
-    const payload = { productId: variant.id, counts: [{ color: variant.color, size: variant.size, quantity: 7, expected: null }] };
-    deny = true; assert.equal((await exports.PUT(request(payload))).status, 401); deny = false;
-    assert.equal((await exports.PATCH(protection(true))).status, 200, "protection can be enabled with unknown counts");
-    assert.equal((await exports.PATCH(protection(false))).status, 200);
-    assert.equal((await exports.PUT(request(payload))).status, 200);
-    assert.equal((await exports.PUT(request(payload))).status, 409);
-    assert.equal((await exports.PUT(request({ ...payload, counts: [{ ...payload.counts[0], quantity: -1 }] }))).status, 422);
-    assert.equal((await exports.PUT(request({ ...payload, counts: [{ ...payload.counts[0], expected: 7, quantity: 0 }] }))).status, 200);
-    const listed = await exports.GET(new Request(`https://example.test/api/admin/inventory?product=${variant.id}`));
-    assert.equal(listed.status, 200); assert.equal(listed.body.counts[0].quantity, 0); assert.equal(listed.body.history.length, 2);
-    const [stock] = await tx`SELECT quantity FROM inventory_stock`;
-    const [history] = await tx`SELECT count(*)::int AS count FROM inventory_adjustments`;
-    assert.equal(stock.quantity, 0); assert.equal(history.count, 2);
-    const inventory = {};
-    const inventoryCode = ts.transpileModule(fs.readFileSync("lib/inventory-reservations.ts", "utf8"), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
-    vm.runInNewContext(inventoryCode, { exports: inventory });
-    const item = { productId: variant.id, colorName: variant.color, lines: [{ label: variant.size, qty: 2 }] };
-    await tx`DELETE FROM inventory_stock`;
-    assert.equal((await exports.PATCH(protection(true))).status, 200);
-    await assert.rejects(tx.savepoint(async (inner) => inventory.reserveInventory(inner, 105, [item])), /no longer available/, "unknown stock cannot be ordered");
-    assert.equal((await exports.PATCH(protection(false))).status, 200);
-    await tx`INSERT INTO inventory_stock (product_id, color_name, size_label, quantity) VALUES (${variant.id}, ${variant.color}, ${variant.size}, 0)`;
-    await tx.savepoint(async (inner) => inventory.reserveInventory(inner, 100, [item]));
-    assert.equal((await tx`SELECT * FROM inventory_reservations`).length, 0, "disabled protection does not reserve stock");
-    assert.equal((await exports.PUT(request({ ...payload, counts: [{ ...payload.counts[0], expected: 0, quantity: 3 }] }))).status, 200);
-    await tx.savepoint(async (inner) => inventory.reserveInventory(inner, 103, [{ ...item, saleMode: "ready-made" }]));
-    assert.equal((await tx`SELECT * FROM inventory_reservations WHERE order_id = 103`).length, 1, "finished goods reserve stock even when blank-garment protection is off");
-    await assert.rejects(tx.savepoint(async (inner) => inventory.reserveInventory(inner, 104, [{ ...item, saleMode: "ready-made" }])), /no longer available/);
-    await tx.savepoint(async (inner) => inventory.releaseInventory(inner, 103));
-    await tx`INSERT INTO orders (status, stripe_session_id, paypal_order_id) VALUES ('pending', NULL, NULL)`;
-    assert.equal((await exports.PATCH(protection(true))).status, 409, "existing pending orders block activation");
-    await tx`DELETE FROM orders`;
-    assert.equal((await exports.PATCH(protection(true))).status, 200);
-    await tx.savepoint(async (inner) => inventory.reserveInventory(inner, 100, [item]));
-    await assert.rejects(tx.savepoint(async (inner) => inventory.reserveInventory(inner, 101, [item])), /no longer available/);
-    assert.equal((await tx`SELECT * FROM inventory_reservations`).length, 1);
-    assert.equal((await exports.PATCH(protection(false))).status, 409, "held stock blocks disabling protection");
-    assert.equal((await exports.PUT(request({ ...payload, counts: [{ ...payload.counts[0], expected: 3, quantity: 1 }] }))).status, 409);
-    await tx.savepoint(async (inner) => inventory.consumeInventory(inner, 100));
-    await tx.savepoint(async (inner) => inventory.consumeInventory(inner, 100));
-    assert.equal((await tx`SELECT quantity FROM inventory_stock`)[0].quantity, 1, "payment replay does not consume twice");
-    await tx.savepoint(async (inner) => inventory.reserveInventory(inner, 102, [{ ...item, lines: [{ label: variant.size, qty: 1 }] }]));
-    await tx.savepoint(async (inner) => inventory.releaseInventory(inner, 102));
-    await tx.savepoint(async (inner) => inventory.releaseInventory(inner, 102));
-    assert.equal((await tx`SELECT * FROM inventory_reservations`).length, 0);
-    assert.equal((await tx`SELECT quantity FROM inventory_stock`)[0].quantity, 1);
-    console.log("PASS: inventory permissions, conflicts, reservations, payment replay and release");
-    throw rollback;
-  });
-} catch (error) { if (error !== rollback) throw error; }
-finally { await db.end(); }
+  // Permissions and protection toggle.
+  const anonymous = await route.PUT(
+    new Request("https://example.test/api/admin/inventory", {
+      method: "PUT",
+      headers: { origin: "https://example.test", "content-type": "application/json" },
+      body: JSON.stringify(payload),
+    })
+  );
+  check("anonymous inventory writes are rejected", anonymous.status === 401);
+  check("protection can be enabled with unknown counts", (await call("PATCH", { enabled: true })).status === 200);
+  check("protection can be disabled", (await call("PATCH", { enabled: false })).status === 200);
+  check("counts save", (await call("PUT", payload)).status === 200);
+  check("a stale expected count is refused", (await call("PUT", payload)).status === 409);
+  check(
+    "negative counts are refused",
+    (await call("PUT", { ...payload, counts: [{ ...payload.counts[0], quantity: -1 }] })).status === 422
+  );
+  check(
+    "a matching expected count updates the count",
+    (await call("PUT", { ...payload, counts: [{ ...payload.counts[0], expected: 7, quantity: 0 }] })).status === 200
+  );
+
+  const listed = await call("GET", undefined, `?product=${variant.product_id}`);
+  const listing = await listed.json();
+  check("inventory listing shows the saved count", listing.counts[0]?.quantity === 0);
+  check("inventory listing shows both adjustments", listing.history.length === 2);
+  check("on-hand stock follows the count", stockCount(db, variant) === 0);
+
+  // Blank garments: unknown stock cannot be ordered while protection is on.
+  check("protection re-enabled", (await call("PATCH", { enabled: true })).status === 200);
+  await assert.rejects(() => reserve(insertOrder(), [item], true), /no longer available/);
+  check("unknown stock cannot be reserved", true);
+
+  check("protection disabled for the next checks", (await call("PATCH", { enabled: false })).status === 200);
+  setStock(db, variant, 0);
+  check("disabled protection skips blank-garment holds", (await reserve(insertOrder(), [item], false)) === undefined);
+  check("customizable blanks are not held while protection is off", all("SELECT * FROM inventory_reservations").length === 0);
+
+  check(
+    "a zero count can be raised",
+    (await call("PUT", { ...payload, counts: [{ ...payload.counts[0], expected: 0, quantity: 3 }] })).status === 200
+  );
+
+  const readyMade = insertOrder();
+  await reserve(readyMade, [{ ...item, saleMode: "ready-made" }], false);
+  check("finished goods reserve stock even when protection is off", all("SELECT * FROM inventory_reservations WHERE order_id = ?", readyMade).length === 1);
+  await assert.rejects(() => reserve(insertOrder(), [{ ...item, saleMode: "ready-made" }], false), /no longer available/);
+  check("finished goods still cannot oversell", true);
+  await release(readyMade);
+  check("releasing a hold removes it", all("SELECT * FROM inventory_reservations WHERE order_id = ?", readyMade).length === 0);
+
+  // Pending payment sessions block activation.
+  insertOrder("pending");
+  check("pending orders block activation", (await call("PATCH", { enabled: true })).status === 409);
+  run("DELETE FROM orders");
+  check("activation works once pending orders are cleared", (await call("PATCH", { enabled: true })).status === 200);
+
+  const heldOrder = insertOrder();
+  await reserve(heldOrder, [item], true);
+  await assert.rejects(() => reserve(insertOrder(), [item], true), /no longer available/);
+  check("two orders cannot hold the same last units", all("SELECT * FROM inventory_reservations").length === 1);
+  check("held stock blocks disabling protection", (await call("PATCH", { enabled: false })).status === 409);
+  check(
+    "a count cannot drop below the held quantity",
+    (await call("PUT", { ...payload, counts: [{ ...payload.counts[0], expected: 3, quantity: 1 }] })).status === 409
+  );
+
+  await consume(heldOrder);
+  await consume(heldOrder);
+  check("payment replay does not consume twice", stockCount(db, variant) === 1);
+
+  const releaseOrder = insertOrder();
+  await reserve(releaseOrder, [{ ...item, lines: [{ label: variant.size_label, qty: 1 }] }], true);
+  await release(releaseOrder);
+  await release(releaseOrder);
+  check("release is idempotent", all("SELECT * FROM inventory_reservations").length === 0);
+  check("release does not change on-hand stock", stockCount(db, variant) === 1);
+} catch (error) {
+  failures += 1;
+  console.log(`FAIL ${error instanceof Error ? error.message : String(error)}`);
+} finally {
+  await harness.close();
+}
+
+console.log(failures ? `\n${failures} inventory check(s) failed` : "\nall inventory checks passed");
+process.exit(failures ? 1 : 0);

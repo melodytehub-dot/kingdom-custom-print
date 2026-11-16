@@ -1,46 +1,77 @@
+/**
+ * Storefront copy lives in `site_settings` as JSON text. Saving one section must
+ * keep the other settings, and a stale homepage edit must not overwrite a newer
+ * one.
+ */
 import assert from "node:assert/strict";
-import fs from "node:fs";
-import vm from "node:vm";
-import ts from "typescript";
-import postgres from "postgres";
+import { createHarness } from "./qa-harness.mjs";
 
-if (!process.env.DATABASE_URL) throw new Error("DATABASE_URL is required");
-const db = postgres(process.env.DATABASE_URL, { max: 1, ssl: /localhost|127\.0\.0\.1/.test(process.env.DATABASE_URL ?? "") ? false : "require" });
-const rollback = new Error("rollback fixture");
+const harness = await createHarness({ name: "home-settings" });
+const { db, load } = harness;
+const catalog = await load("/lib/catalog.ts");
+const builder = await load("/lib/homepage-builder.ts");
+
+const read = () =>
+  new Map(
+    db
+      .prepare("SELECT key, value FROM site_settings")
+      .all()
+      .map((row) => [row.key, catalog.parseSettingValue(row.value)])
+  );
+
+let failures = 0;
+const check = (label, condition) => {
+  console.log(`${condition ? "PASS" : "FAIL"} ${label}`);
+  if (!condition) failures += 1;
+};
+
 try {
-  await db.begin(async (tx) => {
-    await tx`CREATE TEMP TABLE site_settings (key text PRIMARY KEY, value jsonb NOT NULL, updated_at timestamptz DEFAULT now()) ON COMMIT DROP`;
-    const sql = Object.assign((...args) => Reflect.apply(tx, undefined, args), { begin: (fn) => tx.savepoint(fn) });
-    const builder = {};
-    const builderCode = ts.transpileModule(fs.readFileSync("lib/homepage-builder.ts", "utf8"), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
-    vm.runInNewContext(builderCode, { exports: builder });
-    const exports = {};
-    const code = ts.transpileModule(fs.readFileSync("lib/catalog.ts", "utf8"), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
-    vm.runInNewContext(code, { exports, require: (name) => { if (name === "./db") return { sql, num: Number }; if (name === "./homepage-builder") return builder; throw new Error(`Unexpected dependency: ${name}`); } });
-    const original = await exports.getSettings();
-    assert.equal(original.homeProductsTitle, "MAKE IT YOURS");
-    const saved = { ...original, homeProductsTitle: "Your team", homeProductsDescription: "Choose a style", homeContactTitle: "Questions?", homeContactDescription: "Get in touch." };
-    await exports.saveSettings(saved);
-    const read = async () => new Map((await tx`SELECT key, value FROM site_settings`).map(row => [row.key, row.value]));
-    const stored = await read();
-    assert.equal(stored.get("home_products_title"), "Your team");
-    assert.equal(stored.get("home_products_description"), "Choose a style");
-    assert.equal(stored.get("home_contact_title"), "Questions?");
-    assert.equal(stored.get("home_contact_description"), "Get in touch.");
-    assert.equal(stored.get("announcement"), original.announcement);
-    await exports.saveSettings({ ...saved, announcementLink: "/contact", footerBlurb: "Made by our team.", announcement: "Free shipping" });
-    const headerFooter = await read();
-    assert.equal(headerFooter.get("announcement_link"), "/contact");
-    assert.equal(headerFooter.get("footer_blurb"), "Made by our team.");
-    assert.equal(headerFooter.get("announcement"), "Free shipping");
-    console.log("PASS: header and footer copy persist");
-    const baseline = builder.homepageContentFromSettings(saved);
-    await exports.saveSettings({ ...saved, homeContactTitle: "New title" }, baseline);
-    await assert.rejects(() => exports.saveSettings(saved, baseline), error => error instanceof exports.HomepageContentConflict);
-    assert.equal((await read()).get("home_contact_title"), "New title");
-    console.log("PASS: homepage section settings persist without changing other settings");
-    console.log("PASS: stale settings cannot overwrite newer homepage content");
-    throw rollback;
-  });
-} catch (error) { if (error !== rollback) throw error; }
-finally { await db.end(); }
+  const original = await catalog.getSettings();
+  check("the seeded storefront uses the default homepage copy", original.homeProductsTitle === "MAKE IT YOURS");
+
+  const saved = {
+    ...original,
+    homeProductsTitle: "Your team",
+    homeProductsDescription: "Choose a style",
+    homeContactTitle: "Questions?",
+    homeContactDescription: "Get in touch.",
+  };
+  await catalog.saveSettings(saved);
+  const stored = read();
+  check("the products heading is saved", stored.get("home_products_title") === "Your team");
+  check("the products description is saved", stored.get("home_products_description") === "Choose a style");
+  check("the contact heading is saved", stored.get("home_contact_title") === "Questions?");
+  check("the contact description is saved", stored.get("home_contact_description") === "Get in touch.");
+  check("saving homepage copy leaves the announcement alone", stored.get("announcement") === original.announcement);
+
+  await catalog.saveSettings({ ...saved, announcementLink: "/contact", footerBlurb: "Made by our team.", announcement: "Free shipping" });
+  const headerFooter = read();
+  check("the announcement link is saved", headerFooter.get("announcement_link") === "/contact");
+  check("the footer blurb is saved", headerFooter.get("footer_blurb") === "Made by our team.");
+  check("the announcement is saved", headerFooter.get("announcement") === "Free shipping");
+
+  const baseline = builder.homepageContentFromSettings(saved);
+  await catalog.saveSettings({ ...saved, homeContactTitle: "New title" }, baseline);
+  check("a fresh homepage edit saves", read().get("home_contact_title") === "New title");
+
+  let staleRejected = false;
+  try {
+    await catalog.saveSettings(saved, baseline);
+  } catch (error) {
+    staleRejected = error instanceof catalog.HomepageContentConflict;
+  }
+  check("a stale homepage edit is refused", staleRejected);
+  check("the newer copy is kept", read().get("home_contact_title") === "New title");
+
+  const reread = await catalog.getSettings();
+  check("settings read back through the storefront loader", reread.homeProductsTitle === "Your team");
+  check("numeric settings survive the round trip", reread.shippingFlat === original.shippingFlat);
+} catch (error) {
+  failures += 1;
+  console.log(`FAIL ${error instanceof Error ? error.message : String(error)}`);
+} finally {
+  await harness.close();
+}
+
+console.log(failures ? `\n${failures} home settings check(s) failed` : "\nall home settings checks passed");
+process.exit(failures ? 1 : 0);

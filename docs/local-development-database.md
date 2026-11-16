@@ -73,6 +73,34 @@ npm run qa-order-writes    # checkout, inventory holds, payment, refund, cancel
 npm run qa-admin-writes    # settings, products, homepage draft/publish (needs the dev server)
 ```
 
-`scripts/qa-*-db.mjs` and the other `postgres`-based scripts are legacy harnesses
-from the Postgres era. They are not part of the SQLite test path and need to be
-ported before they can run again.
+The database harnesses create their own throwaway database from
+`db/schema.sqlite.sql` and the catalog seed, so they never touch
+`.local-db/store.sqlite`:
+
+```powershell
+npm run qa-db              # inventory, orders, invoices, quotes, settings, support, cutout, guest access
+```
+
+Run one directly when iterating, for example
+`node scripts/qa-inventory-db.mjs`. The browser harnesses that also read or
+write the database (`qa-account-flow`, `qa-email-verification`,
+`qa-order-privacy`, `qa-latest-update`) need the dev server. Account and email
+checks also need a capture address instead of Resend:
+
+```powershell
+# 1. start the capture server
+$env:KCP_MOCK_MAIL_FILE="$PWD/.local-db/qa-mail.json"
+node scripts/mock-mail.mjs
+
+# 2. start the dev server with mail pointing at it
+$env:RESEND_API_KEY='qa-test-key'
+$env:RESEND_API_URL='http://127.0.0.1:3099'
+npx next dev -p 3026
+
+# 3. run the browser checks
+$env:QA_BASE='http://localhost:3026'
+node scripts/qa-account-flow.mjs
+node scripts/qa-email-verification.mjs
+node scripts/qa-order-privacy.mjs
+```
+

@@ -36,6 +36,7 @@ export interface PreparedStatementLike {
 export interface DatabaseLike {
   prepare(sql: string): PreparedStatementLike;
   batch?(statements: PreparedStatementLike[]): Promise<SqlResult<unknown>[]>;
+  close?(): void;
 }
 
 export class SqliteUnsupportedError extends Error {

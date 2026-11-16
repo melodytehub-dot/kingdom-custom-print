@@ -23,11 +23,16 @@ export function emailConfigured(): boolean {
   return Boolean(process.env.RESEND_API_KEY);
 }
 
+/** Resend's API base; overridable so local QA can point at a capture server. */
+function emailApiBase(): string {
+  return (process.env.RESEND_API_URL || "https://api.resend.com").replace(/\/+$/, "");
+}
+
 /** Send transactional mail through Resend; never log the API key or message. */
 export async function sendEmail(message: EmailMessage): Promise<string> {
   const key = process.env.RESEND_API_KEY;
   if (!key) throw new Error("Email service is not configured");
-  const response = await fetch("https://api.resend.com/emails", {
+  const response = await fetch(`${emailApiBase()}/emails`, {
     method: "POST",
     headers: {
       Authorization: `Bearer ${key}`,

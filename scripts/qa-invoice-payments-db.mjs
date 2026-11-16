@@ -1,70 +1,185 @@
+/**
+ * Invoice payment attempts: one live attempt per invoice, retries reuse it,
+ * provider totals are verified, and a closed checkout can be replaced.
+ */
 import assert from "node:assert/strict";
-import { randomBytes, randomUUID } from "node:crypto";
-import fs from "node:fs";
-import vm from "node:vm";
-import ts from "typescript";
-import postgres from "postgres";
+import { createHarness } from "./qa-harness.mjs";
 
-if (!process.env.DATABASE_URL) throw new Error("DATABASE_URL is required");
-const admin = postgres(process.env.DATABASE_URL, { max: 1, ssl: "require" });
-const schema = `qa_invoice_${randomBytes(8).toString("hex")}`;
-assert.match(schema, /^qa_invoice_[a-f0-9]{16}$/);
-let db, created = false;
+// Use environment credentials (the vault is disabled) so the PayPal client can
+// talk to a stubbed fetch instead of the real API.
+delete process.env.PAYMENT_CREDENTIALS_KEY;
+process.env.PAYPAL_CLIENT_ID = "qa-client";
+process.env.PAYPAL_CLIENT_SECRET = "qa-secret";
+
+const harness = await createHarness({ name: "invoice-payments" });
+const { db, load } = harness;
+
+let paypalOrder = null;
+const realFetch = globalThis.fetch;
+globalThis.fetch = async (url, init) => {
+  const target = String(url);
+  if (target.includes("/v1/oauth2/token")) {
+    return new Response(JSON.stringify({ access_token: "qa-token" }), { status: 200 });
+  }
+  if (target.includes("/capture")) {
+    const unit = paypalOrder.purchase_units[0];
+    paypalOrder = {
+      ...paypalOrder,
+      status: "COMPLETED",
+      purchase_units: [
+        {
+          ...unit,
+          payments: {
+            captures: [
+              { id: "CAPTURE123", status: "COMPLETED", amount: { currency_code: "USD", value: unit.amount.value } },
+            ],
+          },
+        },
+      ],
+    };
+    return new Response(JSON.stringify(paypalOrder), { status: 200 });
+  }
+  return new Response(JSON.stringify(paypalOrder), { status: 200 });
+};
+
+const invoicePayments = await load("/lib/invoice-payments.ts");
+
+const lines = JSON.stringify([{ quantity: 2, unitCents: 500 }]);
+const insertQuote = (id, status = "invoice") =>
+  db
+    .prepare("INSERT INTO admin_quotes (id, customer_name, customer_email, notes, lines, shipping_cents, status) VALUES (?, ?, ?, '', ?, 200, ?)")
+    .run(id, "Quote test", "buyer@example.test", lines, status);
+const insertToken = (hash, quoteId, hours = 1) =>
+  db
+    .prepare("INSERT INTO invoice_share_tokens (token_hash, quote_id, expires_at) VALUES (?, ?, ?)")
+    .run(hash, quoteId, new Date(Date.now() + hours * 3600 * 1000).toISOString());
+
+let failures = 0;
+const check = (label, condition) => {
+  console.log(`${condition ? "PASS" : "FAIL"} ${label}`);
+  if (!condition) failures += 1;
+};
+
 try {
-  await admin`CREATE SCHEMA ${admin(schema)}`; created = true;
-  db = postgres(process.env.DATABASE_URL, { max: 4, ssl: "require" });
-  const scoped = (strings, ...values) => db.begin(async (tx) => { await tx`SELECT set_config('search_path', ${schema}, true)`; return tx(strings, ...values); });
-  scoped.begin = (fn) => db.begin(async (tx) => { await tx`SELECT set_config('search_path', ${schema}, true)`; return fn(tx); });
-  await scoped`CREATE TABLE admin_quotes (id bigint PRIMARY KEY, customer_email text NOT NULL, lines jsonb NOT NULL, shipping_cents integer NOT NULL, status text NOT NULL)`;
-  await scoped`CREATE TABLE invoice_share_tokens (token_hash text PRIMARY KEY, quote_id bigint NOT NULL, expires_at timestamptz NOT NULL)`;
-  await scoped`CREATE TABLE invoice_payment_attempts (id uuid PRIMARY KEY, quote_id bigint NOT NULL, provider text NOT NULL, amount_cents bigint NOT NULL, state text NOT NULL DEFAULT 'creating', provider_id text UNIQUE, payment_id text, checkout_url text, created_at timestamptz NOT NULL DEFAULT now(), paid_at timestamptz)`;
-  await scoped`CREATE UNIQUE INDEX invoice_payment_one_live ON invoice_payment_attempts (quote_id) WHERE state IN ('creating', 'open', 'paid', 'refunded')`;
-  await scoped`INSERT INTO admin_quotes VALUES (1, 'buyer@example.test', '[{"quantity":2,"unitCents":500}]'::jsonb, 200, 'invoice')`;
-  await scoped`INSERT INTO invoice_share_tokens VALUES ('hash', 1, now() + interval '1 hour')`;
-  const exports = {};
-  const code = ts.transpileModule(fs.readFileSync("lib/invoice-payments.ts", "utf8"), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
-  let paypalOrder;
-  const paypalRequest = async (_path, options) => { if (options?.method === "POST") paypalOrder = { ...paypalOrder, status: "COMPLETED", purchase_units: [{ ...paypalOrder.purchase_units[0], payments: { captures: [{ id: "CAPTURE123", status: "COMPLETED", amount: { currency_code: "USD", value: "12.00" } }] } }] }; return paypalOrder; };
-  vm.runInNewContext(code, { exports, Date, require: (name) => { if (name === "node:crypto") return { randomUUID }; if (name === "./db") return { sql: scoped }; if (name === "./paypal") return { paypalRequest }; throw new Error(name); } });
-  const results = await Promise.allSettled([exports.reserveInvoicePayment("hash", "stripe"), exports.reserveInvoicePayment("hash", "paypal")]);
-  assert.equal(results.filter((r) => r.status === "fulfilled").length, 1);
-  assert.equal(results.filter((r) => r.status === "rejected").length, 1);
-  const winner = results.find((r) => r.status === "fulfilled").value.attempt;
-  assert.equal(Number(winner.amount_cents), 1200);
-  const replay = await exports.reserveInvoicePayment("hash", winner.provider);
-  assert.equal(replay.attempt.id, winner.id);
-  const [count] = await scoped`SELECT count(*)::int AS count FROM invoice_payment_attempts`;
-  assert.equal(count.count, 1);
-  await scoped`INSERT INTO admin_quotes VALUES (2, 'buyer@example.test', '[{"quantity":2,"unitCents":500}]'::jsonb, 200, 'invoice')`;
-  await scoped`INSERT INTO invoice_share_tokens VALUES ('hash2', 2, now() + interval '1 hour')`;
-  const stripe = (await exports.reserveInvoicePayment("hash2", "stripe")).attempt;
-  await exports.attachInvoiceCheckout(stripe.id, "cs_fixture", "https://checkout.stripe.com/fixture");
-  const session = { id: "cs_fixture", metadata: { invoiceAttemptId: stripe.id }, payment_status: "paid", currency: "usd", amount_total: 1200, payment_intent: "pi_fixture" };
-  await assert.rejects(() => exports.recordStripeInvoicePayment({ ...session, amount_total: 1 }));
-  assert.equal(await exports.recordStripeInvoicePayment(session), true);
-  assert.equal(await exports.recordStripeInvoicePayment(session), true);
-  await assert.rejects(() => exports.reserveInvoicePayment("hash2", "stripe"));
-  await scoped`INSERT INTO admin_quotes VALUES (3, 'buyer@example.test', '[{"quantity":2,"unitCents":500}]'::jsonb, 200, 'invoice')`;
-  await scoped`INSERT INTO invoice_share_tokens VALUES ('hash3', 3, now() + interval '1 hour')`;
-  const paypal = (await exports.reserveInvoicePayment("hash3", "paypal")).attempt;
-  await exports.attachInvoiceCheckout(paypal.id, "PAYPAL123", "https://www.paypal.com/fixture");
-  paypalOrder = { id: "PAYPAL123", status: "APPROVED", purchase_units: [{ custom_id: `invoice-${paypal.id}`, amount: { currency_code: "USD", value: "0.01" } }] };
-  await assert.rejects(() => exports.capturePayPalInvoice("PAYPAL123"));
+  insertQuote(1);
+  insertToken("hash", 1);
+
+  const results = await Promise.allSettled([
+    invoicePayments.reserveInvoicePayment("hash", "stripe"),
+    invoicePayments.reserveInvoicePayment("hash", "paypal"),
+  ]);
+  check("only one payment method can start", results.filter((result) => result.status === "fulfilled").length === 1);
+  check("the competing method is refused", results.filter((result) => result.status === "rejected").length === 1);
+  const winner = results.find((result) => result.status === "fulfilled").value.attempt;
+  check("the invoice total includes shipping", Number(winner.amount_cents) === 1200);
+  const replay = await invoicePayments.reserveInvoicePayment("hash", winner.provider);
+  check("a retry reuses the same attempt", replay.attempt.id === winner.id);
+  check("one attempt is stored", db.prepare("SELECT count(*) AS n FROM invoice_payment_attempts").get().n === 1);
+
+  insertQuote(2);
+  insertToken("hash2", 2);
+  const stripe = (await invoicePayments.reserveInvoicePayment("hash2", "stripe")).attempt;
+  await invoicePayments.attachInvoiceCheckout(stripe.id, "cs_fixture", "https://checkout.stripe.com/fixture");
+  const session = {
+    id: "cs_fixture",
+    metadata: { invoiceAttemptId: stripe.id },
+    payment_status: "paid",
+    currency: "usd",
+    amount_total: 1200,
+    payment_intent: "pi_fixture",
+  };
+  let wrongAmount = false;
+  try {
+    await invoicePayments.recordStripeInvoicePayment({ ...session, amount_total: 1 });
+  } catch {
+    wrongAmount = true;
+  }
+  check("a mismatched Stripe total is refused", wrongAmount);
+  check("a Stripe invoice payment is recorded", (await invoicePayments.recordStripeInvoicePayment(session)) === true);
+  check("a replayed Stripe payment is accepted", (await invoicePayments.recordStripeInvoicePayment(session)) === true);
+  let paidAgain = false;
+  try {
+    await invoicePayments.reserveInvoicePayment("hash2", "stripe");
+  } catch {
+    paidAgain = true;
+  }
+  check("a paid invoice cannot start another payment", paidAgain);
+
+  insertQuote(3);
+  insertToken("hash3", 3);
+  const paypal = (await invoicePayments.reserveInvoicePayment("hash3", "paypal")).attempt;
+  await invoicePayments.attachInvoiceCheckout(paypal.id, "PAYPAL123", "https://www.paypal.com/fixture");
+  paypalOrder = {
+    id: "PAYPAL123",
+    status: "APPROVED",
+    purchase_units: [{ custom_id: `invoice-${paypal.id}`, amount: { currency_code: "USD", value: "0.01" } }],
+  };
+  let paypalMismatch = false;
+  try {
+    await invoicePayments.capturePayPalInvoice("PAYPAL123");
+  } catch {
+    paypalMismatch = true;
+  }
+  check("a mismatched PayPal total is refused", paypalMismatch);
   paypalOrder.purchase_units[0].amount.value = "12.00";
-  assert.equal(await exports.capturePayPalInvoice("PAYPAL123"), true);
-  assert.equal(await exports.capturePayPalInvoice("PAYPAL123"), true);
-  await assert.rejects(() => exports.reserveInvoicePayment("hash3", "paypal"));
-  await scoped`INSERT INTO admin_quotes VALUES (4, 'buyer@example.test', '[{"quantity":2,"unitCents":500}]'::jsonb, 200, 'invoice')`;
-  await scoped`INSERT INTO invoice_share_tokens VALUES ('hash4', 4, now() + interval '1 hour')`;
-  const expired = (await exports.reserveInvoicePayment("hash4", "stripe")).attempt;
-  await exports.attachInvoiceCheckout(expired.id, "cs_expired", "https://checkout.stripe.com/expired");
-  await exports.closeStripeInvoiceSession({ id: "cs_expired", metadata: { invoiceAttemptId: expired.id } });
-  const replacement = (await exports.reserveInvoicePayment("hash4", "paypal")).attempt;
-  assert.notEqual(replacement.id, expired.id);
-  await assert.rejects(() => exports.recordStripeInvoicePayment({ ...session, id: "cs_expired", metadata: { invoiceAttemptId: expired.id } }));
-  console.log("PASS: competing payment methods cannot both start; retries reuse the same attempt");
+  check("a PayPal invoice payment is captured", (await invoicePayments.capturePayPalInvoice("PAYPAL123")) === true);
+  check("a replayed PayPal capture is accepted", (await invoicePayments.capturePayPalInvoice("PAYPAL123")) === true);
+  let paypalPaidAgain = false;
+  try {
+    await invoicePayments.reserveInvoicePayment("hash3", "paypal");
+  } catch {
+    paypalPaidAgain = true;
+  }
+  check("a PayPal-paid invoice cannot start another payment", paypalPaidAgain);
+
+  insertQuote(4);
+  insertToken("hash4", 4);
+  const expired = (await invoicePayments.reserveInvoicePayment("hash4", "stripe")).attempt;
+  await invoicePayments.attachInvoiceCheckout(expired.id, "cs_expired", "https://checkout.stripe.com/expired");
+  await invoicePayments.closeStripeInvoiceSession({ id: "cs_expired", metadata: { invoiceAttemptId: expired.id } });
+  const replacement = (await invoicePayments.reserveInvoicePayment("hash4", "paypal")).attempt;
+  check("a closed checkout can be replaced with another method", replacement.id !== expired.id);
+  let latePaid = false;
+  try {
+    await invoicePayments.recordStripeInvoicePayment({
+      ...session,
+      id: "cs_expired",
+      metadata: { invoiceAttemptId: expired.id },
+    });
+  } catch {
+    latePaid = true;
+  }
+  check("a late Stripe event for the closed checkout is refused", latePaid);
+
+  insertQuote(5, "quote");
+  insertToken("hash5", 5);
+  let notInvoiced = false;
+  try {
+    await invoicePayments.reserveInvoicePayment("hash5", "stripe");
+  } catch {
+    notInvoiced = true;
+  }
+  check("a quote that is not an invoice cannot be paid", notInvoiced);
+
+  insertQuote(6);
+  db.prepare("UPDATE invoice_share_tokens SET expires_at = ? WHERE token_hash = ?").run(
+    new Date(Date.now() - 1000).toISOString(),
+    "hash"
+  );
+  let expiredLink = false;
+  try {
+    await invoicePayments.reserveInvoicePayment("hash", "stripe");
+  } catch {
+    expiredLink = true;
+  }
+  check("an expired invoice link cannot be paid", expiredLink);
+} catch (error) {
+  failures += 1;
+  console.log(`FAIL ${error instanceof Error ? error.message : String(error)}`);
 } finally {
-  if (db) await db.end();
-  if (created) await admin`DROP SCHEMA ${admin(schema)} CASCADE`;
-  await admin.end();
+  globalThis.fetch = realFetch;
+  await harness.close();
 }
+
+console.log(failures ? `\n${failures} invoice payment check(s) failed` : "\nall invoice payment checks passed");
+process.exit(failures ? 1 : 0);
