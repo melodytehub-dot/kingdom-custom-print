@@ -13,6 +13,8 @@ import nodeFs from "node:fs";
 import nodePath from "node:path";
 import nodeUrl from "node:url";
 import { mkdirSync, readFileSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 
 // Vite's module runner loads source files without Node's builtin globals, so
@@ -31,8 +33,9 @@ let counter = 0;
  * Pass `{ seed: false }` for an empty catalog.
  */
 export async function createHarness({ seed = true, name = "qa" } = {}) {
-  mkdirSync(".local-db", { recursive: true });
-  const target = `.local-db/${name}-${process.pid}-${counter++}.sqlite`;
+  const directory = join(tmpdir(), "kcp-qa");
+  mkdirSync(directory, { recursive: true });
+  const target = join(directory, `${name}-${process.pid}-${counter++}.sqlite`);
   rmSync(target, { force: true });
 
   const db = new DatabaseSync(target);
