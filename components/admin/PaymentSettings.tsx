@@ -1,7 +1,7 @@
 "use client";
 import { InlineSkeleton } from "@/components/PageSkeleton";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 const fields = [
   ["STRIPE_SECRET_KEY", "Stripe secret key"],
@@ -11,6 +11,20 @@ const fields = [
   ["PAYPAL_WEBHOOK_ID", "PayPal webhook ID"],
 ] as const;
 
+type ProviderCheck = {
+  stripe: string;
+  paypal: string;
+  stripeWebhook: string;
+  paypalWebhook: string;
+};
+
+const CHECK_LABELS: [keyof ProviderCheck, string][] = [
+  ["stripe", "Card payments (Stripe)"],
+  ["stripeWebhook", "Stripe webhook"],
+  ["paypal", "PayPal payments"],
+  ["paypalWebhook", "PayPal webhook"],
+];
+
 export default function PaymentSettings() {
   const [configured, setConfigured] = useState<Record<string, boolean>>({});
   const [available, setAvailable] = useState(false);
@@ -18,6 +32,8 @@ export default function PaymentSettings() {
   const [values, setValues] = useState<Record<string, string>>({});
   const [password, setPassword] = useState("");
   const [saving, setSaving] = useState(false);
+  const [checking, setChecking] = useState(false);
+  const [check, setCheck] = useState<ProviderCheck | null>(null);
   const [notice, setNotice] = useState("");
 
   useEffect(() => {
@@ -26,6 +42,20 @@ export default function PaymentSettings() {
       .then((data) => { setAvailable(data.available); setConfigured(data.fields); })
       .catch(() => setNotice("Payment settings could not be loaded."))
       .finally(() => setLoading(false));
+  }, []);
+
+  const checkConnection = useCallback(async () => {
+    setChecking(true);
+    try {
+      const response = await fetch("/api/admin/payment-check", { cache: "no-store" });
+      const result = (await response.json()) as ProviderCheck & { error?: string };
+      if (!response.ok) { setNotice(result.error ?? "Could not check the payment connection."); return; }
+      setCheck(result);
+    } catch {
+      setNotice("Connection error. Please try again.");
+    } finally {
+      setChecking(false);
+    }
   }, []);
 
   async function save(event: React.FormEvent) {
@@ -37,7 +67,8 @@ export default function PaymentSettings() {
       const result = await response.json();
       if (!response.ok) { setNotice(result.error || "Could not save payment settings."); return; }
       setConfigured(result.fields); setValues({}); setPassword("");
-      setNotice("Payment credentials saved. Check your payment connection before accepting orders.");
+      setNotice("Payment credentials saved. Checking the connection with each provider.");
+      await checkConnection();
     } catch { setNotice("Connection error. Please try again."); } finally { setSaving(false); }
   }
 
@@ -56,8 +87,16 @@ export default function PaymentSettings() {
           </div>)}
         </fieldset>)}
         <div className="field"><label className="label" htmlFor="payment-admin-password">Confirm admin password</label><input id="payment-admin-password" className="input" type="password" required autoComplete="current-password" value={password} onChange={(event) => setPassword(event.target.value)} /></div>
-        <button className="btn" type="submit" disabled={saving}>{saving ? "Saving…" : "Save payment credentials"}</button>
+        <div className="form-actions">
+          <button className="btn" type="submit" disabled={saving}>{saving ? "Saving…" : "Save payment credentials"}</button>
+          <button className="btn btn-light" type="button" disabled={checking || saving} onClick={() => void checkConnection()}>{checking ? "Checking…" : "Check payment connection"}</button>
+        </div>
       </form>}
+    {check ? <div className="banner-note" role="status">
+      <p><strong>Provider check</strong> <button className="link" type="button" disabled={checking} onClick={() => void checkConnection()}>Run again</button></p>
+      <ul>{CHECK_LABELS.map(([key, label]) => <li key={key}>{label}: <strong>{check[key]}</strong></li>)}</ul>
+      <p className="small muted">This reads account status only. It does not charge anything.</p>
+    </div> : null}
     {notice ? <p role="status" className="banner-note">{notice}</p> : null}
   </section>;
 }
