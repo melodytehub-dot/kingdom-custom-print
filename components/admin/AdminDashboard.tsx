@@ -9,7 +9,9 @@ import ArrowRight from "@/components/icons/ArrowRight";
 import AdminRefund from "./AdminRefund";
 import QuotesPanel from "./QuotesPanel";
 import InventoryPanel from "./InventoryPanel";
+import HomepageSections from "./HomepageSections";
 import { HERO_IMAGES } from "@/lib/hero-slides";
+import { homepageContentFromSettings } from "@/lib/homepage-builder";
 import { formatUSD } from "@/lib/pricing";
 import { mockupsForProduct } from "@/lib/mockups";
 import {
@@ -27,7 +29,7 @@ import type {
   SiteSettings,
 } from "@/lib/catalog-types";
 
-type Tab = "overview" | "orders" | "products" | "inventory" | "customers" | "quotes" | "settings";
+type Tab = "overview" | "orders" | "products" | "inventory" | "customers" | "quotes" | "homepage" | "preview" | "settings";
 
 const TABS: { id: Tab; label: string }[] = [
   { id: "overview", label: "Overview" },
@@ -36,6 +38,8 @@ const TABS: { id: Tab; label: string }[] = [
   { id: "inventory", label: "Inventory" },
   { id: "customers", label: "Customers" },
   { id: "quotes", label: "Quotes & invoices" },
+  { id: "homepage", label: "Homepage sections" },
+  { id: "preview", label: "Website preview" },
   { id: "settings", label: "Settings" },
 ];
 
@@ -74,6 +78,7 @@ export default function AdminDashboard({
 }) {
   const [tab, setTab] = useState<Tab>(initialTab);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [homepageDirty, setHomepageDirty] = useState(false);
   const menuToggleRef = useRef<HTMLButtonElement>(null);
   const router = useRouter();
   const [signedOut, setSignedOut] = useState(false);
@@ -84,6 +89,7 @@ export default function AdminDashboard({
   }
 
   function selectTab(next: Tab) {
+    if (tab === "homepage" && next !== "homepage" && homepageDirty && !window.confirm("You have unsaved homepage changes. Leave without saving?")) return;
     setTab(next);
     setMenuOpen(false);
     if (menuOpen) menuToggleRef.current?.focus();
@@ -118,8 +124,10 @@ export default function AdminDashboard({
         <nav id="admin-menu" aria-label="Dashboard sections" className={`admin-tabs${menuOpen ? " is-open" : ""}`}>
           <div className="admin-menu-heading"><strong>Dashboard</strong><button type="button" onClick={closeMenu} aria-label="Close menu"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><path d="M5 5l14 14M19 5 5 19" /></svg></button></div>
           {TABS.map((t) => (
+          <div className="admin-nav-item" key={t.id}>
+          {t.id === "orders" ? <p className="admin-nav-group">Store</p> : null}
+          {t.id === "homepage" ? <p className="admin-nav-group">Website</p> : null}
           <button
-              key={t.id}
               type="button"
               className={`admin-tab${tab === t.id ? " is-active" : ""}`}
               aria-current={tab === t.id ? "page" : undefined}
@@ -127,6 +135,7 @@ export default function AdminDashboard({
             >
               {t.label}
             </button>
+          </div>
           ))}
         </nav>
         <div className="admin-bar-right">
@@ -140,13 +149,14 @@ export default function AdminDashboard({
         </div>
       </div>
 
+      <div className="admin-content">
       {!data.paymentsLive ? (
         <p className="banner-note" role="status">
           Card payments are unavailable. Contact your website administrator before accepting card orders.
         </p>
       ) : null}
 
-      {tab === "overview" ? <Overview data={data} onOpenOrder={() => selectTab("orders")} /> : null}
+      {tab === "overview" ? <Overview data={data} onNavigate={selectTab} /> : null}
       {tab === "orders" ? (
         <Orders data={data} detail={orderDetail} />
       ) : null}
@@ -154,9 +164,39 @@ export default function AdminDashboard({
       {tab === "inventory" ? <InventoryPanel products={data.products} /> : null}
       {tab === "customers" ? <Customers data={data} /> : null}
       {tab === "quotes" ? <QuotesPanel /> : null}
+      {tab === "homepage" ? <HomepageSections onDirtyChange={setHomepageDirty} products={data.products} /> : null}
+      {tab === "preview" ? <WebsitePreview /> : null}
       {tab === "settings" ? <SettingsPanel settings={data.settings} categories={data.categories} /> : null}
+      </div>
     </div>
   );
+}
+
+const PREVIEW_WIDTHS = { mobile: 375, tablet: 768, desktop: 1280 } as const;
+
+function WebsitePreview() {
+  const [viewport, setViewport] = useState<"mobile" | "tablet" | "desktop">("mobile");
+  const [previewContainer, setPreviewContainer] = useState<HTMLDivElement | null>(null);
+  const [previewWidth, setPreviewWidth] = useState(0);
+  const deviceWidth = PREVIEW_WIDTHS[viewport];
+  const previewScale = previewWidth ? Math.min(1, previewWidth / deviceWidth) : 1;
+
+  useEffect(() => {
+    if (!previewContainer) return;
+    const update = () => setPreviewWidth(previewContainer.clientWidth);
+    update();
+    const observer = new ResizeObserver(update);
+    observer.observe(previewContainer);
+    return () => observer.disconnect();
+  }, [previewContainer]);
+
+  return <section className="admin-site-preview" aria-label="Website preview">
+    <div className="admin-block-head"><div><h2 className="h3">Website preview</h2><p className="small muted">See how your storefront fits different screen sizes.</p></div><Link href="/" target="_blank" className="link">Open storefront <ArrowRight /></Link></div>
+    <div className="admin-preview-toolbar" role="group" aria-label="Preview screen size">
+      {(["mobile", "tablet", "desktop"] as const).map(size => <button type="button" key={size} aria-pressed={viewport === size} onClick={() => setViewport(size)}>{size[0].toUpperCase() + size.slice(1)}</button>)}
+    </div>
+    <div className="admin-preview-scroll"><div ref={setPreviewContainer} className="admin-preview-fit"><div className="admin-preview-frame" style={{ width: deviceWidth * previewScale, height: 800 * previewScale }}><iframe key={viewport} title={`${viewport} storefront preview`} src="/" style={{ width: deviceWidth, transform: `scale(${previewScale})` }} /></div></div></div>
+  </section>;
 }
 
 /* -------------------------------------------------------------------------
@@ -165,22 +205,30 @@ export default function AdminDashboard({
 
 function Overview({
   data,
-  onOpenOrder,
+  onNavigate,
 }: {
   data: AdminData;
-  onOpenOrder: () => void;
+  onNavigate: (tab: Tab) => void;
 }) {
   const { stats, orders } = data;
   const needsAction = orders.filter((o) => o.status === "pending");
 
   return (
     <section aria-label="Overview">
+      <div className="admin-overview-heading"><h2>Store overview</h2><p>See recent activity and manage your store.</p></div>
       <dl className="stat-grid">
         <Stat label="Orders" value={String(stats.orders)} />
-        <Stat label="Garments ordered" value={String(stats.garments)} />
+        <Stat label="Items ordered" value={String(stats.garments)} />
         <Stat label="Paid revenue" value={formatUSD(stats.revenue)} />
         <Stat label="Awaiting action" value={String(needsAction.length)} />
       </dl>
+
+      <div className="admin-quick-actions" aria-label="Quick actions">
+        <button type="button" onClick={() => onNavigate("orders")}><strong>Orders</strong><span>Review customer orders</span><ArrowRight /></button>
+        <button type="button" onClick={() => onNavigate("products")}><strong>Products</strong><span>Add or edit products</span><ArrowRight /></button>
+        <button type="button" onClick={() => onNavigate("inventory")}><strong>Inventory</strong><span>Update stock quantities</span><ArrowRight /></button>
+        <button type="button" onClick={() => onNavigate("settings")}><strong>Website</strong><span>Edit website content</span><ArrowRight /></button>
+      </div>
 
       {needsAction.length ? (
         <div className="admin-block">
@@ -188,7 +236,7 @@ function Overview({
           <p className="small muted">
             These orders have not been marked paid yet.
           </p>
-          <button type="button" className="link" onClick={onOpenOrder}>
+          <button type="button" className="link" onClick={() => onNavigate("orders")}>
             Review all orders
             <ArrowRight />
           </button>
@@ -1559,6 +1607,7 @@ function SettingsPanel({
   categories: AdminData["categories"];
 }) {
   const [form, setForm] = useState(settings);
+  const [homepageBaseline, setHomepageBaseline] = useState(() => homepageContentFromSettings(settings));
   const [categories, setCategories] = useState(initialCategories);
   const [categoryDraft, setCategoryDraft] = useState<{ id?: number; name: string; slug: string; description: string; sortOrder: string } | null>(null);
   const [categorySaving, setCategorySaving] = useState(false);
@@ -1575,6 +1624,7 @@ function SettingsPanel({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           ...form,
+          expectedHomepageContent: homepageBaseline,
           shippingFlat: Number(form.shippingFlat),
           freeShippingThreshold: Number(form.freeShippingThreshold),
         }),
@@ -1584,6 +1634,7 @@ function SettingsPanel({
         setState({ tone: "error", text: json.error ?? "Settings could not be saved." });
         return;
       }
+      setHomepageBaseline(homepageContentFromSettings(form));
       setState({ tone: "ok", text: "Settings saved. They apply across the storefront." });
     } catch {
       setState({ tone: "error", text: "Network error. Try again." });
@@ -1633,7 +1684,7 @@ function SettingsPanel({
           </div>)}
           {(["heroImage1", "heroImage2", "heroImage3"] as const).map((key, index) => <div className="field" key={key}>
             <label className="label" htmlFor={`s-${key}`}>Slideshow image {index + 1}</label>
-            <select id={`s-${key}`} className="select" value={form[key]} onChange={(e) => setForm({ ...form, [key]: e.target.value })}>{HERO_IMAGES.map((image) => <option key={image.src} value={image.src}>{image.name}</option>)}</select>
+            <select id={`s-${key}`} className="select" value={form[key]} onChange={(e) => setForm({ ...form, [key]: e.target.value })}>{HERO_IMAGES.map((image) => <option key={image.src} value={image.src}>{image.name}</option>)}{!HERO_IMAGES.some(image => image.src === form[key]) ? <option value={form[key]}>Uploaded photo</option> : null}</select>
           </div>)}
         </fieldset>
         <fieldset className="fieldset">

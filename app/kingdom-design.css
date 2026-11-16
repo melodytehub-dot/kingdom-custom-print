@@ -124,6 +124,23 @@
 .kcp-process-steps strong { font-size: 18px; }
 .kcp-process-steps p { margin: 6px 0 0; color: #dfcdce; font-size: 14px; line-height: 1.6; }
 .kcp-contact { display: flex; justify-content: space-between; align-items: end; gap: 30px; padding-block: clamp(75px,8vw,120px); }
+.kcp-custom-message { padding-block: clamp(28px, 5vw, 64px); }
+.kcp-custom-message-inner { display: flex; flex-wrap: wrap; align-items: center; gap: clamp(24px, 4vw, 48px); padding: clamp(26px, 5vw, 60px); border-radius: 18px; background: #f5e8e6; overflow-wrap: anywhere; }
+.kcp-custom-message-inner > div { flex: 1 1 280px; min-width: 0; }
+.kcp-custom-message-image { display: block; flex: 1 1 280px; width: min(100%, 500px); max-width: 100%; height: auto; border-radius: 12px; }
+.kcp-custom-message h2 { margin: 0; font-size: clamp(28px, 4vw, 48px); line-height: 1.1; letter-spacing: -.04em; }
+.kcp-custom-message p { max-width: 60ch; margin: 16px 0; line-height: 1.65; }
+.kcp-custom-message .kcp-button { margin-top: 8px; }
+.kcp-custom-message[data-tone="ivory"] .kcp-custom-message-inner { background: #f6f3ed; }
+.kcp-custom-message[data-tone="dark"] .kcp-custom-message-inner { background: #21191a; color: #fff; }
+.kcp-custom-message[data-tone="dark"] .kcp-button-dark { background: #fff; color: #21191a; }
+.kcp-custom-message[data-tone="dark"] .kcp-button-dark:hover { background: #f1dcd8; }
+.kcp-custom-message[data-alignment="center"] .kcp-custom-message-inner > div { text-align: center; }
+.kcp-custom-message[data-alignment="center"] p { margin-inline: auto; }
+.kcp-custom-message[data-image-position="left"] .kcp-custom-message-image { order: -1; }
+.kcp-custom-faq { padding-block: clamp(36px, 6vw, 80px); }
+.kcp-custom-faq > h2 { margin: 0 0 12px; font-size: clamp(28px, 4vw, 48px); line-height: 1.1; letter-spacing: -.04em; overflow-wrap: anywhere; }
+.kcp-custom-faq > p { max-width: 60ch; line-height: 1.65; }
 .mm-footer { border-top: 1px solid #e7dcd8; background: radial-gradient(ellipse at 85% 0%,#f3d3d0,transparent 42%),linear-gradient(145deg,#f7f0eb,#e9e0dc); }
 .kcp-footer-lead { display: flex; justify-content: space-between; align-items: end; gap: 24px; margin-bottom: clamp(55px,6vw,90px); padding-bottom: clamp(35px,4vw,60px); border-bottom: 1px solid #d9c7c2; }
 .kcp-footer-lead div > span { color: #ac2438; font-size: 10px; font-weight: 750; letter-spacing: .15em; }

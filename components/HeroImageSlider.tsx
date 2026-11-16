@@ -84,6 +84,7 @@ export default function HeroImageSlider({ slides: SLIDES }: { slides: readonly {
           <div
             key={`${slide.src}-${index}`}
             className="mm-hero-slide"
+            data-home-hero-slide={index + 1}
             role="group"
             aria-roledescription="slide"
             aria-label={`${index + 1} of ${SLIDES.length}: ${slide.name}`}

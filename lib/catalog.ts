@@ -1,5 +1,6 @@
 import postgres from "postgres";
 import { sql, num } from "./db";
+import { HOMEPAGE_CONTENT_FIELDS, homepageContentFromSettings, type HomepageContent } from "./homepage-builder";
 import type {
   Category,
   PriceBreak,
@@ -474,8 +475,18 @@ export async function getSettings(): Promise<SiteSettings> {
   };
 }
 
-export async function saveSettings(settings: SiteSettings): Promise<void> {
+export class HomepageContentConflict extends Error {}
+
+export async function saveSettings(settings: SiteSettings, expectedHomepage?: HomepageContent): Promise<void> {
   await sql.begin(async (tx) => {
+    await tx`SELECT pg_advisory_xact_lock(hashtext('kcp_homepage_layout_v1'))`;
+    if (expectedHomepage) {
+      const rows = await tx<{ key: string; value: unknown }[]>`SELECT key, value FROM site_settings`;
+      const values = new Map(rows.map(row => [row.key, row.value]));
+      const current = homepageContentFromSettings(DEFAULT_SETTINGS);
+      for (const field of HOMEPAGE_CONTENT_FIELDS) current[field.name] = String(values.get(field.dbKey) ?? current[field.name]);
+      if (JSON.stringify(current) !== JSON.stringify(expectedHomepage)) throw new HomepageContentConflict();
+    }
     const entries: [string, unknown][] = [
       ["hero_label", settings.heroLabel],
       ["hero_headline_top", settings.heroHeadlineTop],
