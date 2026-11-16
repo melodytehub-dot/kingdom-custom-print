@@ -49,7 +49,9 @@ const nextConfig: NextConfig = {
         source: "/account/verify",
         headers: [
           { key: "Cache-Control", value: "private, no-store" },
-          { key: "Referrer-Policy", value: "no-referrer" },
+          // The token stays in the URL, but the confirmation form needs a real
+          // Origin header; `no-referrer` made Chrome send `Origin: null`.
+          { key: "Referrer-Policy", value: "same-origin" },
           { key: "X-Robots-Tag", value: "noindex, nofollow" },
         ],
       },

@@ -9,7 +9,7 @@ const harness = await createHarness({ name: "cutout-expiry" });
 const { db, load } = harness;
 
 const route = await load("/app/api/cutout-bridge/[id]/route.ts");
-const { sql } = await load("/lib/db.ts");
+const { sweepExpiredCutout } = await load("/lib/media-storage.ts");
 
 const currentId = "a".repeat(32);
 const expiredId = "b".repeat(32);
@@ -48,7 +48,7 @@ try {
   check("an invalid id is not served", (await get("invalid")).status === 404);
 
   // The Worker's scheduled handler runs this exact sweep before serving traffic.
-  await sql`DELETE FROM cutout_bridge_images WHERE created_at < strftime('%Y-%m-%dT%H:%M:%fZ','now','-1 day')`;
+  await sweepExpiredCutout();
 
   const remaining = db.prepare("SELECT id FROM cutout_bridge_images").all().map((row) => row.id);
   check("the sweep deletes only the expired image", JSON.stringify(remaining) === JSON.stringify([currentId]));

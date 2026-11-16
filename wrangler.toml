@@ -19,6 +19,11 @@ binding = "DB"
 database_name = "kingdom-custom-print"
 database_id = "d40d9352-2ef1-416c-8948-8a6601113c30"
 
+# Product photos and hosted-cutout bridge images.
+[[r2_buckets]]
+binding = "MEDIA"
+bucket_name = "kingdom-custom-print-media"
+
 # Custom routes
 [[routes]]
 pattern = "kingdomcustomprint.com/*"

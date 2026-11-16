@@ -8,6 +8,7 @@ import { HOMEPAGE_DRAFT_KEY, HOMEPAGE_DRAFT_REVISION_KEY, HOMEPAGE_HISTORY_KEY, 
 import { revalidatePath } from "next/cache";
 import { DEFAULT_SETTINGS, getSettings, parseSettingValue } from "@/lib/catalog";
 import { isGuardFailure } from "@/lib/inventory-reservations";
+import { mediaExists } from "@/lib/media-storage";
 
 export const dynamic = "force-dynamic";
 
@@ -196,16 +197,14 @@ export async function POST(req: Request) {
     }
     if (block.image?.startsWith("/api/product-media/")) {
       const id = block.image.slice("/api/product-media/".length);
-      const media = await sql<{ id: string }[]>`SELECT id FROM catalog_media WHERE id = ${id}`;
-      if (!media.length) return NextResponse.json({ error: "An image in a message section is no longer available. Choose another image before publishing." }, { status: 422 });
+      if (!(await mediaExists("product", id))) return NextResponse.json({ error: "An image in a message section is no longer available. Choose another image before publishing." }, { status: 422 });
     }
   }
   for (const key of ["heroImage1", "heroImage2", "heroImage3"] as const) {
     const path = nextContent[key];
     if (path.startsWith("/api/product-media/")) {
       const id = path.slice("/api/product-media/".length);
-      const media = await sql<{ id: string }[]>`SELECT id FROM catalog_media WHERE id = ${id}`;
-      if (!media.length) return NextResponse.json({ error: "An uploaded hero image is no longer available. Choose another image before publishing." }, { status: 422 });
+      if (!(await mediaExists("product", id))) return NextResponse.json({ error: "An uploaded hero image is no longer available. Choose another image before publishing." }, { status: 422 });
     }
   }
 

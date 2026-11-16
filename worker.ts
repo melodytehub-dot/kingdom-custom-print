@@ -1,14 +1,15 @@
 import vinextWorker from "vinext/server/fetch-handler";
-import { sql } from "./lib/db";
 import {
   closeDatabaseContext,
   runWithDatabaseContext,
   type DatabaseContext,
 } from "./lib/db-context";
 import type { DatabaseLike } from "./lib/sqlite";
+import { sweepExpiredCutout, type MediaBucket } from "./lib/media-storage";
 
 type WorkerEnvironment = {
   DB: DatabaseLike;
+  MEDIA?: MediaBucket;
   [key: string]: unknown;
 };
 
@@ -25,10 +26,11 @@ const app = vinextWorker as WorkerHandler;
 
 export default {
   async scheduled(_controller: unknown, env: WorkerEnvironment) {
+    globalThis.__kcpMediaBucket ??= env.MEDIA;
     const databaseContext: DatabaseContext = { db: env.DB };
     try {
       await runWithDatabaseContext(databaseContext, async () => {
-        await sql`DELETE FROM cutout_bridge_images WHERE created_at < strftime('%Y-%m-%dT%H:%M:%fZ','now','-1 day')`;
+        await sweepExpiredCutout();
       });
     } finally {
       await closeDatabaseContext(databaseContext);
@@ -36,6 +38,7 @@ export default {
   },
   async fetch(request: Request, env: WorkerEnvironment, ctx: WorkerExecutionContext) {
     globalThis.__kcpWorkerDb ??= env.DB;
+    globalThis.__kcpMediaBucket ??= env.MEDIA;
     const databaseContext: DatabaseContext = { db: env.DB };
 
     try {
@@ -44,9 +47,15 @@ export default {
       );
       const headers = new Headers(response.headers);
       const pathname = new URL(request.url).pathname;
-      if (/^\/(?:invoice|quote)\//.test(pathname) || /^\/account\/verify\/?$/.test(pathname)) {
+      if (/^\/(?:invoice|quote)\//.test(pathname)) {
         headers.set("Cache-Control", "private, no-store");
         headers.set("Referrer-Policy", "no-referrer");
+        headers.set("X-Robots-Tag", "noindex, nofollow");
+      } else if (/^\/account\/verify\/?$/.test(pathname)) {
+        headers.set("Cache-Control", "private, no-store");
+        // The confirmation form must send a real Origin header; `no-referrer`
+        // makes Chrome submit `Origin: null` and fail the same-origin check.
+        headers.set("Referrer-Policy", "same-origin");
         headers.set("X-Robots-Tag", "noindex, nofollow");
       }
 

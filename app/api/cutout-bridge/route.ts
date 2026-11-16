@@ -1,8 +1,8 @@
 import { randomBytes } from "node:crypto";
 import { NextResponse } from "next/server";
-import { sql } from "@/lib/db";
 import { authAttemptAllowed, sameOrigin } from "@/lib/customer-auth";
 import { limitedFormData } from "@/lib/limited-form-data";
+import { putMedia, sweepExpiredCutout } from "@/lib/media-storage";
 
 export const runtime = "nodejs";
 
@@ -10,12 +10,11 @@ export const runtime = "nodejs";
  * Upload for hosted background removal.
  *
  * imgix renders `bg-remove` by fetching the original photo from a public URL,
- * so a photo the editor is cutting out is parked here under a random id and
- * served back by the sibling GET route; imgix fetches it from there. Rows are
+ * so a photo the editor is cutting out is parked in R2 under a random id and
+ * served back by the sibling GET route; imgix fetches it from there. Objects are
  * swept after a day.
  */
-// D1 caps a row at 2 MB, so a parked photo has to stay comfortably below it.
-const MAX_BYTES = 1_900_000;
+const MAX_BYTES = 10_000_000;
 const CONTENT_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
 
 export async function POST(request: Request) {
@@ -27,7 +26,7 @@ export async function POST(request: Request) {
   try {
     form = await limitedFormData(request, MAX_BYTES + 65_536);
   } catch (error) {
-    if (error instanceof RangeError) return NextResponse.json({ error: "Keep the photo under 2 MB." }, { status: 413 });
+    if (error instanceof RangeError) return NextResponse.json({ error: "Keep the photo under 10 MB." }, { status: 413 });
     return NextResponse.json({ error: "Send the photo as form data." }, { status: 400 });
   }
 
@@ -40,14 +39,14 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Use a JPEG, PNG or WebP photo." }, { status: 415 });
   }
   if (file.size > MAX_BYTES) {
-    return NextResponse.json({ error: "Keep the photo under 2 MB." }, { status: 413 });
+    return NextResponse.json({ error: "Keep the photo under 10 MB." }, { status: 413 });
   }
 
   const bytes = new Uint8Array(await file.arrayBuffer());
   const id = randomBytes(16).toString("hex");
 
-  await sql`DELETE FROM cutout_bridge_images WHERE created_at < strftime('%Y-%m-%dT%H:%M:%fZ','now','-1 day')`;
-  await sql`INSERT INTO cutout_bridge_images (id, content_type, bytes) VALUES (${id}, ${contentType}, ${bytes})`;
+  await putMedia("cutout", id, bytes, contentType);
+  await sweepExpiredCutout().catch(() => {});
 
   return NextResponse.json({ id, path: `/api/cutout-bridge/${id}` });
 }

@@ -1,11 +1,11 @@
 import { NextResponse } from "next/server";
-import { sql } from "@/lib/db";
+import { readMedia } from "@/lib/media-storage";
 
 export const runtime = "nodejs";
 
 /**
  * Serves a parked photo so imgix can fetch it during hosted background
- * removal. Random private ids; rows are swept after a day by the POST.
+ * removal. Random private ids; objects are swept after a day.
  */
 export async function GET(
   _request: Request,
@@ -16,16 +16,12 @@ export async function GET(
     return new NextResponse("Not found", { status: 404 });
   }
 
-  const rows = await sql<{ content_type: string; bytes: Buffer }[]>`
-    SELECT content_type, bytes FROM cutout_bridge_images
-    WHERE id = ${id} AND created_at > strftime('%Y-%m-%dT%H:%M:%fZ','now','-1 day')
-  `;
-  const row = rows[0];
+  const row = await readMedia("cutout", id);
   if (!row) return new NextResponse("Not found", { status: 404 });
 
   return new NextResponse(new Uint8Array(row.bytes), {
     headers: {
-      "Content-Type": row.content_type,
+      "Content-Type": row.contentType,
       "Cache-Control": "private, no-store",
       "X-Content-Type-Options": "nosniff",
     },

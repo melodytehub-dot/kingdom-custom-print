@@ -11,7 +11,7 @@ import {
   type ProductInput,
 } from "@/lib/catalog";
 import type { ProductKind } from "@/lib/types";
-import { sql } from "@/lib/db";
+import { mediaExists } from "@/lib/media-storage";
 
 export const dynamic = "force-dynamic";
 
@@ -53,8 +53,8 @@ function slugify(value: string): string {
 async function photosExist(product: ProductInput): Promise<boolean> {
   const ids = [...new Set(product.colors.flatMap(color => [color.frontImage, color.backImage, ...(color.photos ?? [])]).filter((url): url is string => Boolean(url)).map(url => url.split("/").pop()!))];
   if (!ids.length) return true;
-  const rows = await sql<{ id: string }[]>`SELECT id FROM catalog_media WHERE id IN (${sql.array(ids)})`;
-  return rows.length === ids.length;
+  const found = await Promise.all(ids.map((id) => mediaExists("product", id)));
+  return found.every(Boolean);
 }
 
 function validate(raw: RawProduct): { value?: ProductInput; error?: string } {

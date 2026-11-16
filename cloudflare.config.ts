@@ -23,6 +23,7 @@ export default defineConfig({
       ASSETS: bindings.assets(),
       VINEXT_KV_CACHE: bindings.kv({ id: "b93c6df2d79f47f8ae6e5b0d560c35bc" }),
       DB: bindings.d1({ id: "d40d9352-2ef1-416c-8948-8a6601113c30", name: "kingdom-custom-print" }),
+      MEDIA: bindings.r2({ name: "kingdom-custom-print-media" }),
       SUPPORT_INBOUND_DOMAIN: bindings.text("untuulunue.resend.app"),
     },
   }),

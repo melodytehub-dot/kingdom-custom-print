@@ -221,7 +221,7 @@ export default function AdminPages() {
             <label className="label" htmlFor={`block-image-${block.id}`}>Image address</label>
             <input id={`block-image-${block.id}`} className="input" value={block.src} disabled={busy} onChange={event => updateBlock(block.id, { src: event.target.value })} placeholder="/api/product-media/…" />
             <input className="admin-image-upload" type="file" accept="image/jpeg,image/png,image/webp" aria-label="Upload an image for this block" disabled={busy || uploading} onChange={event => { void uploadImage(block.id, event.target.files?.[0]); event.currentTarget.value = ""; }} />
-            <span className="hint">JPG, PNG or WebP, up to 2 MB.</span>
+            <span className="hint">JPG, PNG or WebP, up to 15 MB.</span>
             <label className="label" htmlFor={`block-alt-${block.id}`}>Image description</label>
             <input id={`block-alt-${block.id}`} className="input" maxLength={PAGE_LIMITS.alt} value={block.alt} disabled={busy} onChange={event => updateBlock(block.id, { alt: event.target.value })} />
             <span className="hint">Describe the image for screen readers.</span>

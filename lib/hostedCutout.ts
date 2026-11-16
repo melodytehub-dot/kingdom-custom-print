@@ -20,11 +20,11 @@ import { encodeCanvasUnder } from "./design";
 import { imgixCutoutUrl } from "./imgixCutout";
 
 /**
- * Photos are parked in the database, and D1 caps a row at 2 MB, so keep a
- * comfortable margin below that.
+ * Photos are parked in R2, which has no 2 MB row limit; keep a generous cap so
+ * a phone's camera photo goes through without needless re-encoding.
  */
-const BRIDGE_ACCEPT_BYTES = 1_800_000;
-const BRIDGE_TARGET_BYTES = 1_800_000;
+const BRIDGE_ACCEPT_BYTES = 10_000_000;
+const BRIDGE_TARGET_BYTES = 10_000_000;
 /** Total time the hosted render may take, first cold render included. */
 const RENDER_DEADLINE_MS = 120_000;
 /** Gap between "still processing" retries. */
