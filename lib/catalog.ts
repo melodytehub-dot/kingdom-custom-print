@@ -418,6 +418,8 @@ export interface SiteSettings {
   homeContactTitle: string;
   homeContactDescription: string;
   announcement: string;
+  announcementLink: string;
+  footerBlurb: string;
   shippingFlat: number;
   freeShippingThreshold: number;
   contactEmail: string;
@@ -439,6 +441,8 @@ export const DEFAULT_SETTINGS: SiteSettings = {
   homeContactTitle: "READY TO ORDER?",
   homeContactDescription: "Bulk order, team gear, or a one-off run — send us the details and we will give you a straight answer on timing and pricing.",
   announcement: "Free US shipping on orders over $75",
+  announcementLink: "/shop",
+  footerBlurb: "Custom apparel for your ideas, your team, and your everyday. Choose a garment and make it yours in our online design studio.",
   shippingFlat: 6.95,
   freeShippingThreshold: 75,
   contactEmail: "",
@@ -464,6 +468,8 @@ export async function getSettings(): Promise<SiteSettings> {
     homeContactTitle: String(map.get("home_contact_title") ?? DEFAULT_SETTINGS.homeContactTitle),
     homeContactDescription: String(map.get("home_contact_description") ?? DEFAULT_SETTINGS.homeContactDescription),
     announcement: String(map.get("announcement") ?? DEFAULT_SETTINGS.announcement),
+    announcementLink: String(map.get("announcement_link") ?? DEFAULT_SETTINGS.announcementLink),
+    footerBlurb: String(map.get("footer_blurb") ?? DEFAULT_SETTINGS.footerBlurb),
     shippingFlat: num(map.get("shipping_flat") ?? DEFAULT_SETTINGS.shippingFlat),
     freeShippingThreshold: num(
       map.get("free_shipping_threshold") ?? DEFAULT_SETTINGS.freeShippingThreshold
@@ -500,6 +506,8 @@ export async function saveSettings(settings: SiteSettings, expectedHomepage?: Ho
       ["home_contact_title", settings.homeContactTitle],
       ["home_contact_description", settings.homeContactDescription],
       ["announcement", settings.announcement],
+      ["announcement_link", settings.announcementLink],
+      ["footer_blurb", settings.footerBlurb],
       ["shipping_flat", settings.shippingFlat],
       ["free_shipping_threshold", settings.freeShippingThreshold],
       ["contact_email", settings.contactEmail],

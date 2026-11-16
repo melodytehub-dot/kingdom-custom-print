@@ -7,13 +7,24 @@ declare global {
   var __kcpWorkerConnectionString: string | undefined;
 }
 
+function isLocalDatabase(url: string) {
+  try {
+    const { hostname } = new URL(url);
+    return hostname === "localhost" || hostname === "127.0.0.1" || hostname === "::1";
+  } catch {
+    return false;
+  }
+}
+
 function createClient(url: string, isWorkerRequest = false) {
+  const local = !isWorkerRequest && isLocalDatabase(url);
   return postgres(url, {
     max: isWorkerRequest ? 5 : process.env.NODE_ENV === "production" ? 5 : 3,
     // Hyperdrive provides its own Worker-facing connection string and TLS
     // settings. Forcing Node's SSL mode here can make the TCP socket handshake
-    // stall. Local Neon connections still require SSL.
-    ...(!isWorkerRequest ? { ssl: "require" as const } : {}),
+    // stall. Local Neon connections still require SSL; the local Postgres
+    // server used for development does not support it.
+    ...(!isWorkerRequest ? { ssl: local ? false : ("require" as const) } : {}),
     idle_timeout: 20,
     connect_timeout: 15,
     ...(isWorkerRequest ? { fetch_types: false } : {}),

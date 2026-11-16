@@ -22,7 +22,7 @@ export async function POST(req: Request) {
 
   let allowed: boolean;
   try { allowed = await authAttemptAllowed(req, "__admin_login__"); }
-  catch { return NextResponse.json({ error: "Sign-in is temporarily unavailable. Please try again." }, { status: 503 }); }
+  catch { return NextResponse.json({ error: "Sign-in is unavailable because the store database is not responding. Please try again shortly." }, { status: 503 }); }
   if (!allowed) {
     return NextResponse.json(
       { error: "Too many attempts. Try again in a few minutes." },

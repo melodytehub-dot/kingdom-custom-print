@@ -14,6 +14,8 @@ export interface SiteSettings {
   homeContactTitle: string;
   homeContactDescription: string;
   announcement: string;
+  announcementLink: string;
+  footerBlurb: string;
   shippingFlat: number;
   freeShippingThreshold: number;
   contactEmail: string;

@@ -10,6 +10,7 @@ import AdminRefund from "./AdminRefund";
 import QuotesPanel from "./QuotesPanel";
 import InventoryPanel from "./InventoryPanel";
 import HomepageSections from "./HomepageSections";
+import AdminPages from "./AdminPages";
 import { HERO_IMAGES } from "@/lib/hero-slides";
 import { homepageContentFromSettings } from "@/lib/homepage-builder";
 import { formatUSD } from "@/lib/pricing";
@@ -29,7 +30,7 @@ import type {
   SiteSettings,
 } from "@/lib/catalog-types";
 
-type Tab = "overview" | "orders" | "products" | "inventory" | "customers" | "quotes" | "homepage" | "preview" | "settings";
+type Tab = "overview" | "orders" | "products" | "inventory" | "customers" | "quotes" | "homepage" | "pages" | "preview" | "settings";
 
 const TABS: { id: Tab; label: string }[] = [
   { id: "overview", label: "Overview" },
@@ -39,6 +40,7 @@ const TABS: { id: Tab; label: string }[] = [
   { id: "customers", label: "Customers" },
   { id: "quotes", label: "Quotes & invoices" },
   { id: "homepage", label: "Homepage sections" },
+  { id: "pages", label: "Pages" },
   { id: "preview", label: "Website preview" },
   { id: "settings", label: "Settings" },
 ];
@@ -165,6 +167,7 @@ export default function AdminDashboard({
       {tab === "customers" ? <Customers data={data} /> : null}
       {tab === "quotes" ? <QuotesPanel /> : null}
       {tab === "homepage" ? <HomepageSections onDirtyChange={setHomepageDirty} products={data.products} /> : null}
+      {tab === "pages" ? <AdminPages /> : null}
       {tab === "preview" ? <WebsitePreview /> : null}
       {tab === "settings" ? <SettingsPanel settings={data.settings} categories={data.categories} /> : null}
       </div>
@@ -1715,6 +1718,35 @@ function SettingsPanel({
             onChange={(e) => setForm({ ...form, announcement: e.target.value })}
           />
           <span className="hint">Shown across the top of every page.</span>
+        </div>
+
+        <div className="field">
+          <label className="label" htmlFor="s-announcement-link">
+            Announcement link
+          </label>
+          <input
+            id="s-announcement-link"
+            className="input"
+            value={form.announcementLink}
+            placeholder="/shop"
+            onChange={(e) => setForm({ ...form, announcementLink: e.target.value })}
+          />
+          <span className="hint">Optional. Use a page on your website, such as /shop. Leave blank to keep the bar as plain text.</span>
+        </div>
+
+        <div className="field">
+          <label className="label" htmlFor="s-footer-blurb">
+            Footer introduction
+          </label>
+          <textarea
+            id="s-footer-blurb"
+            className="textarea"
+            rows={3}
+            maxLength={350}
+            value={form.footerBlurb}
+            onChange={(e) => setForm({ ...form, footerBlurb: e.target.value })}
+          />
+          <span className="hint">Shown in the footer beside your logo.</span>
         </div>
 
         <div className="field-grid">

@@ -26,3 +26,9 @@ skills-lock.json
 /dist/
 .vinext/
 .cloudflare/
+
+# local development database and QA helpers
+.local-db/
+.qa-tsconfig.json
+.qa-tsconfig.tsbuildinfo
+.qa-next-env.d.ts

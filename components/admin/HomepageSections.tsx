@@ -1,14 +1,22 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { DEFAULT_DESIGN_BANNER, DEFAULT_HERO_ACTIONS, DEFAULT_HOMEPAGE_QUESTIONS, DEFAULT_MESSAGE_STYLE, HOMEPAGE_CONTENT_FIELDS, HOMEPAGE_SECTIONS, isSafeHomepageLink, parseHomepageLayout, type DesignBanner, type HomepageContentKey, type HomepageLayout, type HomepageMessageStyle, type HomepageSectionId } from "@/lib/homepage-builder";
+import { DEFAULT_DESIGN_BANNER, DEFAULT_HERO_ACTIONS, DEFAULT_HOMEPAGE_QUESTIONS, DEFAULT_MESSAGE_STYLE, HOMEPAGE_BREAKPOINTS, HOMEPAGE_CONTENT_FIELDS, HOMEPAGE_SECTIONS, isSafeHomepageLink, parseHomepageLayout, type DesignBanner, type HomepageBreakpoint, type HomepageContentKey, type HomepageLayout, type HomepageMessageStyle, type HomepageSectionId } from "@/lib/homepage-builder";
+import type { HomepageHistorySummary } from "@/lib/homepage-layout-store";
 import { HERO_IMAGES } from "@/lib/hero-slides";
 import { useRouter } from "next/navigation";
 import type { Product } from "@/lib/types";
 import HomepageQuestionsFields from "./HomepageQuestionsFields";
 
-export default function HomepageSections({ onDirtyChange, products }: { onDirtyChange: (dirty: boolean) => void; products: Product[] }) {
-  const [layout, setLayout] = useState<HomepageLayout | null>(null);
+/** Deterministic timestamp so the editor renders the same on server and client. */
+function formatVersionDate(value: string) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "Saved version";
+  const iso = date.toISOString();
+  return `${iso.slice(0, 10)} at ${iso.slice(11, 16)} UTC`;
+}
+
+export default function HomepageSections({ onDirtyChange, products }: { onDirtyChange: (dirty: boolean) => void; products: Product[] }) {  const [layout, setLayout] = useState<HomepageLayout | null>(null);
   const [loading, setLoading] = useState(true);
   const [dragging, setDragging] = useState<HomepageSectionId | null>(null);
   const [dropTarget, setDropTarget] = useState<HomepageSectionId | null>(null);
@@ -20,6 +28,7 @@ export default function HomepageSections({ onDirtyChange, products }: { onDirtyC
   const [revision, setRevision] = useState<string | null>(null);
   const [initial, setInitial] = useState<string | null>(null);
   const [hasPrevious, setHasPrevious] = useState(false);
+  const [history, setHistory] = useState<HomepageHistorySummary[]>([]);
   const [viewport, setViewport] = useState<"mobile" | "tablet" | "desktop">("mobile");
   const [previewContainer, setPreviewContainer] = useState<HTMLDivElement | null>(null);
   const [previewWidth, setPreviewWidth] = useState(0);
@@ -53,7 +62,7 @@ export default function HomepageSections({ onDirtyChange, products }: { onDirtyC
     try {
       const response = await fetch("/api/admin/homepage-draft", { cache: "no-store" });
       if (!response.ok) throw new Error();
-      const result = await response.json() as { layout: unknown; hasDraft: boolean; hasPrevious: boolean; revision: string | null };
+      const result = await response.json() as { layout: unknown; hasDraft: boolean; hasPrevious: boolean; revision: string | null; history?: HomepageHistorySummary[] };
       const valid = parseHomepageLayout(result.layout);
       if (!valid) throw new Error();
       setLayout(valid);
@@ -61,6 +70,7 @@ export default function HomepageSections({ onDirtyChange, products }: { onDirtyC
       setSaved(result.hasDraft ? JSON.stringify(valid) : null);
       setRevision(result.revision);
       setHasPrevious(result.hasPrevious);
+      setHistory(result.history ?? []);
     } catch {
       setError("Could not load the homepage draft. Please try again.");
     } finally {
@@ -142,6 +152,23 @@ export default function HomepageSections({ onDirtyChange, products }: { onDirtyC
     setMessage("");
   }
 
+  /** Shows or hides the selected section on one screen size. */
+  function toggleBreakpoint(id: HomepageSectionId, breakpoint: HomepageBreakpoint) {
+    if (!layout || busy) return;
+    const current = layout.hiddenOn?.[id] ?? [];
+    const next = current.includes(breakpoint) ? current.filter(size => size !== breakpoint) : [...current, breakpoint];
+    if (next.length === HOMEPAGE_BREAKPOINTS.length) {
+      setError("Keep this section visible on at least one screen size.");
+      return;
+    }
+    const hiddenOn = { ...(layout.hiddenOn ?? {}) };
+    if (next.length) hiddenOn[id] = HOMEPAGE_BREAKPOINTS.filter(size => next.includes(size));
+    else delete hiddenOn[id];
+    setError("");
+    setMessage("");
+    setLayout({ ...layout, hiddenOn });
+  }
+
   function addSection(type: "message" | "faq" | "products") {
     if (!layout || busy || (layout.customBlocks?.length ?? 0) >= 8) return;
     const id = `custom-${crypto.randomUUID()}` as const;
@@ -151,7 +178,9 @@ export default function HomepageSections({ onDirtyChange, products }: { onDirtyC
 
   function removeMessage(id: HomepageSectionId) {
     if (!layout || busy || !window.confirm("Remove this section from the draft?")) return;
-    setLayout({ ...layout, sections: layout.sections.filter(section => section !== id), hiddenSections: (layout.hiddenSections ?? []).filter(section => section !== id), customBlocks: (layout.customBlocks ?? []).filter(block => block.id !== id) });
+    const hiddenOn = { ...(layout.hiddenOn ?? {}) };
+    delete hiddenOn[id];
+    setLayout({ ...layout, sections: layout.sections.filter(section => section !== id), hiddenSections: (layout.hiddenSections ?? []).filter(section => section !== id), hiddenOn, customBlocks: (layout.customBlocks ?? []).filter(block => block.id !== id) });
     setSelected("hero"); setMessage("");
   }
 
@@ -216,7 +245,7 @@ export default function HomepageSections({ onDirtyChange, products }: { onDirtyC
     setBusy(true); setError(""); setMessage(""); setConflict("");
     try {
       const response = await fetch("/api/admin/homepage-draft", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action, layout, expectedRevision: revision }) });
-      const data = await response.json().catch(() => ({})) as { error?: string; layout?: unknown; hasPrevious?: boolean; revision?: string };
+      const data = await response.json().catch(() => ({})) as { error?: string; layout?: unknown; hasPrevious?: boolean; revision?: string; history?: HomepageHistorySummary[] };
       if (!response.ok) {
         if (response.status === 409) { setConflict(data.error || "This draft changed in another session. Download your changes, then reload the saved draft."); return; }
         setError(data.error || "The page could not be updated.");
@@ -225,10 +254,32 @@ export default function HomepageSections({ onDirtyChange, products }: { onDirtyC
       const next = parseHomepageLayout(data.layout);
       if (!next || !data.revision) throw new Error("The page was updated, but the editor could not refresh. Reload this page.");
       setRevision(data.revision);
-      setLayout(next); setSaved(JSON.stringify(next)); setHasPrevious(Boolean(data.hasPrevious)); setPreviewKey(value => value + 1);
+      setLayout(next); setSaved(JSON.stringify(next)); setHasPrevious(Boolean(data.hasPrevious)); setHistory(data.history ?? history); setPreviewKey(value => value + 1);
       router.refresh();
       setMessage(action === "publish" ? "Homepage published." : "Previous homepage restored.");
     } catch (error) { setError(error instanceof Error ? error.message : "The page could not be updated. Please try again."); }
+    finally { setBusy(false); }
+  }
+
+  /** Copies a previously published version into the draft so it can be reviewed. */
+  async function loadVersion(id: string) {
+    if (busy || uploading || inlineEditing || !revision) return;
+    if (!window.confirm("Load this version into your draft? The current draft will be replaced. The live homepage stays as it is until you publish.")) return;
+    setBusy(true); setError(""); setMessage(""); setConflict("");
+    try {
+      const response = await fetch("/api/admin/homepage-draft", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "load-version", versionId: id, expectedRevision: revision }) });
+      const data = await response.json().catch(() => ({})) as { error?: string; layout?: unknown; revision?: string; history?: { id: string; savedAt: string }[] };
+      if (!response.ok) {
+        if (response.status === 409) { setConflict(data.error || "This draft changed in another session. Download your changes, then reload the saved draft."); return; }
+        setError(data.error || "That version could not be loaded.");
+        return;
+      }
+      const next = parseHomepageLayout(data.layout);
+      if (!next || !data.revision) throw new Error("The version was loaded, but the editor could not refresh. Reload this page.");
+      setRevision(data.revision);
+      setLayout(next); setSaved(JSON.stringify(next)); setHistory(data.history ?? history); setPreviewKey(value => value + 1);
+      setMessage("Version loaded into the draft. Review it, then publish when you are ready.");
+    } catch (error) { setError(error instanceof Error ? error.message : "That version could not be loaded."); }
     finally { setBusy(false); }
   }
 
@@ -286,6 +337,16 @@ export default function HomepageSections({ onDirtyChange, products }: { onDirtyC
     })}</ol>
     <div className="admin-editor-actions"><button type="button" className="btn btn-light" onClick={() => addSection("message")} disabled={busy || (layout.customBlocks?.length ?? 0) >= 8}>Add message section</button><button type="button" className="btn btn-light" onClick={() => addSection("faq")} disabled={busy || (layout.customBlocks?.length ?? 0) >= 8}>Add questions section</button><button type="button" className="btn btn-light" onClick={() => addSection("products")} disabled={busy || (layout.customBlocks?.length ?? 0) >= 8}>Add products section</button></div>
     <fieldset ref={fieldsRef} className="fieldset admin-section-fields"><legend className="label">Edit {HOMEPAGE_SECTIONS.find(section => section.id === selected)?.label ?? (layout.customBlocks?.find(block => block.id === selected)?.type === "faq" ? "questions section" : layout.customBlocks?.find(block => block.id === selected)?.type === "products" ? "products section" : "message section")}</legend>
+      <div className="admin-visibility" role="group" aria-label="Screen sizes this section appears on">
+        <span className="label">Visible on</span>
+        <div className="admin-visibility-options">
+          {HOMEPAGE_BREAKPOINTS.map(size => {
+            const visible = !(layout.hiddenOn?.[selected] ?? []).includes(size);
+            return <button type="button" key={size} className="admin-visibility-option" aria-pressed={visible} aria-label={`${visible ? "Hide" : "Show"} this section on ${size}`} disabled={busy} onClick={() => toggleBreakpoint(selected, size)}>{size[0].toUpperCase() + size.slice(1)}</button>;
+          })}
+        </div>
+        <span className="hint">Clear a size to hide this section there. Keep at least one selected.</span>
+      </div>
       {selected === "questions" ? <HomepageQuestionsFields value={layout.questionsContent ?? DEFAULT_HOMEPAGE_QUESTIONS} disabled={busy} onChange={questionsContent => setLayout({ ...layout, questionsContent })} /> : selected === "hero-actions" ? <>{([ ["primaryText", "First button text", 60], ["primaryLink", "First button link", 300], ["secondaryText", "Second button text", 60], ["secondaryLink", "Second button link", 300] ] as const).map(([key, label, max]) => <div className="field" key={key}><label className="label" htmlFor={`hero-action-${key}`}>{label}</label><input id={`hero-action-${key}`} className="input" maxLength={max} disabled={busy} value={(layout.heroActions ?? DEFAULT_HERO_ACTIONS)[key]} onChange={event => setLayout({ ...layout, heroActions: { ...(layout.heroActions ?? DEFAULT_HERO_ACTIONS), [key]: event.target.value } })} />{key.endsWith("Link") ? <span className="hint">Use a page on your website, such as /shop or /contact.</span> : null}</div>)}</> : layout.customBlocks?.find(block => block.id === selected)?.type === "products" ? (() => {
         const block = layout.customBlocks!.find(item => item.id === selected)!;
         const update = (patch: Partial<typeof block>) => setLayout({ ...layout, customBlocks: layout.customBlocks!.map(item => item.id === selected ? { ...item, ...patch } : item) });
@@ -309,6 +370,7 @@ export default function HomepageSections({ onDirtyChange, products }: { onDirtyC
       {uploading ? <p role="status">Uploading image…</p> : null}
     </fieldset>
     <div className="admin-editor-actions"><button type="button" className="btn" onClick={save} disabled={busy || uploading || inlineEditing}>{busy ? "Please wait…" : "Save draft"}</button><button type="button" className="btn btn-light" onClick={() => changePublished("publish")} disabled={busy || uploading || inlineEditing || saved !== JSON.stringify(layout)}>Publish</button><button type="button" className="btn btn-light" onClick={discard} disabled={busy || uploading || inlineEditing || (!saved && !dirty)}>Discard draft</button><button type="button" className="btn btn-light" onClick={() => changePublished("restore")} disabled={busy || uploading || inlineEditing || !hasPrevious}>Restore previous</button></div>
+    {history.length ? <details className="admin-history"><summary>Previous versions ({history.length})</summary><p className="hint">Load a version into the draft to review it. Publish to make it live.</p><ul className="admin-history-list">{history.map(version => <li key={version.id}><span>{formatVersionDate(version.savedAt)}</span><button type="button" className="btn btn-light" disabled={busy || uploading || inlineEditing} onClick={() => void loadVersion(version.id)} aria-label={`Load the version saved ${formatVersionDate(version.savedAt)} into the draft`}>Load into draft</button></li>)}</ul></details> : null}
     {inlineEditing ? <p className="hint">Finish editing the text in the preview before saving.</p> : null}
     {saved !== JSON.stringify(layout) ? <p className="hint">Save your draft before publishing.</p> : null}
     <div className="admin-editor-preview"><h3>Draft preview</h3><div className="admin-preview-toolbar" role="group" aria-label="Draft preview screen size">{(["mobile", "tablet", "desktop"] as const).map(size => <button type="button" key={size} aria-pressed={viewport === size} onClick={() => setViewport(size)}>{size[0].toUpperCase() + size.slice(1)}</button>)}</div><div className="admin-preview-scroll"><div ref={setPreviewContainer} className="admin-preview-fit"><div className="admin-preview-frame" style={{ width: deviceWidth * previewScale, height: 800 * previewScale }}><iframe ref={previewRef} key={previewKey} title={`${viewport} homepage draft preview`} src="/homepage-preview" style={{ width: deviceWidth, transform: `scale(${previewScale})` }} /></div></div></div></div></> : null}

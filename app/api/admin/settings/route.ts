@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
 import { requireAdmin } from "../_guard";
 import { getSettings, HomepageContentConflict, saveSettings, type SiteSettings } from "@/lib/catalog";
-import { isHomepageImage, parseHomepageContent } from "@/lib/homepage-builder";
+import { isHomepageImage, isSafeHomepageLink, parseHomepageContent } from "@/lib/homepage-builder";
 
 export const dynamic = "force-dynamic";
 
@@ -47,6 +47,8 @@ export async function PUT(req: Request) {
     homeContactTitle: str(body.homeContactTitle ?? current.homeContactTitle, 100),
     homeContactDescription: str(body.homeContactDescription ?? current.homeContactDescription, 350),
     announcement: str(body.announcement ?? current.announcement, 160),
+    announcementLink: typeof body.announcementLink === "string" && (body.announcementLink === "" || isSafeHomepageLink(body.announcementLink)) ? body.announcementLink : current.announcementLink,
+    footerBlurb: str(body.footerBlurb ?? current.footerBlurb, 350),
     shippingFlat: numField(body.shippingFlat, current.shippingFlat, 999),
     freeShippingThreshold: numField(
       body.freeShippingThreshold,

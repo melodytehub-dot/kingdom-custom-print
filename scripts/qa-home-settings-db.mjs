@@ -5,7 +5,7 @@ import ts from "typescript";
 import postgres from "postgres";
 
 if (!process.env.DATABASE_URL) throw new Error("DATABASE_URL is required");
-const db = postgres(process.env.DATABASE_URL, { max: 1, ssl: "require" });
+const db = postgres(process.env.DATABASE_URL, { max: 1, ssl: /localhost|127\.0\.0\.1/.test(process.env.DATABASE_URL ?? "") ? false : "require" });
 const rollback = new Error("rollback fixture");
 try {
   await db.begin(async (tx) => {
@@ -28,6 +28,12 @@ try {
     assert.equal(stored.get("home_contact_title"), "Questions?");
     assert.equal(stored.get("home_contact_description"), "Get in touch.");
     assert.equal(stored.get("announcement"), original.announcement);
+    await exports.saveSettings({ ...saved, announcementLink: "/contact", footerBlurb: "Made by our team.", announcement: "Free shipping" });
+    const headerFooter = await read();
+    assert.equal(headerFooter.get("announcement_link"), "/contact");
+    assert.equal(headerFooter.get("footer_blurb"), "Made by our team.");
+    assert.equal(headerFooter.get("announcement"), "Free shipping");
+    console.log("PASS: header and footer copy persist");
     const baseline = builder.homepageContentFromSettings(saved);
     await exports.saveSettings({ ...saved, homeContactTitle: "New title" }, baseline);
     await assert.rejects(() => exports.saveSettings(saved, baseline), error => error instanceof exports.HomepageContentConflict);

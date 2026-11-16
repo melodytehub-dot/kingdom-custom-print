@@ -20,7 +20,7 @@ function compile(source, mocks) {
 }
 const builder = compile(builderSource, {});
 const defaults = { heroLabel: "PRINT ON DEMAND STUDIO", heroHeadlineTop: "YOUR IDEAS.", heroHeadlineBottom: "MADE TO WEAR.", heroDescription: "Custom apparel", heroImage1: "/img/shop-studio.png", heroImage2: "/img/shop-printing.png", heroImage3: "/img/kingdom-team.webp", homeProductsTitle: "MAKE IT YOURS", homeProductsDescription: "Design your own", homeContactTitle: "READY TO ORDER?", homeContactDescription: "Contact us" };
-const sql = postgres(process.env.DATABASE_URL, { ssl: "require", max: 1 });
+const sql = postgres(process.env.DATABASE_URL, { ssl: /localhost|127\.0\.0\.1/.test(process.env.DATABASE_URL ?? "") ? false : "require", max: 1 });
 const check = (label, ok) => { console.log(`${ok ? "PASS" : "FAIL"} ${label}`); if (!ok) throw new Error(label); };
 try {
   await sql.begin(async tx => {
@@ -31,6 +31,16 @@ try {
     const draftKey = "homepage_layout_draft_v1", revisionKey = "homepage_layout_draft_revision_v1", publishedKey = "homepage_layout_published_v1", previousKey = "homepage_layout_previous_v1";
     const read = async key => { const rows = await tx`SELECT key, value FROM site_settings`; const row = rows.find(item => item.key === key); return row ? builder.parseHomepageLayout(row.value) : null; };
     const db = Object.assign((...args) => Reflect.apply(tx, undefined, args), { begin: async callback => callback(tx) });
+    const historyKey = "homepage_layout_history_v1";
+    const parseHistory = value => Array.isArray(value) ? value.map(item => {
+      const layout = item && typeof item === "object" ? builder.parseHomepageLayout(item.layout) : null;
+      return layout && typeof item.id === "string" && typeof item.savedAt === "string" ? { id: item.id, savedAt: item.savedAt, layout } : null;
+    }).filter(Boolean).slice(0, 10) : [];
+    const withHistory = (entries, layout) => {
+      const { baseStructure: _baseStructure, ...stored } = layout;
+      return [{ id: crypto.randomUUID(), savedAt: new Date().toISOString(), layout: stored }, ...entries].slice(0, 10);
+    };
+    const historySummary = entries => entries.map(entry => ({ id: entry.id, savedAt: entry.savedAt }));
     let invalidations = 0;
     const route = compile(routeSource, {
       "next/server": { NextResponse: { json: (value, init) => Response.json(value, init) } },
@@ -40,7 +50,7 @@ try {
       "@/lib/limited-form-data": { limitedJson: request => request.json() },
       "@/lib/homepage-builder": builder,
       "@/lib/catalog": { DEFAULT_SETTINGS: defaults, getSettings: async () => defaults },
-      "@/lib/homepage-layout-store": { HOMEPAGE_DRAFT_KEY: draftKey, HOMEPAGE_DRAFT_REVISION_KEY: revisionKey, HOMEPAGE_PUBLISHED_KEY: publishedKey, HOMEPAGE_PREVIOUS_KEY: previousKey, readHomepageLayout: read, publishedHomepageLayout: async () => await read(publishedKey) ?? builder.defaultHomepageLayout() },
+      "@/lib/homepage-layout-store": { HOMEPAGE_DRAFT_KEY: draftKey, HOMEPAGE_DRAFT_REVISION_KEY: revisionKey, HOMEPAGE_PUBLISHED_KEY: publishedKey, HOMEPAGE_PREVIOUS_KEY: previousKey, HOMEPAGE_HISTORY_KEY: historyKey, HOMEPAGE_HISTORY_LIMIT: 10, parseHomepageHistory: parseHistory, withHomepageHistoryEntry: withHistory, homepageHistorySummary: historySummary, readHomepageLayout: read, publishedHomepageLayout: async () => await read(publishedKey) ?? builder.defaultHomepageLayout() },
     });
     let revision = null;
     for (const method of ["PUT", "POST", "DELETE"]) {

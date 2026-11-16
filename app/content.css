@@ -230,3 +230,14 @@
 .process-body .h3 {
   margin-bottom: 10px;
 }
+/* Pages built in the dashboard */
+.custom-page-body { max-width: 780px; }
+.custom-page-head { padding-bottom: 22px; margin-bottom: 26px; border-bottom: 1px solid var(--line); }
+.custom-page-head .display { margin: 0; }
+.custom-page-lede { margin: 14px 0 0; font-size: clamp(1rem, 1.4vw, 1.18rem); color: var(--ink-2); max-width: 62ch; }
+.custom-page-heading { margin: 34px 0 12px; }
+.custom-page-text { margin: 0 0 18px; color: var(--ink-2); max-width: 68ch; white-space: pre-line; }
+.custom-page-media { margin: 26px 0; }
+.custom-page-media img { width: 100%; height: auto; border-radius: 14px; }
+.custom-page-action { margin: 24px 0; }
+.custom-page-faq { margin-top: 26px; }

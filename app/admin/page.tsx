@@ -19,7 +19,7 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false },
 };
 
-const TABS = ["overview", "orders", "products", "inventory", "customers", "quotes", "homepage", "preview", "settings"] as const;
+const TABS = ["overview", "orders", "products", "inventory", "customers", "quotes", "homepage", "pages", "preview", "settings"] as const;
 type Tab = (typeof TABS)[number];
 
 export default async function AdminPage({

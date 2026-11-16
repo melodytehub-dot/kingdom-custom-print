@@ -20,9 +20,11 @@ const MAIN_NAV_LINKS = [
 export default async function Header({
   categories,
   announcement,
+  announcementLink = "",
 }: {
   categories: Category[];
   announcement: string;
+  announcementLink?: string;
 }) {
 
   return (
@@ -30,8 +32,17 @@ export default async function Header({
       {announcement.trim() ? (
         <div className="mm-announcement" role="status">
           <div className="mm-announcement-track">
-            <span className="mm-announcement-item"><span className="mm-announcement-dot" aria-hidden="true" />{announcement}</span>
-            <span className="mm-announcement-item" aria-hidden="true"><span className="mm-announcement-dot" />{announcement}</span>
+            {announcementLink ? (
+              <>
+                <Link className="mm-announcement-item" href={announcementLink}><span className="mm-announcement-dot" aria-hidden="true" />{announcement}</Link>
+                <Link className="mm-announcement-item" href={announcementLink} aria-hidden="true" tabIndex={-1}><span className="mm-announcement-dot" />{announcement}</Link>
+              </>
+            ) : (
+              <>
+                <span className="mm-announcement-item"><span className="mm-announcement-dot" aria-hidden="true" />{announcement}</span>
+                <span className="mm-announcement-item" aria-hidden="true"><span className="mm-announcement-dot" />{announcement}</span>
+              </>
+            )}
           </div>
         </div>
       ) : null}

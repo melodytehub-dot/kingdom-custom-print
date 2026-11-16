@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
-import { DEFAULT_DESIGN_BANNER, DEFAULT_HERO_ACTIONS, DEFAULT_HOMEPAGE_QUESTIONS, DEFAULT_MESSAGE_STYLE, HOMEPAGE_CONTENT_FIELDS, HOMEPAGE_SECTIONS, parseHomepageLayout, type HomepageContentKey } from "@/lib/homepage-builder";
+import { DEFAULT_DESIGN_BANNER, DEFAULT_HERO_ACTIONS, DEFAULT_HOMEPAGE_QUESTIONS, DEFAULT_MESSAGE_STYLE, HOMEPAGE_CONTENT_FIELDS, HOMEPAGE_SECTIONS, parseHomepageLayout, type HomepageContentKey, type HomepageSectionId } from "@/lib/homepage-builder";
 
 const titleFields = new Set<HomepageContentKey>(["heroLabel", "heroHeadlineTop", "heroHeadlineBottom", "homeProductsTitle", "homeContactTitle"]);
 function displayTitle(value: string) {
@@ -99,6 +99,9 @@ export default function HomepagePreviewBridge() {
       for (const [id, section] of sections) {
         section.toggleAttribute("data-home-selected", id === payload.selected);
         section.hidden = layout.hiddenSections?.includes(id as typeof layout.sections[number]) ?? false;
+        const hiddenOn = layout.hiddenOn?.[id as HomepageSectionId] ?? [];
+        if (hiddenOn.length) section.setAttribute("data-home-hide", hiddenOn.join(" "));
+        else section.removeAttribute("data-home-hide");
       }
       const banner = layout.designBanner ?? DEFAULT_DESIGN_BANNER;
       for (const key of ["eyebrow", "heading", "description", "buttonText"] as const) {

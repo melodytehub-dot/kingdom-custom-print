@@ -7,7 +7,10 @@ if (!process.env.DATABASE_URL) {
   process.exit(1);
 }
 
-const sql = postgres(process.env.DATABASE_URL, { max: 1, ssl: "require" });
+const sql = postgres(process.env.DATABASE_URL, {
+  max: 1,
+  ssl: /localhost|127\.0\.0\.1/.test(process.env.DATABASE_URL) ? false : "require",
+});
 
 /* -------------------------------------------------------------------------
    Catalogue

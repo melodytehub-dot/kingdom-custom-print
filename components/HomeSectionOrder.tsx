@@ -33,6 +33,16 @@ export function HomeSectionOrder({ layout, children, preview = false, products =
     const section = sections.get(id);
     const hidden = layout.hiddenSections?.includes(id) ?? false;
     if (hidden && !preview) return null;
-    return <Fragment key={id}>{preview && hidden && isValidElement<HTMLAttributes<HTMLElement>>(section) ? cloneElement(section, { hidden: true }) : section}</Fragment>;
+    const hiddenOn = layout.hiddenOn?.[id] ?? [];
+    const attributes: HTMLAttributes<HTMLElement> = {
+      ...(hiddenOn.length ? { "data-home-hide": hiddenOn.join(" ") } : {}),
+      ...(preview && hidden ? { hidden: true } : {}),
+    };
+    // Screen-size visibility rides on the section element so the preview bridge
+    // can keep reordering and hiding sections without a wrapper.
+    const content = isValidElement<HTMLAttributes<HTMLElement>>(section) && Object.keys(attributes).length
+      ? cloneElement(section, attributes)
+      : section;
+    return <Fragment key={id}>{content}</Fragment>;
   })}</>;
 }

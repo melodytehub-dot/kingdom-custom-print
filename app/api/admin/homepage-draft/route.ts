@@ -3,7 +3,7 @@ import { requireAdmin } from "../_guard";
 import { sql } from "@/lib/db";
 import { limitedJson } from "@/lib/limited-form-data";
 import { HOMEPAGE_CONTENT_FIELDS, defaultHomepageLayout, homepageContentFromSettings, homepageStructure, parseHomepageLayout } from "@/lib/homepage-builder";
-import { HOMEPAGE_DRAFT_KEY, HOMEPAGE_DRAFT_REVISION_KEY, HOMEPAGE_PREVIOUS_KEY, HOMEPAGE_PUBLISHED_KEY, publishedHomepageLayout, readHomepageLayout } from "@/lib/homepage-layout-store";
+import { HOMEPAGE_DRAFT_KEY, HOMEPAGE_DRAFT_REVISION_KEY, HOMEPAGE_HISTORY_KEY, HOMEPAGE_PREVIOUS_KEY, HOMEPAGE_PUBLISHED_KEY, homepageHistorySummary, parseHomepageHistory, publishedHomepageLayout, readHomepageLayout, withHomepageHistoryEntry } from "@/lib/homepage-layout-store";
 import { revalidatePath } from "next/cache";
 import { DEFAULT_SETTINGS, getSettings } from "@/lib/catalog";
 
@@ -20,7 +20,9 @@ export async function GET(req: Request) {
   const [published, previous, settings] = await Promise.all([publishedHomepageLayout(), readHomepageLayout(HOMEPAGE_PREVIOUS_KEY), getSettings()]);
   const current = homepageContentFromSettings(settings);
   const layout = draft?.content ? { ...draft, baseStructure: draft.baseStructure ?? homepageStructure(published) } : { ...(draft ?? published), content: current, baseContent: current, baseStructure: homepageStructure(published) };
-  return NextResponse.json({ layout, hasDraft: Boolean(draft?.content), hasPrevious: Boolean(previous), revision: revisionRow?.value ?? null });
+  const historyRows = await sql<{ value: unknown }[]>`SELECT value FROM site_settings WHERE key = ${HOMEPAGE_HISTORY_KEY}`;
+  const history = homepageHistorySummary(parseHomepageHistory(historyRows[0]?.value));
+  return NextResponse.json({ layout, hasDraft: Boolean(draft?.content), hasPrevious: Boolean(previous), revision: revisionRow?.value ?? null, history });
 }
 
 function validRevision(value: unknown): value is string | null {
@@ -58,13 +60,14 @@ export async function PUT(req: Request) {
 export async function POST(req: Request) {
   const denied = await requireAdmin(req);
   if (denied) return denied;
-  let input: { action?: unknown; layout?: unknown; expectedRevision?: unknown };
+  let input: { action?: unknown; layout?: unknown; expectedRevision?: unknown; versionId?: unknown };
   try { input = await limitedJson(req, 524288) as typeof input; }
   catch (error) { return NextResponse.json({ error: "The request could not be read." }, { status: error instanceof RangeError ? 413 : 400 }); }
-  if (!input || (input.action !== "publish" && input.action !== "restore")) return NextResponse.json({ error: "Invalid action." }, { status: 400 });
+  if (!input || (input.action !== "publish" && input.action !== "restore" && input.action !== "load-version")) return NextResponse.json({ error: "Invalid action." }, { status: 400 });
   if (!validRevision(input.expectedRevision)) return NextResponse.json({ error: "The draft version is invalid." }, { status: 422 });
   const requested = input.action === "publish" ? parseHomepageLayout(input.layout) : null;
   if (input.action === "publish" && !requested) return NextResponse.json({ error: "The page layout is invalid." }, { status: 422 });
+  if (input.action === "load-version" && (typeof input.versionId !== "string" || !/^[0-9a-f-]{36}$/i.test(input.versionId))) return NextResponse.json({ error: "That version is not available." }, { status: 422 });
 
   const result = await sql.begin(async tx => {
     await tx`SELECT pg_advisory_xact_lock(hashtext('kcp_homepage_layout_v1'))`;
@@ -80,6 +83,20 @@ export async function POST(req: Request) {
     const liveContent = { ...defaults };
     for (const field of HOMEPAGE_CONTENT_FIELDS) liveContent[field.name] = String(values.get(field.dbKey) ?? defaults[field.name]);
     const current = { ...(storedPublished ?? defaultHomepageLayout()), content: liveContent, baseContent: liveContent };
+    const history = parseHomepageHistory(values.get(HOMEPAGE_HISTORY_KEY));
+
+    if (input.action === "load-version") {
+      const entry = history.find(item => item.id === input.versionId);
+      if (!entry) return { error: "That version is no longer available. Reload the editor to see the latest versions.", status: 409 };
+      const loaded = entry.layout.content
+        ? { ...entry.layout, baseContent: liveContent, baseStructure: homepageStructure(current) }
+        : { ...current, ...entry.layout, content: liveContent, baseContent: liveContent, baseStructure: homepageStructure(current) };
+      const revision = crypto.randomUUID();
+      await tx`INSERT INTO site_settings (key, value, updated_at) VALUES (${HOMEPAGE_DRAFT_KEY}, ${tx.json(loaded as never)}, now()) ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = now()`;
+      await tx`INSERT INTO site_settings (key, value, updated_at) VALUES (${HOMEPAGE_DRAFT_REVISION_KEY}, ${tx.json(revision)}, now()) ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = now()`;
+      return { layout: loaded, revision, hasPrevious: Boolean(previous), history: homepageHistorySummary(history), status: 200 };
+    }
+
     if (input.action === "publish" && (!draft || JSON.stringify(draft) !== JSON.stringify(requested))) return { error: "The saved draft changed. Reload it before publishing.", status: 409 };
     if (input.action === "publish" && draft?.baseContent && JSON.stringify(draft.baseContent) !== JSON.stringify(liveContent)) return { error: "Homepage content changed since this draft was started. Discard the draft and start again with the latest content before publishing.", status: 409 };
     if (input.action === "publish" && (!draft?.baseStructure || draft.baseStructure !== homepageStructure(current))) return { error: "The live homepage layout changed since this draft was started. Discard this draft and start again with the latest layout before publishing.", status: 409 };
@@ -124,19 +141,22 @@ export async function POST(req: Request) {
       }
     }
     const next = { ...selected, content: nextContent, baseContent: nextContent, baseStructure: homepageStructure(selected) };
+    let nextHistory = history;
     if (JSON.stringify(current) !== JSON.stringify(next)) {
       await tx`INSERT INTO site_settings (key, value, updated_at) VALUES (${HOMEPAGE_PREVIOUS_KEY}, ${tx.json(current as never)}, now()) ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = now()`;
+      nextHistory = withHomepageHistoryEntry(history, current);
+      await tx`INSERT INTO site_settings (key, value, updated_at) VALUES (${HOMEPAGE_HISTORY_KEY}, ${tx.json(nextHistory as never)}, now()) ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = now()`;
     }
     await tx`INSERT INTO site_settings (key, value, updated_at) VALUES (${HOMEPAGE_PUBLISHED_KEY}, ${tx.json(next as never)}, now()) ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = now()`;
     for (const field of HOMEPAGE_CONTENT_FIELDS) await tx`INSERT INTO site_settings (key, value, updated_at) VALUES (${field.dbKey}, ${tx.json(nextContent[field.name])}, now()) ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = now()`;
     await tx`INSERT INTO site_settings (key, value, updated_at) VALUES (${HOMEPAGE_DRAFT_KEY}, ${tx.json(next as never)}, now()) ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = now()`;
     const revision = crypto.randomUUID();
     await tx`INSERT INTO site_settings (key, value, updated_at) VALUES (${HOMEPAGE_DRAFT_REVISION_KEY}, ${tx.json(revision)}, now()) ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = now()`;
-    return { layout: next, revision, hasPrevious: JSON.stringify(current) !== JSON.stringify(next) || Boolean(previous), status: 200 };
+    return { layout: next, revision, hasPrevious: JSON.stringify(current) !== JSON.stringify(next) || Boolean(previous), history: homepageHistorySummary(nextHistory), status: 200 };
   });
   if ("error" in result) return NextResponse.json({ error: result.error }, { status: result.status });
   revalidatePath("/", "layout");
-  return NextResponse.json({ ok: true, layout: result.layout, revision: result.revision, hasPrevious: result.hasPrevious });
+  return NextResponse.json({ ok: true, layout: result.layout, revision: result.revision, hasPrevious: result.hasPrevious, history: result.history });
 }
 
 export async function DELETE(req: Request) {

@@ -15,6 +15,12 @@ export const HOMEPAGE_SECTIONS = [
 ] as const;
 
 export type HomepageSectionId = (typeof HOMEPAGE_SECTIONS)[number]["id"] | `custom-${string}`;
+
+/** Screen sizes an administrator can hide individual homepage sections on. */
+export const HOMEPAGE_BREAKPOINTS = ["mobile", "tablet", "desktop"] as const;
+export type HomepageBreakpoint = (typeof HOMEPAGE_BREAKPOINTS)[number];
+export type HomepageVisibility = Partial<Record<HomepageSectionId, HomepageBreakpoint[]>>;
+
 export type HomepageMessageStyle = { tone: "rose" | "ivory" | "dark"; alignment: "left" | "center"; imagePosition: "left" | "right" };
 export const DEFAULT_MESSAGE_STYLE: HomepageMessageStyle = { tone: "rose", alignment: "left", imagePosition: "right" };
 export type HomepageCustomBlock = { id: `custom-${string}`; type: "message" | "faq" | "products"; heading: string; description: string; buttonText: string; buttonLink: string; image?: string; imageAlt?: string; faqItems?: { question: string; answer: string }[]; productIds?: number[]; style?: HomepageMessageStyle };
@@ -115,6 +121,8 @@ export interface HomepageLayout {
   version: 1;
   sections: HomepageSectionId[];
   hiddenSections?: HomepageSectionId[];
+  /** Screen sizes a section is hidden on. Sections hidden everywhere are rejected. */
+  hiddenOn?: HomepageVisibility;
   content?: HomepageContent;
   baseContent?: HomepageContent;
   designBanner?: DesignBanner;
@@ -126,7 +134,7 @@ export interface HomepageLayout {
 
 /** Snapshot of the published layout used to detect edits made in another session. */
 export function homepageStructure(layout: HomepageLayout): string {
-  return JSON.stringify({ sections: layout.sections, hiddenSections: layout.hiddenSections ?? [], designBanner: layout.designBanner ?? null, customBlocks: layout.customBlocks ?? [], ...(layout.heroActions ? { heroActions: layout.heroActions } : {}), ...(layout.questionsContent ? { questionsContent: layout.questionsContent } : {}) });
+  return JSON.stringify({ sections: layout.sections, hiddenSections: layout.hiddenSections ?? [], hiddenOn: layout.hiddenOn ?? {}, designBanner: layout.designBanner ?? null, customBlocks: layout.customBlocks ?? [], ...(layout.heroActions ? { heroActions: layout.heroActions } : {}), ...(layout.questionsContent ? { questionsContent: layout.questionsContent } : {}) });
 }
 
 export function defaultHomepageLayout(): HomepageLayout {
@@ -136,7 +144,7 @@ export function defaultHomepageLayout(): HomepageLayout {
 /** Reject unknown or repeated sections before saving data or rendering it. */
 export function parseHomepageLayout(value: unknown): HomepageLayout | null {
   if (!value || typeof value !== "object") return null;
-  const input = value as { version?: unknown; sections?: unknown; hiddenSections?: unknown; content?: unknown; baseContent?: unknown; designBanner?: unknown; heroActions?: unknown; questionsContent?: unknown; customBlocks?: unknown; baseStructure?: unknown };
+  const input = value as { version?: unknown; sections?: unknown; hiddenSections?: unknown; hiddenOn?: unknown; content?: unknown; baseContent?: unknown; designBanner?: unknown; heroActions?: unknown; questionsContent?: unknown; customBlocks?: unknown; baseStructure?: unknown };
   if (input.version !== 1 || !Array.isArray(input.sections)) return null;
   const allowed = new Set<string>(HOMEPAGE_SECTIONS.map(section => section.id));
   let customBlocks: HomepageCustomBlock[] | undefined;
@@ -179,6 +187,8 @@ export function parseHomepageLayout(value: unknown): HomepageLayout | null {
   if (new Set(input.sections).size !== allowed.size) return null;
   const hidden = input.hiddenSections === undefined ? [] : input.hiddenSections;
   if (!Array.isArray(hidden) || hidden.some(section => typeof section !== "string" || !allowed.has(section) || section === "hero") || new Set(hidden).size !== hidden.length) return null;
+  const hiddenOn = parseHomepageVisibility(input.hiddenOn, allowed);
+  if (hiddenOn === null) return null;
   const content = input.content === undefined ? undefined : parseHomepageContent(input.content);
   const baseContent = input.baseContent === undefined ? undefined : parseHomepageContent(input.baseContent);
   if (content === null || baseContent === null || Boolean(content) !== Boolean(baseContent)) return null;
@@ -189,5 +199,26 @@ export function parseHomepageLayout(value: unknown): HomepageLayout | null {
   const questionsContent = input.questionsContent === undefined ? undefined : parseHomepageQuestions(input.questionsContent);
   if (questionsContent === null) return null;
   if (input.baseStructure !== undefined && (typeof input.baseStructure !== "string" || input.baseStructure.length > 60000)) return null;
-  return { version: 1, sections: input.sections as HomepageSectionId[], hiddenSections: hidden as HomepageSectionId[], ...(content && baseContent ? { content, baseContent } : {}), ...(designBanner ? { designBanner } : {}), ...(heroActions ? { heroActions } : {}), ...(questionsContent ? { questionsContent } : {}), ...(customBlocks ? { customBlocks } : {}), ...(input.baseStructure !== undefined ? { baseStructure: input.baseStructure } : {}) };
+  return { version: 1, sections: input.sections as HomepageSectionId[], hiddenSections: hidden as HomepageSectionId[], ...(hiddenOn && Object.keys(hiddenOn).length ? { hiddenOn } : {}), ...(content && baseContent ? { content, baseContent } : {}), ...(designBanner ? { designBanner } : {}), ...(heroActions ? { heroActions } : {}), ...(questionsContent ? { questionsContent } : {}), ...(customBlocks ? { customBlocks } : {}), ...(input.baseStructure !== undefined ? { baseStructure: input.baseStructure } : {}) };
+}
+
+/**
+ * Validates the per-screen-size visibility map. Empty lists are dropped, and a
+ * section cannot be hidden on every screen size because it would disappear.
+ */
+export function parseHomepageVisibility(value: unknown, allowed: Set<string>): HomepageVisibility | null {
+  if (value === undefined) return {};
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const input = value as Record<string, unknown>;
+  const entries = Object.entries(input);
+  if (entries.length > 40) return null;
+  const visibility: HomepageVisibility = {};
+  for (const [id, sizes] of entries) {
+    if (!allowed.has(id) || !Array.isArray(sizes) || sizes.length > HOMEPAGE_BREAKPOINTS.length) return null;
+    if (sizes.some(size => typeof size !== "string" || !(HOMEPAGE_BREAKPOINTS as readonly string[]).includes(size))) return null;
+    if (new Set(sizes).size !== sizes.length) return null;
+    if (sizes.length === HOMEPAGE_BREAKPOINTS.length) return null;
+    if (sizes.length) visibility[id as HomepageSectionId] = HOMEPAGE_BREAKPOINTS.filter(size => sizes.includes(size));
+  }
+  return visibility;
 }

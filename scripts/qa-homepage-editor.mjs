@@ -28,18 +28,26 @@ for (const [index, [name, engine, options]] of engines.entries()) {
     assert.equal(settingsResponse.ok(), true, "settings load");
     const content = homepageContentFromSettings(await settingsResponse.json());
     let draft = { ...defaultHomepageLayout(), content, baseContent: content };
-    let published = draft, previous = null, revision = null;
+    let published = draft, previous = null, revision = null, history = [];
     await page.route("**/api/admin/homepage-draft", async route => {
       const request = route.request();
       if (request.method() === "PUT") { const { expectedRevision, ...next } = request.postDataJSON(); if (expectedRevision !== revision) { await route.fulfill({ status: 409, json: { error: "The saved draft changed in another session. Copy any unsaved edits, then reload the editor." } }); return; } draft = next; revision = crypto.randomUUID(); await route.fulfill({ json: { ok: true, revision } }); }
       else if (request.method() === "POST") {
-        const { action, expectedRevision } = request.postDataJSON();
+        const { action, expectedRevision, versionId } = request.postDataJSON();
         if (expectedRevision !== revision) { await route.fulfill({ status: 409, json: { error: "The saved draft changed in another session. Copy any unsaved edits, then reload the editor." } }); return; }
-        if (action === "publish") { previous = published; published = { ...draft, baseContent: draft.content }; draft = published; }
-        else { const old = published; published = previous; previous = old; draft = published; }
-        revision = crypto.randomUUID(); await route.fulfill({ json: { ok: true, layout: published, revision, hasPrevious: Boolean(previous) } });
+        if (action === "publish") {
+          previous = published;
+          history = [{ id: crypto.randomUUID(), savedAt: new Date().toISOString() }, ...history].slice(0, 10);
+          published = { ...draft, baseContent: draft.content }; draft = published;
+        } else if (action === "restore") {
+          const old = published; published = previous; previous = old; draft = published;
+        } else if (action === "load-version") {
+          if (!history.some(entry => entry.id === versionId)) { await route.fulfill({ status: 409, json: { error: "That version is no longer available." } }); return; }
+          draft = { ...published, content: { ...published.content, heroHeadlineTop: "Older version" }, baseContent: published.content, baseStructure: "" };
+        }
+        revision = crypto.randomUUID(); await route.fulfill({ json: { ok: true, layout: draft, revision, hasPrevious: Boolean(previous), history } });
       } else if (request.method() === "DELETE") { draft = null; revision = null; await route.fulfill({ json: { ok: true } }); }
-      else await route.fulfill({ json: { layout: draft ?? published, revision, hasDraft: Boolean(draft), hasPrevious: Boolean(previous) } });
+      else await route.fulfill({ json: { layout: draft ?? published, revision, hasDraft: Boolean(draft), hasPrevious: Boolean(previous), history } });
     });
     await page.route("**/api/admin/product-media", route => route.fulfill({ json: { url: uploadUrl } }));
     await page.route(`**${uploadUrl}`, route => route.fulfill({ body: imageBytes, contentType: "image/webp" }));
@@ -195,10 +203,34 @@ for (const [index, [name, engine, options]] of engines.entries()) {
     await page.getByRole("button", { name: "Publish", exact: true }).click();
     await page.getByText("Homepage published.").waitFor();
     assert.equal(published.sections[0], "hero-actions");
+    await page.getByText(/Previous versions/).click();
+    page.once("dialog", dialog => dialog.accept());
+    await page.getByRole("button", { name: /^Load the version saved/ }).first().click();
+    await page.getByText(/Version loaded into the draft/).waitFor();
+    await page.waitForFunction(() => document.querySelector('iframe[title="mobile homepage draft preview"]')?.contentDocument?.querySelector('[data-home-field="heroHeadlineTop"]')?.textContent === "Older version");
     page.once("dialog", dialog => dialog.accept());
     await page.getByRole("button", { name: "Restore previous" }).click();
     await page.getByText("Previous homepage restored.").waitFor();
     assert.equal(published.sections[0], "hero");
+    await page.getByRole("button", { name: "Ready to ship", exact: true }).click();
+    await page.getByRole("button", { name: "Hide this section on mobile" }).click();
+    await page.getByRole("button", { name: "Save draft" }).click();
+    await page.getByText("Draft saved.").waitFor();
+    assert.deepEqual((await page.evaluate(async () => (await fetch("/api/admin/homepage-draft", { cache: "no-store" })).json())).layout.hiddenOn["ready-to-ship"], ["mobile"]);
+    await page.getByRole("button", { name: "Mobile", exact: true }).click();
+    frame = page.frameLocator('iframe[title="mobile homepage draft preview"]');
+    await frame.locator('[data-home-section="ready-to-ship"][data-home-hide~="mobile"]').waitFor({ state: "attached", timeout: 60000 });
+    assert.equal(await frame.locator('[data-home-section="ready-to-ship"]').isVisible(), false, "mobile draft preview hides a section set to mobile-only");
+    await page.getByRole("button", { name: "Desktop", exact: true }).click();
+    frame = page.frameLocator('iframe[title="desktop homepage draft preview"]');
+    await frame.locator('.kcp-home:visible [data-home-section="ready-to-ship"]').waitFor({ timeout: 60000 });
+    assert.equal(await frame.locator('[data-home-section="ready-to-ship"]').isVisible(), true, "desktop draft preview still shows the section");
+    await page.getByRole("button", { name: "Hide this section on tablet" }).click();
+    await page.getByRole("button", { name: "Hide this section on desktop" }).click();
+    assert.match(await page.getByText(/Keep this section visible on at least one screen size/i).innerText(), /at least one/i);
+    await page.getByRole("button", { name: "Show this section on mobile" }).click();
+    await page.getByRole("button", { name: "Save draft" }).click();
+    await page.getByText("Draft saved.").waitFor();
     for (const [label, width] of [["Mobile", 375], ["Tablet", 768], ["Desktop", 1280]]) {
       await page.getByRole("button", { name: label, exact: true }).click();
       frame = page.frameLocator(`iframe[title="${label.toLowerCase()} homepage draft preview"]`);

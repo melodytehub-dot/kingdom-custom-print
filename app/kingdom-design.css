@@ -351,6 +351,8 @@
 .mm-announcement { justify-content: flex-start; overflow: hidden; padding-inline: 0; }
 .mm-announcement-track { display: flex; width: max-content; min-width: 100%; animation: kcp-announcement-slide 22s linear infinite; }
 .mm-announcement-item { display: inline-flex; flex: 0 0 auto; align-items: center; justify-content: center; gap: 9px; min-width: 50%; padding-inline: 36px; white-space: nowrap; }
+a.mm-announcement-item { color: inherit; text-decoration: none; }
+a.mm-announcement-item:hover { text-decoration: underline; text-underline-offset: 3px; }
 .mm-announcement:hover .mm-announcement-track { animation-play-state: paused; }
 @keyframes kcp-announcement-slide { to { transform: translateX(-50%); } }
 @media (prefers-reduced-motion: reduce) { .mm-announcement-track { width: 100%; animation: none; } .mm-announcement-item { min-width: 100%; white-space: normal; } .mm-announcement-item[aria-hidden="true"] { display: none; } }

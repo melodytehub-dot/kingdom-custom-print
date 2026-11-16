@@ -24,7 +24,7 @@ export default async function Footer() {
               />
             </Link>
             <p>
-              Custom apparel for your ideas, your team, and your everyday. Choose a garment and make it yours in our online design studio.
+              {settings.footerBlurb}
             </p>
             <Link href="/customize" className="mm-footer-studio">Make something yours ↗</Link>
           </div>

@@ -976,3 +976,16 @@
     border-bottom: 0;
   }
 }
+
+/* Per-screen-size section visibility, controlled from the homepage editor. */
+@media (max-width: 760px) {
+  [data-home-hide~="mobile"] { display: none !important; }
+}
+
+@media (min-width: 761px) and (max-width: 1080px) {
+  [data-home-hide~="tablet"] { display: none !important; }
+}
+
+@media (min-width: 1081px) {
+  [data-home-hide~="desktop"] { display: none !important; }
+}
