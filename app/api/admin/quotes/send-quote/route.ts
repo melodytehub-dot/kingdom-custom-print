@@ -17,15 +17,28 @@ export async function POST(req: Request) {
   if (!/^[1-9][0-9]{0,15}$/.test(id)) return NextResponse.json({ error: "Quote not found." }, { status: 422 });
   if (!emailConfigured()) return NextResponse.json({ error: "Email is temporarily unavailable." }, { status: 503 });
   try {
-    const [quote] = await sql<{ customer_name: string; customer_email: string }[]>`SELECT customer_name, customer_email FROM admin_quotes WHERE id = ${id}::bigint AND status = 'quote'`;
+    const [quote] = await sql<{ customer_name: string; customer_email: string }[]>`SELECT customer_name, customer_email FROM admin_quotes WHERE id = ${id} AND status = 'quote'`;
     if (!quote) return NextResponse.json({ error: "Quote not found or already converted." }, { status: 404 });
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(quote.customer_email)) return NextResponse.json({ error: "Add a valid customer email to the quote first." }, { status: 422 });
     const token = randomBytes(32).toString("base64url");
     const hash = createHash("sha256").update(token).digest("hex");
     // Copy the quote in the database, atomically with checking that it is still editable.
-    const saved = await sql`INSERT INTO quote_share_tokens (token_hash, quote_id, snapshot, expires_at)
-      SELECT ${hash}, id, jsonb_build_object('id', id::text, 'customer_name', customer_name, 'customer_email', customer_email, 'notes', notes, 'lines', lines, 'shipping_cents', shipping_cents, 'created_at', created_at), now() + interval '30 days'
-      FROM admin_quotes WHERE id = ${id}::bigint AND status = 'quote' AND customer_email = ${quote.customer_email} RETURNING quote_id`;
+    const saved = await sql`
+      INSERT INTO quote_share_tokens (token_hash, quote_id, snapshot, expires_at)
+      SELECT ${hash}, id, json_object(
+          'id', CAST(id AS TEXT),
+          'customer_name', customer_name,
+          'customer_email', customer_email,
+          'notes', notes,
+          'lines', json(lines),
+          'shipping_cents', shipping_cents,
+          'status', status,
+          'created_at', created_at,
+          'invoiced_at', invoiced_at
+        ), strftime('%Y-%m-%dT%H:%M:%fZ','now','+30 days')
+      FROM admin_quotes
+      WHERE id = ${id} AND status = 'quote' AND customer_email = ${quote.customer_email}
+      RETURNING quote_id`;
     if (!saved.length) return NextResponse.json({ error: "The quote changed. Refresh and try again." }, { status: 409 });
     const url = `${publicSiteUrl()}/quote/${token}`;
     const settings = await getSettings();

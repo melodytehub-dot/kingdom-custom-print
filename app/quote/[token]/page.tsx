@@ -13,9 +13,14 @@ export default async function SharedQuote({ params }: { params: Promise<{ token:
   const { token } = await params;
   if (!/^[A-Za-z0-9_-]{43}$/.test(token)) return <Unavailable />;
   const hash = createHash("sha256").update(token).digest("hex");
-  const [row] = await sql<{ snapshot: AdminQuote }[]>`SELECT snapshot FROM quote_share_tokens WHERE token_hash = ${hash} AND expires_at > now()`;
+  const [row] = await sql<{ snapshot: string }[]>`SELECT snapshot FROM quote_share_tokens WHERE token_hash = ${hash} AND expires_at > strftime('%Y-%m-%dT%H:%M:%fZ','now')`;
   if (!row) return <Unavailable />;
-  const quote = row.snapshot;
+  let quote: AdminQuote;
+  try {
+    quote = JSON.parse(row.snapshot) as AdminQuote;
+  } catch {
+    return <Unavailable />;
+  }
   const settings = await getSettings();
   const subtotal = quote.lines.reduce((sum, line) => sum + line.quantity * line.unitCents, 0);
   return <main className="admin-invoice public-invoice"><div className="admin-invoice-actions"><Link href="/contact">Contact us</Link><PrintInvoiceButton /></div>

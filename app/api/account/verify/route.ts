@@ -14,14 +14,20 @@ export async function POST(request: Request) {
   const token = String(data.get("token") ?? "");
   if (!/^[a-f0-9]{64}$/.test(token)) return NextResponse.redirect(new URL("/account?verification=invalid", request.url), 303);
   try {
-    const verified = await sql.begin(async (tx) => {
-      const [row] = await tx<{ account_id: number }[]>`DELETE FROM customer_email_verifications WHERE token_hash = ${verificationHash(token)} AND expires_at > now() RETURNING account_id`;
-      if (!row) return false;
-      await tx`UPDATE customer_accounts SET email_verified = true WHERE id = ${row.account_id}`;
-      await tx`DELETE FROM customer_email_verifications WHERE account_id = ${row.account_id}`;
-      return true;
-    });
-    return NextResponse.redirect(new URL(`/account?verification=${verified ? "success" : "invalid"}`, request.url), 303);
+    const [pending] = await sql<{ account_id: number }[]>`
+      SELECT account_id FROM customer_email_verifications
+      WHERE token_hash = ${verificationHash(token)}
+        AND expires_at > strftime('%Y-%m-%dT%H:%M:%fZ','now')
+      LIMIT 1`;
+    if (!pending) {
+      return NextResponse.redirect(new URL("/account?verification=invalid", request.url), 303);
+    }
+    await sql.batch([
+      sql`DELETE FROM customer_email_verifications WHERE token_hash = ${verificationHash(token)}`,
+      sql`UPDATE customer_accounts SET email_verified = 1 WHERE id = ${pending.account_id}`,
+      sql`DELETE FROM customer_email_verifications WHERE account_id = ${pending.account_id}`,
+    ]);
+    return NextResponse.redirect(new URL("/account?verification=success", request.url), 303);
   } catch {
     return NextResponse.redirect(new URL("/account?verification=unavailable", request.url), 303);
   }

@@ -1,6 +1,7 @@
 import "server-only";
 import { sql } from "@/lib/db";
 import { defaultHomepageLayout, parseHomepageLayout, type HomepageLayout } from "@/lib/homepage-builder";
+import { parseSettingValue } from "@/lib/catalog";
 
 export const HOMEPAGE_DRAFT_KEY = "homepage_layout_draft_v1";
 export const HOMEPAGE_DRAFT_REVISION_KEY = "homepage_layout_draft_revision_v1";
@@ -17,7 +18,7 @@ export type HomepageHistorySummary = { id: string; savedAt: string };
 export async function readHomepageLayout(key: string): Promise<HomepageLayout | null> {
   const rows = await sql<{ value: unknown }[]>`SELECT value FROM site_settings WHERE key = ${key}`;
   if (!rows.length) return null;
-  const layout = parseHomepageLayout(rows[0].value);
+  const layout = parseHomepageLayout(parseSettingValue(rows[0].value));
   if (!layout) throw new Error("Invalid stored homepage layout");
   return layout;
 }
@@ -54,3 +55,4 @@ export function withHomepageHistoryEntry(entries: HomepageHistoryEntry[], layout
   const { baseStructure: _baseStructure, ...stored } = layout;
   return [{ id: crypto.randomUUID(), savedAt: new Date().toISOString(), layout: stored }, ...entries].slice(0, HOMEPAGE_HISTORY_LIMIT);
 }
+

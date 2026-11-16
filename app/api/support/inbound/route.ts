@@ -47,7 +47,7 @@ export async function POST(request: Request) {
       .trim().slice(0, 4000);
     if (!text) return NextResponse.json({ ok: true });
     const tokenHash = createHash("sha256").update(token).digest("hex");
-    const [conversation] = await sql<{ id: string; name: string; email: string; audience: "owner" | "customer" }[]>`SELECT c.id::text, c.name, c.email, t.audience FROM support_reply_tokens t JOIN support_conversations c ON c.id = t.conversation_id WHERE t.token_hash = ${tokenHash} AND c.expires_at > now()`;
+    const [conversation] = await sql<{ id: number; name: string; email: string; audience: "owner" | "customer" }[]>`SELECT c.id, c.name, c.email, t.audience FROM support_reply_tokens t JOIN support_conversations c ON c.id = t.conversation_id WHERE t.token_hash = ${tokenHash} AND c.expires_at > strftime('%Y-%m-%dT%H:%M:%fZ','now')`;
     if (!conversation) return NextResponse.json({ ok: true });
     const isOwner = conversation.audience === "owner" && sender === owner;
     const isCustomer = conversation.audience === "customer" && sender === conversation.email.toLowerCase();
@@ -57,9 +57,10 @@ export async function POST(request: Request) {
     // Keep the reply address and email identical when Resend retries the event.
     const nextToken = createHmac("sha256", secret).update(`support-reply:${emailId}:${audience}`).digest("hex").slice(0, 48);
     const nextHash = createHash("sha256").update(nextToken).digest("hex");
-    await sql`INSERT INTO support_reply_tokens (token_hash, conversation_id, audience) VALUES (${nextHash}, ${conversation.id}::bigint, ${audience}) ON CONFLICT (token_hash) DO NOTHING`;
-    await sql`INSERT INTO support_messages (conversation_id, sender, body, provider_event_id) VALUES (${conversation.id}::bigint, ${role}, ${text}, ${emailId}) ON CONFLICT (provider_event_id) DO NOTHING`;
+    await sql`INSERT INTO support_reply_tokens (token_hash, conversation_id, audience) VALUES (${nextHash}, ${conversation.id}, ${audience}) ON CONFLICT (token_hash) DO NOTHING`;
+    await sql`INSERT INTO support_messages (conversation_id, sender, body, provider_event_id) VALUES (${conversation.id}, ${role}, ${text}, ${emailId}) ON CONFLICT (provider_event_id) DO NOTHING`;
     await sendEmail({ to: isOwner ? conversation.email : owner, replyTo: `kcp-${nextToken}@${domain}`, subject: isOwner ? "A reply from Kingdom Custom Print" : "Customer support reply", text: isOwner ? `Hi ${conversation.name},\n\n${text}\n\nReply to this email to continue the conversation.` : `From: ${conversation.name}\nCustomer email: ${conversation.email}\n\n${text}\n\nReply to this email to continue the conversation.`, idempotencyKey: `support-reply-${emailId}` });
     return NextResponse.json({ ok: true });
   } catch { return NextResponse.json({ error: "Temporary failure" }, { status: 503 }); }
 }
+

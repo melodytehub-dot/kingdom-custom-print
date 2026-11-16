@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { requireAdmin } from "../_guard";
-import { sql } from "@/lib/db";
+import { sql, num } from "@/lib/db";
+import { isGuardFailure } from "@/lib/inventory-reservations";
+import type { SqlFragment } from "@/lib/sqlite";
 
 export const dynamic = "force-dynamic";
 
@@ -10,21 +12,21 @@ export async function GET(req: Request) {
   if (params.get("summary") === "1") {
     try {
       const [rows, controls] = await Promise.all([
-        sql`SELECT p.id, count(*)::int AS total, count(i.product_id)::int AS counted FROM products p JOIN product_colors c ON c.product_id = p.id JOIN product_sizes s ON s.product_id = p.id LEFT JOIN inventory_stock i ON i.product_id = p.id AND i.color_name = c.name AND i.size_label = s.label WHERE p.active = true GROUP BY p.id ORDER BY p.id`,
-        sql`SELECT enabled FROM inventory_control WHERE id = true`,
+        sql<{ id: number; total: number; counted: number }[]>`SELECT p.id, count(*) AS total, count(i.product_id) AS counted FROM products p JOIN product_colors c ON c.product_id = p.id JOIN product_sizes s ON s.product_id = p.id LEFT JOIN inventory_stock i ON i.product_id = p.id AND i.color_name = c.name AND i.size_label = s.label WHERE p.active = 1 GROUP BY p.id ORDER BY p.id`,
+        sql<{ enabled: number }[]>`SELECT enabled FROM inventory_control WHERE id = 1`,
       ]);
-      return NextResponse.json({ products: rows, enabled: controls[0]?.enabled === true }, { headers: { "Cache-Control": "no-store" } });
+      return NextResponse.json({ products: rows, enabled: Boolean(controls[0]?.enabled) }, { headers: { "Cache-Control": "no-store" } });
     } catch { return NextResponse.json({ error: "Inventory summary is temporarily unavailable." }, { status: 503 }); }
   }
   const id = Number(params.get("product"));
   if (!Number.isSafeInteger(id) || id < 1) return NextResponse.json({ error: "Choose a product." }, { status: 422 });
   try {
     const [rows, history, controls] = await Promise.all([
-      sql`SELECT s.color_name, s.size_label, s.quantity, s.updated_at, COALESCE((SELECT sum(r.quantity) FROM inventory_reservations r WHERE r.product_id = s.product_id AND r.color_name = s.color_name AND r.size_label = s.size_label), 0)::int AS reserved FROM inventory_stock s WHERE s.product_id = ${id}`,
+      sql`SELECT s.color_name, s.size_label, s.quantity, s.updated_at, COALESCE((SELECT sum(r.quantity) FROM inventory_reservations r WHERE r.product_id = s.product_id AND r.color_name = s.color_name AND r.size_label = s.size_label), 0) AS reserved FROM inventory_stock s WHERE s.product_id = ${id}`,
       sql`SELECT color_name, size_label, previous_quantity, new_quantity, created_at FROM inventory_adjustments WHERE product_id = ${id} ORDER BY id DESC LIMIT 30`,
-      sql`SELECT enabled FROM inventory_control WHERE id = true`,
+      sql<{ enabled: number }[]>`SELECT enabled FROM inventory_control WHERE id = 1`,
     ]);
-    return NextResponse.json({ counts: rows, history, enabled: controls[0]?.enabled === true }, { headers: { "Cache-Control": "no-store" } });
+    return NextResponse.json({ counts: rows, history, enabled: Boolean(controls[0]?.enabled) }, { headers: { "Cache-Control": "no-store" } });
   } catch { return NextResponse.json({ error: "Inventory is temporarily unavailable." }, { status: 503 }); }
 }
 
@@ -35,27 +37,29 @@ export async function PATCH(req: Request) {
   catch { return NextResponse.json({ error: "Choose whether to enable stock protection." }, { status: 422 }); }
   const enabled = body.enabled as boolean;
   try {
-    await sql.begin(async (tx) => {
-      const [control] = await tx<{ enabled: boolean }[]>`SELECT enabled FROM inventory_control WHERE id = true FOR UPDATE`;
-      if (!control) throw new Error("unavailable");
-      if (control.enabled === enabled) return;
-      if (enabled) {
-        const duplicateColors = await tx`SELECT 1 FROM product_colors c JOIN products p ON p.id = c.product_id WHERE p.active = true GROUP BY c.product_id, c.name HAVING count(*) > 1 LIMIT 1`;
-        if (duplicateColors.length) throw new Error("duplicates");
-        const [pending] = await tx<{ count: number }[]>`SELECT count(*)::int AS count FROM orders WHERE status = 'pending' OR (status = 'cancelled' AND (stripe_session_id IS NOT NULL OR paypal_order_id IS NOT NULL) AND NOT inventory_provider_closed)`;
-        if (pending.count) throw new Error("pending");
-      } else {
-        const held = await tx`SELECT 1 FROM inventory_reservations LIMIT 1`;
-        if (held.length) throw new Error("held");
-      }
-      await tx`UPDATE inventory_control SET enabled = ${enabled} WHERE id = true`;
-    });
+    const [control] = await sql<{ enabled: number }[]>`SELECT enabled FROM inventory_control WHERE id = 1`;
+    if (!control) throw new Error("unavailable");
+    if (Boolean(control.enabled) === enabled) return NextResponse.json({ ok: true });
+    if (enabled) {
+      const duplicateColors = await sql`SELECT 1 FROM product_colors c JOIN products p ON p.id = c.product_id WHERE p.active = 1 GROUP BY c.product_id, c.name HAVING count(*) > 1 LIMIT 1`;
+      if (duplicateColors.length) throw new Error("duplicates");
+      const [pending] = await sql<{ count: number }[]>`SELECT count(*) AS count FROM orders WHERE status = 'pending' OR (status = 'cancelled' AND (stripe_session_id IS NOT NULL OR paypal_order_id IS NOT NULL) AND inventory_provider_closed = 0)`;
+      if (num(pending?.count)) throw new Error("pending");
+    } else {
+      const held = await sql`SELECT 1 FROM inventory_reservations LIMIT 1`;
+      if (held.length) throw new Error("held");
+    }
+    const updated = await sql`
+      UPDATE inventory_control SET enabled = ${enabled} WHERE id = 1 AND enabled = ${control.enabled}
+      RETURNING id`;
+    if (!updated.length) throw new Error("conflict");
     return NextResponse.json({ ok: true });
   } catch (error) {
     const reason = error instanceof Error ? error.message : "";
     if (reason === "duplicates") return NextResponse.json({ error: "Active products need distinct color names before stock protection can be enabled." }, { status: 409 });
     if (reason === "pending") return NextResponse.json({ error: "Existing pending or cancelled payment sessions need reconciliation before stock protection can be enabled. Contact the site administrator." }, { status: 409 });
     if (reason === "held") return NextResponse.json({ error: "Stock is held for pending orders. Resolve those orders before turning protection off." }, { status: 409 });
+    if (reason === "conflict") return NextResponse.json({ error: "Stock protection changed elsewhere. Reload and try again." }, { status: 409 });
     return NextResponse.json({ error: "Stock protection could not be updated." }, { status: 503 });
   }
 }
@@ -78,25 +82,50 @@ export async function PUT(req: Request) {
     unique.add(key); counts.push({ color: row.color, size: row.size, quantity: row.quantity, expected: row.expected as number | null });
   }
   try {
-    await sql.begin(async (tx) => {
-      // Serialize count edits for a product, including creation of a new row.
-      await tx`SELECT pg_advisory_xact_lock(1296786772, ${id})`;
-      const [product] = await tx<{ name: string }[]>`SELECT name FROM products WHERE id = ${id} FOR SHARE`;
-      if (!product) throw new Error("variant");
-      const colors = await tx<{ name: string }[]>`SELECT name FROM product_colors WHERE product_id = ${id}`;
-      const sizes = await tx<{ label: string }[]>`SELECT label FROM product_sizes WHERE product_id = ${id}`;
-      for (const row of counts) {
-        if (!colors.some((c) => c.name === row.color) || !sizes.some((s) => s.label === row.size)) throw new Error("variant");
-        const [current] = await tx<{ quantity: number }[]>`SELECT quantity FROM inventory_stock WHERE product_id = ${id} AND color_name = ${row.color} AND size_label = ${row.size} FOR UPDATE`;
-        const previous = current?.quantity ?? null;
-        if (previous !== row.expected) throw new Error("conflict");
-        const [held] = await tx<{ quantity: number }[]>`SELECT COALESCE(sum(quantity), 0)::int AS quantity FROM inventory_reservations WHERE product_id = ${id} AND color_name = ${row.color} AND size_label = ${row.size}`;
-        if (row.quantity < held.quantity) throw new Error("reserved");
-        if (previous === row.quantity) continue;
-        await tx`INSERT INTO inventory_stock (product_id, color_name, size_label, quantity) VALUES (${id}, ${row.color}, ${row.size}, ${row.quantity}) ON CONFLICT (product_id, color_name, size_label) DO UPDATE SET quantity = EXCLUDED.quantity, updated_at = now()`;
-        await tx`INSERT INTO inventory_adjustments (product_id, product_name, color_name, size_label, previous_quantity, new_quantity) VALUES (${id}, ${product.name}, ${row.color}, ${row.size}, ${previous}, ${row.quantity})`;
+    const [product] = await sql<{ name: string }[]>`SELECT name FROM products WHERE id = ${id}`;
+    if (!product) throw new Error("variant");
+    const colors = await sql<{ name: string }[]>`SELECT name FROM product_colors WHERE product_id = ${id}`;
+    const sizes = await sql<{ label: string }[]>`SELECT label FROM product_sizes WHERE product_id = ${id}`;
+
+    const statements: SqlFragment[] = [];
+    for (const [index, row] of counts.entries()) {
+      if (!colors.some((c) => c.name === row.color) || !sizes.some((s) => s.label === row.size)) throw new Error("variant");
+      const [current] = await sql<{ quantity: number }[]>`
+        SELECT quantity FROM inventory_stock
+        WHERE product_id = ${id} AND color_name = ${row.color} AND size_label = ${row.size} LIMIT 1`;
+      const previous = current?.quantity ?? null;
+      if (previous !== row.expected) throw new Error("conflict");
+      const [held] = await sql<{ quantity: number }[]>`
+        SELECT COALESCE(sum(quantity), 0) AS quantity FROM inventory_reservations
+        WHERE product_id = ${id} AND color_name = ${row.color} AND size_label = ${row.size}`;
+      if (row.quantity < num(held?.quantity)) throw new Error("reserved");
+      if (previous === row.quantity) continue;
+
+      // Only writes when the count still matches what the admin saw. A null
+      // expected value means "no row yet", so a conflict must not update.
+      statements.push(sql`
+        INSERT INTO inventory_stock (product_id, color_name, size_label, quantity)
+        VALUES (${id}, ${row.color}, ${row.size}, ${row.quantity})
+        ON CONFLICT (product_id, color_name, size_label) DO UPDATE
+          SET quantity = excluded.quantity,
+              updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now')
+          WHERE inventory_stock.quantity = ${row.expected ?? -1}`);
+      statements.push(sql`
+        INSERT INTO transaction_guards (key, value)
+        SELECT ${`stock-count:${index}`}, 0 WHERE changes() <> 1`);
+      statements.push(sql`
+        INSERT INTO inventory_adjustments
+          (product_id, product_name, color_name, size_label, previous_quantity, new_quantity)
+        VALUES (${id}, ${product.name}, ${row.color}, ${row.size}, ${previous}, ${row.quantity})`);
+    }
+
+    if (statements.length) {
+      try {
+        await sql.batch(statements);
+      } catch (error) {
+        throw isGuardFailure(error) ? new Error("conflict") : error;
       }
-    });
+    }
     return NextResponse.json({ ok: true });
   } catch (error) {
     if (error instanceof Error && error.message === "conflict") return NextResponse.json({ error: "These counts changed elsewhere. Reload inventory before saving." }, { status: 409 });

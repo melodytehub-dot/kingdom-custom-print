@@ -53,7 +53,7 @@ function slugify(value: string): string {
 async function photosExist(product: ProductInput): Promise<boolean> {
   const ids = [...new Set(product.colors.flatMap(color => [color.frontImage, color.backImage, ...(color.photos ?? [])]).filter((url): url is string => Boolean(url)).map(url => url.split("/").pop()!))];
   if (!ids.length) return true;
-  const rows = await sql<{ id: string }[]>`SELECT id FROM catalog_media WHERE id IN (SELECT jsonb_array_elements_text(${sql.json(ids)}::jsonb))`;
+  const rows = await sql<{ id: string }[]>`SELECT id FROM catalog_media WHERE id IN (${sql.array(ids)})`;
   return rows.length === ids.length;
 }
 

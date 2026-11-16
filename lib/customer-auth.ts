@@ -1,7 +1,7 @@
 import { createHash, randomBytes, scrypt, timingSafeEqual } from "node:crypto";
 import { promisify } from "node:util";
 import { cookies } from "next/headers";
-import { sql } from "./db";
+import { sql, num } from "./db";
 
 const derive = promisify(scrypt);
 const SESSION_DAYS = 30;
@@ -54,7 +54,7 @@ export async function customerFromToken(token: string | null): Promise<CustomerA
   const [account] = await sql<CustomerAccount[]>`
     SELECT a.id, a.email, a.name FROM customer_accounts a
     JOIN customer_sessions s ON s.account_id = a.id
-    WHERE s.token_hash = ${tokenHash(token)} AND s.expires_at > now() AND a.email_verified = true
+    WHERE s.token_hash = ${tokenHash(token)} AND s.expires_at > strftime('%Y-%m-%dT%H:%M:%fZ','now') AND a.email_verified = 1
     LIMIT 1`;
   return account ?? null;
 }
@@ -87,12 +87,12 @@ export async function authAttemptAllowed(request: Request, email: string, maxAtt
   const key = createHash("sha256").update(`${ip}:${email}`).digest("hex");
   const [row] = await sql<{ attempts: number }[]>`
     INSERT INTO customer_auth_attempts (key, attempts, reset_at)
-    VALUES (${key}, 1, now() + interval '15 minutes')
+    VALUES (${key}, 1, strftime('%Y-%m-%dT%H:%M:%fZ','now','+15 minutes'))
     ON CONFLICT (key) DO UPDATE SET
-      attempts = CASE WHEN customer_auth_attempts.reset_at < now() THEN 1 ELSE customer_auth_attempts.attempts + 1 END,
-      reset_at = CASE WHEN customer_auth_attempts.reset_at < now() THEN now() + interval '15 minutes' ELSE customer_auth_attempts.reset_at END
+      attempts = CASE WHEN customer_auth_attempts.reset_at < strftime('%Y-%m-%dT%H:%M:%fZ','now') THEN 1 ELSE customer_auth_attempts.attempts + 1 END,
+      reset_at = CASE WHEN customer_auth_attempts.reset_at < strftime('%Y-%m-%dT%H:%M:%fZ','now') THEN strftime('%Y-%m-%dT%H:%M:%fZ','now','+15 minutes') ELSE customer_auth_attempts.reset_at END
     RETURNING attempts`;
-  return row.attempts <= maxAttempts;
+  return num(row.attempts) <= maxAttempts;
 }
 
 export function sameOrigin(request: Request): boolean {
@@ -100,3 +100,4 @@ export function sameOrigin(request: Request): boolean {
   if (!origin) return true;
   return origin === new URL(request.url).origin;
 }
+

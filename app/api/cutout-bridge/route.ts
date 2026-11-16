@@ -42,11 +42,13 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Keep the photo under 4 MB." }, { status: 413 });
   }
 
-  const bytes = Buffer.from(await file.arrayBuffer());
+  const bytes = new Uint8Array(await file.arrayBuffer());
   const id = randomBytes(16).toString("hex");
 
-  await sql`DELETE FROM cutout_bridge_images WHERE created_at < now() - interval '1 day'`;
+  await sql`DELETE FROM cutout_bridge_images WHERE created_at < strftime('%Y-%m-%dT%H:%M:%fZ','now','-1 day')`;
   await sql`INSERT INTO cutout_bridge_images (id, content_type, bytes) VALUES (${id}, ${contentType}, ${bytes})`;
 
   return NextResponse.json({ id, path: `/api/cutout-bridge/${id}` });
 }
+
+

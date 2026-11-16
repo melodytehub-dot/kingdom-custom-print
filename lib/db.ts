@@ -1,95 +1,125 @@
-import postgres from "postgres";
+import { createRequire } from "node:module";
 import { getDatabaseContext } from "./db-context";
+import {
+  createSqlClient,
+  type DatabaseLike,
+  type PreparedStatementLike,
+  type SqlClient,
+  type SqlResult,
+  type SqlValue,
+} from "./sqlite";
 
 declare global {
-  var __kcpSql: ReturnType<typeof postgres> | undefined;
-  var __kcpWorkerSql: ReturnType<typeof postgres> | undefined;
-  var __kcpWorkerConnectionString: string | undefined;
+  var __kcpWorkerDb: DatabaseLike | undefined;
+  var __kcpLocalDb: DatabaseLike | undefined;
 }
 
-function isLocalDatabase(url: string) {
-  try {
-    const { hostname } = new URL(url);
-    return hostname === "localhost" || hostname === "127.0.0.1" || hostname === "::1";
-  } catch {
-    return false;
+type LocalStatement = {
+  all(...params: unknown[]): Record<string, unknown>[];
+  get(...params: unknown[]): Record<string, unknown> | undefined;
+  run(...params: unknown[]): { changes?: number | bigint } | undefined;
+};
+type LocalDatabase = {
+  exec(sql: string): void;
+  prepare(sql: string): LocalStatement;
+  close(): void;
+};
+type LocalDatabaseConstructor = new (file: string) => LocalDatabase;
+
+/**
+ * Local development driver: Node's built-in SQLite behind the same shape as a
+ * Cloudflare D1 binding. Node modules are required lazily so the Worker bundle
+ * never evaluates them.
+ */
+function openLocalDatabase(file: string): DatabaseLike {
+  // `createRequire` needs a path rather than an import URL: bundlers rewrite
+  // `import.meta.url` for the server build and reject it here.
+  const nodeRequire = createRequire(`${process.cwd()}/package.json`);
+  const { existsSync, mkdirSync, readFileSync } = nodeRequire("node:fs") as typeof import("node:fs");
+  const { dirname, join } = nodeRequire("node:path") as typeof import("node:path");
+  const { fileURLToPath } = nodeRequire("node:url") as typeof import("node:url");
+  const { DatabaseSync } = nodeRequire("node:sqlite") as { DatabaseSync: LocalDatabaseConstructor };
+
+  mkdirSync(dirname(file), { recursive: true });
+  const db = new DatabaseSync(file);
+  db.exec("PRAGMA foreign_keys = ON;");
+  const ready = db
+    .prepare("SELECT count(*) AS n FROM sqlite_master WHERE type = 'table' AND name = 'products'")
+    .get() as { n: number } | undefined;
+  if (!ready?.n) {
+    const schemaPath = join(dirname(fileURLToPath(import.meta.url)), "..", "db", "schema.sqlite.sql");
+    if (!existsSync(schemaPath)) throw new Error(`Local database schema is missing at ${schemaPath}`);
+    db.exec(readFileSync(schemaPath, "utf8"));
   }
-}
 
-function createClient(url: string, isWorkerRequest = false) {
-  const local = !isWorkerRequest && isLocalDatabase(url);
-  return postgres(url, {
-    max: isWorkerRequest ? 5 : process.env.NODE_ENV === "production" ? 5 : 3,
-    // Hyperdrive provides its own Worker-facing connection string and TLS
-    // settings. Forcing Node's SSL mode here can make the TCP socket handshake
-    // stall. Local Neon connections still require SSL; the local Postgres
-    // server used for development does not support it.
-    ...(!isWorkerRequest ? { ssl: local ? false : ("require" as const) } : {}),
-    idle_timeout: 20,
-    connect_timeout: 15,
-    ...(isWorkerRequest ? { fetch_types: false } : {}),
-    // Neon returns numerics as strings to preserve precision; parse them here.
-    types: {
-      numeric: postgres.BigInt,
-      // Worker requests disable type discovery, so postgres.js does not load
-      // the serializer map for built-in array OIDs. Register int4[] explicitly
-      // because catalog queries pass product IDs through sql.array(..., 1007).
-      int4array: {
-        to: 1007,
-        from: [],
-        serialize: (values: number[]) => {
-          if (!values.every(Number.isSafeInteger)) {
-            throw new TypeError("int4[] values must contain safe integers");
-          }
-          return `{${values.join(",")}}`;
-        },
-        parse: (value: string) => value,
+  const changes = () => {
+    const row = db.prepare("SELECT changes() AS n").get() as { n: number } | undefined;
+    return Number(row?.n ?? 0);
+  };
+
+  const execute = <T>(text: string, values: unknown[]): SqlResult<T> => {
+    const results = db.prepare(text).all(...values);
+    return { results, meta: { changes: changes() } } as SqlResult<T>;
+  };
+
+  const statement = (text: string): PreparedStatementLike => {
+    const make = (values: SqlValue[]): PreparedStatementLike => ({
+      bind(...more: SqlValue[]) {
+        return make([...values, ...more]);
       },
+      all: <T>() => execute<T>(text, values),
+      run: async () => db.prepare(text).run(...values),
+      first: <T>() => (db.prepare(text).get(...values) ?? null) as T | null,
+    });
+    return make([]);
+  };
+
+  return {
+    prepare: statement,
+    // SQLite is synchronous locally, so a batch is a plain transaction loop.
+    async batch(statements: PreparedStatementLike[]) {
+      db.exec("BEGIN IMMEDIATE");
+      try {
+        const results: SqlResult[] = [];
+        for (const item of statements) {
+          results.push((await item.all()) as SqlResult);
+        }
+        db.exec("COMMIT");
+        return results;
+      } catch (error) {
+        db.exec("ROLLBACK");
+        throw error;
+      }
     },
-    transform: {
-      undefined: null,
-    },
-  });
+  };
 }
 
-function getClient() {
+function localDatabaseFile(): string {
+  return process.env.LOCAL_DB_PATH ?? `${process.cwd()}/.local-db/store.sqlite`;
+}
+
+function database(): DatabaseLike {
   const context = getDatabaseContext();
-  if (context) {
-    context.client ??= createClient(context.connectionString, true);
-    return context.client;
-  }
-
-  // Async render work can resume after the Worker has returned its streaming
-  // response, outside the request AsyncLocalStorage scope. Hyperdrive's URL is
-  // isolate-stable, so retain a Worker client as a safe fallback for that work.
-  if (globalThis.__kcpWorkerConnectionString) {
-    globalThis.__kcpWorkerSql ??= createClient(globalThis.__kcpWorkerConnectionString, true);
-    return globalThis.__kcpWorkerSql;
-  }
-
-  const url = process.env.DATABASE_URL;
-  if (!url) {
-    throw new Error(
-      "DATABASE_URL is not configured. Add it to .env.local — see .env.example."
-    );
-  }
-  globalThis.__kcpSql ??= createClient(url);
-  return globalThis.__kcpSql;
+  if (context) return context.db;
+  if (globalThis.__kcpWorkerDb) return globalThis.__kcpWorkerDb;
+  globalThis.__kcpLocalDb ??= openLocalDatabase(localDatabaseFile());
+  return globalThis.__kcpLocalDb;
 }
 
 /**
- * Reuse the pool across hot reloads in development so we do not exhaust
- * Neon's connection limit on every code change.
+ * Tagged-template SQL client shared by every query module. The database is
+ * chosen per request: D1 in the Worker, SQLite on disk in development.
  */
-export const sql = new Proxy((() => undefined) as unknown as ReturnType<typeof postgres>, {
-  apply(_target, thisArg, args: Parameters<ReturnType<typeof postgres>>) {
-    return Reflect.apply(getClient(), thisArg, args);
+export const sql = new Proxy((() => undefined) as unknown as SqlClient, {
+  apply(_target, thisArg, args) {
+    const client = createSqlClient(database());
+    return Reflect.apply(client as unknown as (...a: unknown[]) => unknown, thisArg, args);
   },
   get(_target, property) {
-    const client = getClient();
-    return Reflect.get(client, property, client);
+    const client = createSqlClient(database());
+    return Reflect.get(client as object, property, client);
   },
-}) as ReturnType<typeof postgres>;
+}) as SqlClient;
 
 export function num(value: unknown): number {
   if (value === null || value === undefined) return 0;

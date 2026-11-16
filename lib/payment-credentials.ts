@@ -43,9 +43,15 @@ export async function getPaymentCredential(name: PaymentField): Promise<string |
 
 export async function savePaymentCredentials(values: Partial<Record<PaymentField, string>>): Promise<void> {
   const rows = Object.entries(values).map(([name, value]) => ({ name: name as PaymentField, ciphertext: encryptPaymentCredential(name as PaymentField, value!) }));
-  await sql.begin(async (tx) => {
-    for (const row of rows) await tx`INSERT INTO payment_credentials (name, ciphertext) VALUES (${row.name}, ${row.ciphertext}) ON CONFLICT (name) DO UPDATE SET ciphertext = EXCLUDED.ciphertext, updated_at = now()`;
-  });
+  if (!rows.length) return;
+  await sql.batch(
+    rows.map((row) => sql`
+      INSERT INTO payment_credentials (name, ciphertext)
+      VALUES (${row.name}, ${row.ciphertext})
+      ON CONFLICT (name) DO UPDATE
+        SET ciphertext = excluded.ciphertext,
+            updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now')`)
+  );
 }
 
 export async function paymentCredentialStatus(): Promise<Record<PaymentField, boolean>> {

@@ -18,7 +18,7 @@ export async function GET(
 
   const rows = await sql<{ content_type: string; bytes: Buffer }[]>`
     SELECT content_type, bytes FROM cutout_bridge_images
-    WHERE id = ${id} AND created_at > now() - interval '1 day'
+    WHERE id = ${id} AND created_at > strftime('%Y-%m-%dT%H:%M:%fZ','now','-1 day')
   `;
   const row = rows[0];
   if (!row) return new NextResponse("Not found", { status: 404 });

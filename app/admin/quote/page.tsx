@@ -3,7 +3,7 @@ import { cookies } from "next/headers";
 import { ADMIN_COOKIE, adminConfigured, validateSession } from "@/lib/admin-auth";
 import { sql } from "@/lib/db";
 import { getSettings } from "@/lib/catalog";
-import type { AdminQuote } from "@/lib/admin-quotes";
+import { quoteFromRow, type QuoteRow } from "@/lib/admin-quotes";
 import { formatUSD } from "@/lib/pricing";
 import PrintInvoiceButton from "@/components/admin/PrintInvoiceButton";
 
@@ -15,8 +15,9 @@ export default async function QuotePage({ searchParams }: { searchParams: Promis
   if (!adminConfigured() || !(await validateSession(jar.get(ADMIN_COOKIE)?.value ?? null))) return <main className="wrap"><h1>Sign in to view this document</h1><Link href="/admin">Go to admin</Link></main>;
   const { id } = await searchParams;
   if (!id || !/^[1-9][0-9]{0,15}$/.test(id)) return <main className="wrap"><h1>Document not found</h1><Link href="/admin?tab=quotes">Back to quotes</Link></main>;
-  const [quote] = await sql<AdminQuote[]>`SELECT id::text, customer_name, customer_email, notes, lines, shipping_cents, status, created_at, invoiced_at FROM admin_quotes WHERE id = ${id}::bigint`;
-  if (!quote) return <main className="wrap"><h1>Document not found</h1><Link href="/admin?tab=quotes">Back to quotes</Link></main>;
+  const [row] = await sql<QuoteRow[]>`SELECT id, customer_name, customer_email, notes, lines, shipping_cents, status, created_at, invoiced_at FROM admin_quotes WHERE id = ${id}`;
+  if (!row) return <main className="wrap"><h1>Document not found</h1><Link href="/admin?tab=quotes">Back to quotes</Link></main>;
+  const quote = quoteFromRow(row);
   const settings = await getSettings();
   const subtotal = quote.lines.reduce((n, line) => n + line.quantity * line.unitCents, 0);
   return <main className="admin-invoice"><div className="admin-invoice-actions"><Link href="/admin?tab=quotes">Back to quotes</Link><PrintInvoiceButton /></div>

@@ -31,7 +31,7 @@ export async function validateSession(token: string | null): Promise<boolean> {
   if (!token) return false;
   const rows = await sql<{ ok: number }[]>`
     SELECT 1 AS ok FROM admin_sessions
-    WHERE token = ${token} AND expires_at > now()`;
+    WHERE token = ${token} AND expires_at > strftime('%Y-%m-%dT%H:%M:%fZ','now')`;
   return rows.length > 0;
 }
 
@@ -53,5 +53,5 @@ export function readSessionCookie(req: Request): string | null {
 
 /** Best-effort cleanup of expired sessions; called on login. */
 export async function pruneSessions(): Promise<void> {
-  await sql`DELETE FROM admin_sessions WHERE expires_at <= now()`;
+  await sql`DELETE FROM admin_sessions WHERE expires_at <= strftime('%Y-%m-%dT%H:%M:%fZ','now')`;
 }

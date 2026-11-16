@@ -17,13 +17,13 @@ export async function GET(request: Request) {
   const token = tokenFrom(request);
   const available = Boolean(process.env.SUPPORT_EMAIL?.trim() && process.env.SUPPORT_INBOUND_DOMAIN?.trim() && process.env.RESEND_INBOUND_API_KEY && process.env.RESEND_WEBHOOK_SECRET && emailConfigured());
   if (!token) return NextResponse.json({ messages: [], available }, { headers: { "Cache-Control": "no-store" } });
-  const [conversation] = await sql<{ id: string }[]>`SELECT id FROM support_conversations WHERE customer_token_hash = ${hash(token)} AND expires_at > now() LIMIT 1`;
+  const [conversation] = await sql<{ id: number }[]>`SELECT id FROM support_conversations WHERE customer_token_hash = ${hash(token)} AND expires_at > strftime('%Y-%m-%dT%H:%M:%fZ','now') LIMIT 1`;
   if (!conversation) {
     const response = NextResponse.json({ messages: [], available }, { headers: { "Cache-Control": "no-store" } });
     response.cookies.set(cookieName, "", { httpOnly: true, sameSite: "lax", secure: process.env.NODE_ENV === "production", path: "/", maxAge: 0 });
     return response;
   }
-  const messages = await sql<{ sender: string; body: string; created_at: Date }[]>`SELECT sender, body, created_at FROM (SELECT id, sender, body, created_at FROM support_messages WHERE conversation_id = ${conversation.id} ORDER BY id DESC LIMIT 200) recent ORDER BY id ASC`;
+  const messages = await sql<{ sender: string; body: string; created_at: string }[]>`SELECT sender, body, created_at FROM (SELECT id, sender, body, created_at FROM support_messages WHERE conversation_id = ${conversation.id} ORDER BY id DESC LIMIT 200) recent ORDER BY id ASC`;
   return NextResponse.json({ messages, available }, { headers: { "Cache-Control": "no-store" } });
 }
 
@@ -44,9 +44,9 @@ export async function POST(request: Request) {
   try {
     if (!await authAttemptAllowed(request, "__support_message__")) return NextResponse.json({ error: "Too many messages. Please try again later." }, { status: 429 });
     const customerToken = existing || randomBytes(32).toString("hex");
-    let conversation = existing ? (await sql<{ id: string; name: string; email: string }[]>`SELECT id, name, email FROM support_conversations WHERE customer_token_hash = ${hash(existing)} AND expires_at > now() LIMIT 1`)[0] : undefined;
+    let conversation = existing ? (await sql<{ id: number; name: string; email: string }[]>`SELECT id, name, email FROM support_conversations WHERE customer_token_hash = ${hash(existing)} AND expires_at > strftime('%Y-%m-%dT%H:%M:%fZ','now') LIMIT 1`)[0] : undefined;
     if (existing && !conversation) return NextResponse.json({ error: "This conversation has expired." }, { status: 410 });
-    if (!conversation) [conversation] = await sql<{ id: string; name: string; email: string }[]>`INSERT INTO support_conversations (customer_token_hash, name, email) VALUES (${hash(customerToken)}, ${name}, ${email}) RETURNING id, name, email`;
+    if (!conversation) [conversation] = await sql<{ id: number; name: string; email: string }[]>`INSERT INTO support_conversations (customer_token_hash, name, email) VALUES (${hash(customerToken)}, ${name}, ${email}) RETURNING id, name, email`;
     const replyToken = randomBytes(24).toString("hex");
     await sql`INSERT INTO support_reply_tokens (token_hash, conversation_id) VALUES (${hash(replyToken)}, ${conversation.id})`;
     await sendEmail({ to: destination, replyTo: `kcp-${replyToken}@${inboundDomain}`, subject: "New customer support message", text: `From: ${conversation.name}\nCustomer email: ${conversation.email}\n\n${message}\n\nReply to this email to respond in the customer's conversation.` });
@@ -56,3 +56,4 @@ export async function POST(request: Request) {
     return response;
   } catch { return NextResponse.json({ error: "Could not send your message. Please try again." }, { status: 503 }); }
 }
+

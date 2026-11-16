@@ -88,7 +88,7 @@ export async function GET(request: NextRequest) {
       if (existing) {
         if (!authoritative || existing.google_sub) return finish(request, "account-exists");
         const [updated] = await sql<{ id: number }[]>`
-          UPDATE customer_accounts SET google_sub = ${profile.sub}, email_verified = true
+          UPDATE customer_accounts SET google_sub = ${profile.sub}, email_verified = 1
           WHERE id = ${existing.id} AND google_sub IS NULL RETURNING id`;
         accountId = updated?.id;
       } else {
@@ -108,3 +108,4 @@ export async function GET(request: NextRequest) {
     return finish(request, `unavailable-${stage}`);
   }
 }
+

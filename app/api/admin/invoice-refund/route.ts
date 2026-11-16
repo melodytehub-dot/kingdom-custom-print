@@ -14,7 +14,7 @@ export async function POST(req: Request) {
   let body: { id?: unknown; password?: unknown }; try { body = await req.json(); } catch { return NextResponse.json({ error: "Invalid request." }, { status: 400 }); }
   if (typeof body.password !== "string" || !passwordMatches(body.password)) return NextResponse.json({ error: "The admin password is incorrect." }, { status: 403 });
   const id = String(body.id ?? ""); if (!/^[1-9][0-9]{0,15}$/.test(id)) return NextResponse.json({ error: "Invoice not found." }, { status: 422 });
-  const [payment] = await sql<{ id: string; provider: string; payment_id: string | null }[]>`SELECT id::text, provider, payment_id FROM invoice_payment_attempts WHERE quote_id = ${id}::bigint AND state = 'paid' LIMIT 1`;
+  const [payment] = await sql<{ id: string; provider: string; payment_id: string | null }[]>`SELECT id, provider, payment_id FROM invoice_payment_attempts WHERE quote_id = ${id} AND state = 'paid' LIMIT 1`;
   if (!payment?.payment_id) return NextResponse.json({ error: "This invoice has no refundable payment." }, { status: 409 });
   try {
     if (payment.provider === "paypal") {

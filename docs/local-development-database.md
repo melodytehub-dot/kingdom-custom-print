@@ -1,36 +1,56 @@
 # Local development database
 
-The storefront normally talks to the production Postgres database through
-Cloudflare Hyperdrive. Dashboard and editor checks should not run against that
-database, so development and QA use a local Postgres-compatible server built on
-PGlite.
+The storefront runs on one SQLite dialect everywhere: Cloudflare D1 in
+production and Node's built-in SQLite on disk in development. There is no
+Postgres emulator to start, and no connection string to configure.
 
-## Start the local database
+## Prepare the local database
 
 ```powershell
-npm run db:local          # listens on 127.0.0.1:55432
-npm run db:local:reset    # delete the local data directory and re-apply db/schema.sql
+npm run db:local          # apply db/schema.sqlite.sql, then seed if empty
+npm run db:local:reset    # delete .local-db/store.sqlite and start clean
+npm run db:migrate        # apply the schema only
+npm run db:seed           # reseed the catalog (resets catalog tables)
 ```
 
-The first run applies `db/schema.sql`. Data is kept in `.local-db/`, which is
-ignored by git.
+Data lives in `.local-db/store.sqlite`, which is ignored by git. Set
+`LOCAL_DB_PATH` to use a different file, which is handy for throwaway QA runs.
 
-Create `.env.development.local` so `next dev` uses it:
+Only one environment variable is needed for local admin work:
 
 ```
-DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:55432/postgres
 ADMIN_PASSWORD=choose-a-local-password
 ```
 
-`.env.development.local` takes precedence over `.env.local`, so the production
-connection string is untouched. Seed the sample catalog with:
+Put it in `.env.development.local`. `DATABASE_URL` is no longer read by the app.
+
+## Database changes
+
+Edit `db/schema.sqlite.sql`, then apply it to the local file and to D1:
 
 ```powershell
-$env:DATABASE_URL='postgresql://postgres:postgres@127.0.0.1:55432/postgres'
-node scripts/seed.mjs
+npm run db:migrate
+npm run db:d1:schema
 ```
 
-## Run the dashboard checks
+The schema is written so it can be re-applied: tables, indexes and triggers use
+`IF NOT EXISTS`. Timestamps are ISO-8601 UTC text, booleans are `0`/`1`, and
+JSON columns are text parsed by the query layer.
+
+## Catalog seed for D1
+
+`scripts/seed-sqlite.mjs` seeds the local database from `scripts/seed.mjs`
+catalog data. To publish the same catalog to production:
+
+```powershell
+npm run db:seed:sql    # writes db/seed.sql from a throwaway seeded database
+npm run db:d1:seed     # applies db/seed.sql to the remote D1 database
+```
+
+`db/seed.sql` replaces catalog tables and the seeded site settings only; it
+never touches orders, customers or uploaded media.
+
+## Run the checks
 
 Start the app with `npx next dev -p 3026 -H 127.0.0.1`, then:
 
@@ -46,13 +66,13 @@ node scripts/qa-admin-settings.mjs
 node scripts/qa-custom-pages.mjs
 ```
 
-Database-level scripts read `DATABASE_URL` directly:
+The write-path checks run against the local SQLite file and need no browser:
 
 ```powershell
-$env:DATABASE_URL='postgresql://postgres:postgres@127.0.0.1:55432/postgres'
-node scripts/qa-homepage-layout-db.mjs
-node scripts/qa-home-settings-db.mjs
+npm run qa-order-writes    # checkout, inventory holds, payment, refund, cancel
+npm run qa-admin-writes    # settings, products, homepage draft/publish (needs the dev server)
 ```
 
-All of these scripts create their own pages, versions, or temporary tables.
-None of them should be pointed at the live store.
+`scripts/qa-*-db.mjs` and the other `postgres`-based scripts are legacy harnesses
+from the Postgres era. They are not part of the SQLite test path and need to be
+ported before they can run again.

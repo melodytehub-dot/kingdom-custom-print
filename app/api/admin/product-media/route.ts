@@ -22,7 +22,7 @@ export async function POST(req: Request) {
     const mime = format === "jpeg" ? "image/jpeg" : format === "png" ? "image/png" : format === "webp" ? "image/webp" : null;
     if (!mime) return NextResponse.json({ error: "Use a JPG, PNG or WebP photo." }, { status: 422 });
     const id = randomUUID();
-    await sql`INSERT INTO catalog_media (id, content_type, content) VALUES (${id}, ${mime}, ${Buffer.from(bytes)})`;
+    await sql`INSERT INTO catalog_media (id, content_type, content) VALUES (${id}, ${mime}, ${bytes})`;
     return NextResponse.json({ url: `/api/product-media/${id}` });
   } catch (error) {
     if (error instanceof RangeError) return NextResponse.json({ error: "Choose a photo under 4 MB." }, { status: 413 });
@@ -30,3 +30,4 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "The photo could not be uploaded. Try again." }, { status: 500 });
   }
 }
+

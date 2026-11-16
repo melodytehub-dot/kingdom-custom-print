@@ -1,5 +1,5 @@
-import postgres from "postgres";
 import { sql, num } from "./db";
+import type { SqlFragment } from "./sqlite";
 import { HOMEPAGE_CONTENT_FIELDS, homepageContentFromSettings, type HomepageContent } from "./homepage-builder";
 import type {
   Category,
@@ -70,16 +70,16 @@ async function loadVariants(ids: number[]) {
   const [colorRows, sizeRows, breakRows, imageRows] = await Promise.all([
     sql<VariantRow[]>`
       SELECT id, product_id, slug, name, hex, front_image, back_image FROM product_colors
-      WHERE product_id = ANY(${sql.array(ids, 1007)}) ORDER BY sort_order, id`,
+      WHERE product_id IN (${sql.array(ids)}) ORDER BY sort_order, id`,
     sql<SizeRow[]>`
       SELECT id, product_id, label, surcharge FROM product_sizes
-      WHERE product_id = ANY(${sql.array(ids, 1007)}) ORDER BY sort_order, id`,
+      WHERE product_id IN (${sql.array(ids)}) ORDER BY sort_order, id`,
     sql<BreakRow[]>`
       SELECT product_id, min_qty, amount_off FROM price_breaks
-      WHERE product_id = ANY(${sql.array(ids, 1007)}) ORDER BY min_qty DESC`,
+      WHERE product_id IN (${sql.array(ids)}) ORDER BY min_qty DESC`,
     sql<ImageRow[]>`
       SELECT id, product_id, url, alt FROM product_images
-      WHERE product_id = ANY(${sql.array(ids, 1007)}) ORDER BY sort_order, id`,
+      WHERE product_id IN (${sql.array(ids)}) ORDER BY sort_order, id`,
   ]);
 
   return {
@@ -108,9 +108,9 @@ function hydrate(row: ProductRow, variants: Awaited<ReturnType<typeof loadVarian
     basePrice: num(row.base_price),
     compareAt: row.compare_at === null ? null : num(row.compare_at),
     printFeePerSide: num(row.print_fee_per_side),
-    printArea: row.print_area,
-    featured: row.featured,
-    active: row.active,
+    printArea: typeof row.print_area === "string" ? JSON.parse(row.print_area) as PrintArea : row.print_area,
+    featured: Boolean(row.featured),
+    active: Boolean(row.active),
     sortOrder: row.sort_order,
     colors: (colors.get(row.id) ?? []).map((c) => ({
       id: c.id,
@@ -150,7 +150,7 @@ export async function getProducts(options?: {
     SELECT ${productColumns()}
     FROM products p
     LEFT JOIN categories c ON c.id = p.category_id
-    WHERE (${options?.categorySlug ?? null}::text IS NULL OR c.slug = ${options?.categorySlug ?? null})
+    WHERE (${options?.categorySlug ?? null} IS NULL OR c.slug = ${options?.categorySlug ?? null})
       ${activeFilter}
       AND (${options?.featuredOnly ?? false} = false OR p.featured = true)
     ORDER BY p.sort_order, p.id
@@ -195,7 +195,7 @@ export async function getCategories(): Promise<Category[]> {
     { id: number; slug: string; name: string; description: string; sort_order: number; product_count: number }[]
   >`
     SELECT c.id, c.slug, c.name, c.description, c.sort_order,
-      (SELECT count(*)::int FROM products p WHERE p.category_id = c.id AND p.active) AS product_count
+      (SELECT count(*) FROM products p WHERE p.category_id = c.id AND p.active = 1) AS product_count
     FROM categories c
     ORDER BY c.sort_order, c.id
   `;
@@ -270,10 +270,6 @@ export interface ProductInput {
   priceBreaks: { minQty: number; amountOff: number }[];
 }
 
-/** postgres.js transaction handle; typed loosely because the library's
- *  begin() overloads do not narrow the callback parameter. */
-type Tx = postgres.TransactionSql;
-
 export class ProductInventoryConflictError extends Error {
   constructor(message: string) {
     super(message);
@@ -281,22 +277,37 @@ export class ProductInventoryConflictError extends Error {
   }
 }
 
-async function replaceVariants(productId: number, input: ProductInput, tx: Tx) {
+/**
+ * Builds the statements that replace a product's colors, sizes and price
+ * breaks. Callers run the returned list with `sql.batch` so the delete and the
+ * inserts land together, which is the SQLite equivalent of the old transaction.
+ *
+ * `inventory_reservations` references `inventory_stock` with ON DELETE RESTRICT,
+ * so a color or size that still holds stock for an order makes the batch fail
+ * rather than silently dropping held inventory.
+ */
+async function variantStatements(productId: SqlFragment, input: ProductInput): Promise<SqlFragment[]> {
+  const id = productId;
   // Inventory and payment holds use the displayed color and size names. Do not
   // leave a count behind that might later be mistaken for newly available stock.
-  const oldColors = await tx<{ name: string }[]>`SELECT name FROM product_colors WHERE product_id = ${productId}`;
-  const oldSizes = await tx<{ label: string }[]>`SELECT label FROM product_sizes WHERE product_id = ${productId}`;
-  const stocks = await tx<{ color_name: string; size_label: string; quantity: number }[]>`SELECT color_name, size_label, quantity FROM inventory_stock WHERE product_id = ${productId}`;
-  const holds = await tx<{ color_name: string; size_label: string }[]>`SELECT color_name, size_label FROM inventory_reservations WHERE product_id = ${productId}`;
-  const oldColorNames = new Set(oldColors.map(c => c.name));
-  const oldSizeLabels = new Set(oldSizes.map(s => s.label));
-  const newColorNames = new Set(input.colors.map(c => c.name));
-  const newSizeLabels = new Set(input.sizes.map(s => s.label));
+  const oldColors = await sql<{ name: string }[]>`SELECT name FROM product_colors WHERE product_id = ${id}`;
+  const oldSizes = await sql<{ label: string }[]>`SELECT label FROM product_sizes WHERE product_id = ${id}`;
+  const stocks = await sql<{ color_name: string; size_label: string; quantity: number }[]>`
+    SELECT color_name, size_label, quantity FROM inventory_stock WHERE product_id = ${id}`;
+  const holds = await sql<{ color_name: string; size_label: string }[]>`
+    SELECT color_name, size_label FROM inventory_reservations WHERE product_id = ${id}`;
+  const oldColorNames = new Set(oldColors.map((c) => c.name));
+  const oldSizeLabels = new Set(oldSizes.map((s) => s.label));
+  const newColorNames = new Set(input.colors.map((c) => c.name));
+  const newSizeLabels = new Set(input.sizes.map((s) => s.label));
   const existsBefore = (color: string, size: string) => oldColorNames.has(color) && oldSizeLabels.has(size);
   const existsAfter = (color: string, size: string) => newColorNames.has(color) && newSizeLabels.has(size);
-  if (holds.some(row => !existsAfter(row.color_name, row.size_label))) {
+
+  if (holds.some((row) => !existsAfter(row.color_name, row.size_label))) {
     throw new ProductInventoryConflictError("This option has stock held for a pending order. Resolve the order before changing or removing it.");
   }
+
+  const statements: SqlFragment[] = [];
   for (const stock of stocks) {
     const before = existsBefore(stock.color_name, stock.size_label);
     const after = existsAfter(stock.color_name, stock.size_label);
@@ -307,75 +318,90 @@ async function replaceVariants(productId: number, input: ProductInput, tx: Tx) {
       throw new ProductInventoryConflictError("This option has an old stock count. Contact the site administrator to review it before adding the option.");
     }
     if (before && !after) {
-      await tx`DELETE FROM inventory_stock WHERE product_id = ${productId} AND color_name = ${stock.color_name} AND size_label = ${stock.size_label}`;
+      statements.push(sql`
+        DELETE FROM inventory_stock
+        WHERE product_id = ${id} AND color_name = ${stock.color_name} AND size_label = ${stock.size_label}`);
     }
   }
-  await tx`DELETE FROM product_colors WHERE product_id = ${productId}`;
-  await tx`DELETE FROM product_sizes WHERE product_id = ${productId}`;
-  await tx`DELETE FROM price_breaks WHERE product_id = ${productId}`;
-  const updateGalleries = input.saleMode === "ready-made" && input.colors.some(color => color.photos !== undefined);
-  if (updateGalleries) await tx`DELETE FROM product_images WHERE product_id = ${productId} AND left(alt, 18) = '__color_gallery__:'`;
+
+  statements.push(sql`DELETE FROM product_colors WHERE product_id = ${id}`);
+  statements.push(sql`DELETE FROM product_sizes WHERE product_id = ${id}`);
+  statements.push(sql`DELETE FROM price_breaks WHERE product_id = ${id}`);
+  const updateGalleries = input.saleMode === "ready-made" && input.colors.some((color) => color.photos !== undefined);
+  if (updateGalleries) {
+    statements.push(sql`DELETE FROM product_images WHERE product_id = ${id} AND substr(alt, 1, 18) = '__color_gallery__:'`);
+  }
 
   for (const [i, c] of input.colors.entries()) {
-    await tx`
+    statements.push(sql`
       INSERT INTO product_colors (product_id, slug, name, hex, sort_order, front_image, back_image)
-      VALUES (${productId}, ${c.slug}, ${c.name}, ${c.hex}, ${i}, ${c.frontImage ?? null}, ${c.backImage ?? null})`;
-    if (updateGalleries) for (const [index, url] of (c.photos ?? []).entries()) {
-      await tx`INSERT INTO product_images (product_id, url, alt, sort_order) VALUES (${productId}, ${url}, ${`__color_gallery__:${c.slug}`}, ${index})`;
+      VALUES (${id}, ${c.slug}, ${c.name}, ${c.hex}, ${i}, ${c.frontImage ?? null}, ${c.backImage ?? null})`);
+    if (updateGalleries) {
+      for (const [index, url] of (c.photos ?? []).entries()) {
+        statements.push(sql`
+          INSERT INTO product_images (product_id, url, alt, sort_order)
+          VALUES (${id}, ${url}, ${`__color_gallery__:${c.slug}`}, ${index})`);
+      }
     }
   }
-  for (const [i, s] of input.sizes.entries()) {
-    await tx`
-      INSERT INTO product_sizes (product_id, label, surcharge, sort_order)
-      VALUES (${productId}, ${s.label}, ${s.surcharge}, ${i})`;
-  }
-  for (const b of input.priceBreaks) {
-    await tx`
-      INSERT INTO price_breaks (product_id, min_qty, amount_off)
-      VALUES (${productId}, ${b.minQty}, ${b.amountOff})`;
-  }
-}
 
-/** postgres.js only accepts index-signature objects for json/jsonb params. */
-function asJson(value: unknown) {
-  return value as never;
+  for (const [i, s] of input.sizes.entries()) {
+    statements.push(sql`
+      INSERT INTO product_sizes (product_id, label, surcharge, sort_order)
+      VALUES (${id}, ${s.label}, ${s.surcharge}, ${i})`);
+  }
+
+  for (const b of input.priceBreaks) {
+    statements.push(sql`
+      INSERT INTO price_breaks (product_id, min_qty, amount_off)
+      VALUES (${id}, ${b.minQty}, ${b.amountOff})`);
+  }
+
+  return statements;
 }
 
 export async function createProduct(input: ProductInput): Promise<number> {
-  return sql.begin(async (tx) => {
-    const [row] = await tx<{ id: number }[]>`
+  // The product row goes in first, then variants reference it by slug, which is
+  // unique, so the whole thing can run as one atomic batch without RETURNING.
+  const id = sql`(SELECT id FROM products WHERE slug = ${input.slug})`;
+  const statements: SqlFragment[] = [
+    sql`
       INSERT INTO products (slug, name, style_code, category_id, kind, sale_mode, blurb, description, material,
         base_price, compare_at, print_fee_per_side, print_area, featured, active)
       VALUES (${input.slug}, ${input.name}, ${input.styleCode}, ${input.categoryId}, ${input.kind}, ${input.saleMode},
         ${input.blurb}, ${input.description}, ${input.material}, ${input.basePrice},
-        ${input.compareAt}, ${input.printFeePerSide}, ${tx.json(asJson(input.printArea))},
-        ${input.featured}, ${input.active})
-      RETURNING id`;
-    await replaceVariants(row.id, input, tx);
-    return row.id;
-  });
+        ${input.compareAt}, ${input.printFeePerSide}, ${sql.json(input.printArea)},
+        ${input.featured}, ${input.active})`,
+  ];
+  statements.push(...(await variantStatements(id, input)));
+  await sql.batch(statements);
+  const [row] = await sql<{ id: number }[]>`SELECT id FROM products WHERE slug = ${input.slug}`;
+  return row.id;
 }
 
 export async function updateProduct(
   id: number,
   input: ProductInput
 ): Promise<boolean> {
-  return sql.begin(async (tx) => {
-    await tx`SELECT pg_advisory_xact_lock(1296786772, ${id})`;
-    const result = await tx`
+  const existing = await sql<{ id: number }[]>`SELECT id FROM products WHERE id = ${id}`;
+  if (!existing.length) return false;
+
+  const productId = sql`${id}`;
+  const statements: SqlFragment[] = [
+    sql`
       UPDATE products SET
         slug = ${input.slug}, name = ${input.name}, style_code = ${input.styleCode},
         category_id = ${input.categoryId},
         kind = ${input.kind}, sale_mode = ${input.saleMode}, blurb = ${input.blurb}, description = ${input.description},
         material = ${input.material}, base_price = ${input.basePrice},
         compare_at = ${input.compareAt}, print_fee_per_side = ${input.printFeePerSide},
-        print_area = ${tx.json(asJson(input.printArea))}, featured = ${input.featured},
+        print_area = ${sql.json(input.printArea)}, featured = ${input.featured},
         active = ${input.active}
-      WHERE id = ${id}`;
-    if (result.count === 0) return false;
-    await replaceVariants(id, input, tx);
-    return true;
-  });
+      WHERE id = ${productId}`,
+  ];
+  statements.push(...(await variantStatements(productId, input)));
+  await sql.batch(statements);
+  return true;
 }
 
 export async function setProductActive(
@@ -451,10 +477,20 @@ export const DEFAULT_SETTINGS: SiteSettings = {
   productionDays: "3-5 business days after artwork approval",
 };
 
+/** `site_settings.value` is JSON text, so every read parses it first. */
+export function parseSettingValue(value: unknown): unknown {
+  if (typeof value !== "string") return value;
+  try {
+    return JSON.parse(value) as unknown;
+  } catch {
+    return value;
+  }
+}
+
 export async function getSettings(): Promise<SiteSettings> {
   const rows = await sql<{ key: string; value: unknown }[]>`
     SELECT key, value FROM site_settings`;
-  const map = new Map(rows.map((r) => [r.key, r.value]));
+  const map = new Map(rows.map((r) => [r.key, parseSettingValue(r.value)]));
   return {
     heroLabel: String(map.get("hero_label") ?? DEFAULT_SETTINGS.heroLabel),
     heroHeadlineTop: String(map.get("hero_headline_top") ?? DEFAULT_SETTINGS.heroHeadlineTop),
@@ -484,43 +520,44 @@ export async function getSettings(): Promise<SiteSettings> {
 export class HomepageContentConflict extends Error {}
 
 export async function saveSettings(settings: SiteSettings, expectedHomepage?: HomepageContent): Promise<void> {
-  await sql.begin(async (tx) => {
-    await tx`SELECT pg_advisory_xact_lock(hashtext('kcp_homepage_layout_v1'))`;
-    if (expectedHomepage) {
-      const rows = await tx<{ key: string; value: unknown }[]>`SELECT key, value FROM site_settings`;
-      const values = new Map(rows.map(row => [row.key, row.value]));
-      const current = homepageContentFromSettings(DEFAULT_SETTINGS);
-      for (const field of HOMEPAGE_CONTENT_FIELDS) current[field.name] = String(values.get(field.dbKey) ?? current[field.name]);
-      if (JSON.stringify(current) !== JSON.stringify(expectedHomepage)) throw new HomepageContentConflict();
-    }
-    const entries: [string, unknown][] = [
-      ["hero_label", settings.heroLabel],
-      ["hero_headline_top", settings.heroHeadlineTop],
-      ["hero_headline_bottom", settings.heroHeadlineBottom],
-      ["hero_description", settings.heroDescription],
-      ["hero_image_1", settings.heroImage1],
-      ["hero_image_2", settings.heroImage2],
-      ["hero_image_3", settings.heroImage3],
-      ["home_products_title", settings.homeProductsTitle],
-      ["home_products_description", settings.homeProductsDescription],
-      ["home_contact_title", settings.homeContactTitle],
-      ["home_contact_description", settings.homeContactDescription],
-      ["announcement", settings.announcement],
-      ["announcement_link", settings.announcementLink],
-      ["footer_blurb", settings.footerBlurb],
-      ["shipping_flat", settings.shippingFlat],
-      ["free_shipping_threshold", settings.freeShippingThreshold],
-      ["contact_email", settings.contactEmail],
-      ["contact_phone", settings.contactPhone],
-      ["business_address", settings.businessAddress],
-      ["production_days", settings.productionDays],
-    ];
-    for (const [key, value] of entries) {
-      await tx`
-        INSERT INTO site_settings (key, value, updated_at)
-        VALUES (${key}, ${tx.json(asJson(value))}, now())
-        ON CONFLICT (key) DO UPDATE
-          SET value = EXCLUDED.value, updated_at = now()`;
-    }
-  });
+  if (expectedHomepage) {
+    const rows = await sql<{ key: string; value: unknown }[]>`SELECT key, value FROM site_settings`;
+    const values = new Map(rows.map((row) => [row.key, parseSettingValue(row.value)]));
+    const current = homepageContentFromSettings(DEFAULT_SETTINGS);
+    for (const field of HOMEPAGE_CONTENT_FIELDS) current[field.name] = String(values.get(field.dbKey) ?? current[field.name]);
+    if (JSON.stringify(current) !== JSON.stringify(expectedHomepage)) throw new HomepageContentConflict();
+  }
+
+  const entries: [string, unknown][] = [
+    ["hero_label", settings.heroLabel],
+    ["hero_headline_top", settings.heroHeadlineTop],
+    ["hero_headline_bottom", settings.heroHeadlineBottom],
+    ["hero_description", settings.heroDescription],
+    ["hero_image_1", settings.heroImage1],
+    ["hero_image_2", settings.heroImage2],
+    ["hero_image_3", settings.heroImage3],
+    ["home_products_title", settings.homeProductsTitle],
+    ["home_products_description", settings.homeProductsDescription],
+    ["home_contact_title", settings.homeContactTitle],
+    ["home_contact_description", settings.homeContactDescription],
+    ["announcement", settings.announcement],
+    ["announcement_link", settings.announcementLink],
+    ["footer_blurb", settings.footerBlurb],
+    ["shipping_flat", settings.shippingFlat],
+    ["free_shipping_threshold", settings.freeShippingThreshold],
+    ["contact_email", settings.contactEmail],
+    ["contact_phone", settings.contactPhone],
+    ["business_address", settings.businessAddress],
+    ["production_days", settings.productionDays],
+  ];
+
+  await sql.batch(
+    entries.map(([key, value]) => sql`
+      INSERT INTO site_settings (key, value, updated_at)
+      VALUES (${key}, ${sql.json(value)}, strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+      ON CONFLICT (key) DO UPDATE
+        SET value = excluded.value, updated_at = excluded.updated_at`)
+  );
 }
+
+

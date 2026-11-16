@@ -1,6 +1,36 @@
 export type QuoteLine = { description: string; quantity: number; unitCents: number };
 export type AdminQuote = { id: string; customer_name: string; customer_email: string; notes: string; lines: QuoteLine[]; shipping_cents: number; status: "quote" | "invoice"; created_at: string; invoiced_at: string | null; payment_state?: string | null; payment_provider?: "stripe" | "paypal" | null };
 
+/** `admin_quotes.lines` is JSON text in SQLite. */
+export function parseQuoteLines(value: unknown): QuoteLine[] {
+  if (Array.isArray(value)) return value as QuoteLine[];
+  if (typeof value !== "string") return [];
+  try {
+    const parsed = JSON.parse(value) as unknown;
+    return Array.isArray(parsed) ? (parsed as QuoteLine[]) : [];
+  } catch {
+    return [];
+  }
+}
+
+export type QuoteRow = {
+  id: number;
+  customer_name: string;
+  customer_email: string;
+  notes: string;
+  lines: unknown;
+  shipping_cents: number;
+  status: "quote" | "invoice";
+  created_at: string;
+  invoiced_at: string | null;
+  payment_state?: string | null;
+  payment_provider?: "stripe" | "paypal" | null;
+};
+
+export function quoteFromRow(row: QuoteRow): AdminQuote {
+  return { ...row, id: String(row.id), lines: parseQuoteLines(row.lines) };
+}
+
 export function validateQuote(input: unknown): { value?: { name: string; email: string; notes: string; lines: QuoteLine[]; shippingCents: number }; error?: string } {
   if (!input || typeof input !== "object") return { error: "Enter the quote details." };
   const raw = input as Record<string, unknown>;

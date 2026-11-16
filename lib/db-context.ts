@@ -1,9 +1,7 @@
-import { AsyncLocalStorage } from "node:async_hooks";
-import type postgres from "postgres";
+import type { DatabaseLike } from "./sqlite";
 
 export type DatabaseContext = {
-  connectionString: string;
-  client?: ReturnType<typeof postgres>;
+  db: DatabaseLike;
 };
 
 const databaseContext = new AsyncLocalStorage<DatabaseContext>();
@@ -19,14 +17,7 @@ export function runWithDatabaseContext<T>(
   return databaseContext.run(context, callback);
 }
 
-export async function closeDatabaseContext(context: DatabaseContext) {
-  if (context.client) {
-    const client = context.client;
-    context.client = undefined;
-    try {
-      await client.end({ timeout: 1 });
-    } catch (error) {
-      console.warn("Could not close the request database client cleanly:", error);
-    }
-  }
+/** Kept for callers that close request-scoped resources. */
+export async function closeDatabaseContext(_context: DatabaseContext) {
+  // SQLite and D1 connections are managed by the platform; nothing to close.
 }

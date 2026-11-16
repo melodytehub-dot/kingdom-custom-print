@@ -13,10 +13,11 @@ crons = ["0 * * * *"]
 binding = "VINEXT_KV_CACHE"
 id = "b93c6df2d79f47f8ae6e5b0d560c35bc"
 
-# Hyperdrive database connection
-[[hyperdrive]]
-binding = "HYPERDRIVE"
-id = "1df73f5672d24cc79faee05423ca8c2c"
+# Primary database (SQLite). Replaces the Neon Postgres + Hyperdrive setup.
+[[d1_databases]]
+binding = "DB"
+database_name = "kingdom-custom-print"
+database_id = "d40d9352-2ef1-416c-8948-8a6601113c30"
 
 # Custom routes
 [[routes]]

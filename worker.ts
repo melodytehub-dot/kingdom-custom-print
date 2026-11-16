@@ -5,9 +5,10 @@ import {
   runWithDatabaseContext,
   type DatabaseContext,
 } from "./lib/db-context";
+import type { DatabaseLike } from "./lib/sqlite";
 
 type WorkerEnvironment = {
-  HYPERDRIVE: { connectionString: string };
+  DB: DatabaseLike;
   [key: string]: unknown;
 };
 
@@ -24,22 +25,18 @@ const app = vinextWorker as WorkerHandler;
 
 export default {
   async scheduled(_controller: unknown, env: WorkerEnvironment) {
-    const databaseContext: DatabaseContext = {
-      connectionString: env.HYPERDRIVE.connectionString,
-    };
+    const databaseContext: DatabaseContext = { db: env.DB };
     try {
       await runWithDatabaseContext(databaseContext, async () => {
-        await sql`DELETE FROM cutout_bridge_images WHERE created_at < now() - interval '1 day'`;
+        await sql`DELETE FROM cutout_bridge_images WHERE created_at < strftime('%Y-%m-%dT%H:%M:%fZ','now','-1 day')`;
       });
     } finally {
       await closeDatabaseContext(databaseContext);
     }
   },
   async fetch(request: Request, env: WorkerEnvironment, ctx: WorkerExecutionContext) {
-    globalThis.__kcpWorkerConnectionString ??= env.HYPERDRIVE.connectionString;
-    const databaseContext: DatabaseContext = {
-      connectionString: env.HYPERDRIVE.connectionString,
-    };
+    globalThis.__kcpWorkerDb ??= env.DB;
+    const databaseContext: DatabaseContext = { db: env.DB };
 
     try {
       const response = await runWithDatabaseContext(databaseContext, () =>
@@ -63,8 +60,8 @@ export default {
         async pull(controller) {
           try {
             // Server components may continue rendering after app.fetch returns
-            // its streaming response. Re-enter the request database context for
-            // each read so deferred catalog queries still have Hyperdrive.
+            // its streaming response, so the database context is re-entered for
+            // each read to keep deferred catalog queries working.
             const { done, value } = await runWithDatabaseContext(
               databaseContext,
               () => reader.read()

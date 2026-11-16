@@ -56,7 +56,7 @@ export async function POST(request: Request) {
       const hash = await passwordHash(password);
       const [account] = await sql<{ id: number; email: string; name: string }[]>`
         INSERT INTO customer_accounts (email, name, password_hash, email_verified)
-        VALUES (${email}, ${name}, ${hash}, false)
+        VALUES (${email}, ${name}, ${hash}, 0)
         ON CONFLICT (email) DO NOTHING RETURNING id, email, name`;
       if (!account) return NextResponse.json({ error: "This email already has an account. Sign in instead." }, { status: 409 });
       try { await sendAccountVerification(account); } catch {
@@ -64,7 +64,7 @@ export async function POST(request: Request) {
       }
       return NextResponse.json({ verificationRequired: true }, { headers: { "Cache-Control": "no-store" } });
     } else {
-      const [account] = await sql<{ id: number; email: string; name: string; email_verified: boolean; password_hash: string }[]>`
+      const [account] = await sql<{ id: number; email: string; name: string; email_verified: number; password_hash: string }[]>`
         SELECT id, email, name, email_verified, password_hash FROM customer_accounts WHERE email = ${email} LIMIT 1`;
       if (!(await passwordValid(password, account?.password_hash ?? DUMMY_HASH)) || !account) {
         return NextResponse.json({ error: "Email or password is incorrect." }, { status: 401 });
@@ -85,3 +85,4 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Account access is temporarily unavailable." }, { status: 503 });
   }
 }
+
