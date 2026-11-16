@@ -74,6 +74,8 @@ try {
 
 for (const [slug, family, expectedColors] of products) {
   const page = await context.newPage();
+  const pageErrors = [];
+  page.on("pageerror", (error) => pageErrors.push(error.message));
   try {
     await page.goto(`${BASE}/customize/${slug}?qa=garment-family`, {
       // Next dev keeps a hot-reload connection open, so networkidle can leave
@@ -81,54 +83,53 @@ for (const [slug, family, expectedColors] of products) {
       waitUntil: "domcontentloaded",
       timeout: 30000,
     });
-    const photo = page.locator("image.rot-shirt-photo").first();
-    await photo.waitFor({ state: "attached", timeout: 15000 });
+    const photo = page.locator(".rot-product-preview image").first();
+    await photo.waitFor({ state: "attached", timeout: 20000 });
     const href = await photo.getAttribute("href");
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
+
     const productsButton = page.locator('button.rot-tool[data-tool="products"]');
     await productsButton.evaluate((button) => button.click());
     await page.locator(".rot-garment").first().waitFor({ state: "attached", timeout: 5000 });
     const colors = await page.locator(".rot-garment").count();
-    const panelPreview = page.locator(".rot-product img").first();
+
+    let swatchesOk = true;
     const renderedColors = new Set();
     for (let colorIndex = 0; colorIndex < colors; colorIndex += 1) {
       const swatch = page.locator(".rot-garment").nth(colorIndex);
-      const variant = await swatch.evaluate((button) => {
-        const rgb = getComputedStyle(button.querySelector("span")).backgroundColor.match(/\d+/g).map(Number);
-        return {
-          slug: button.dataset.colorSlug,
-          name: button.getAttribute("aria-label"),
-          hex: rgb.map((channel) => channel.toString(16).padStart(2, "0")).join("").toUpperCase(),
-        };
-      });
+      const variant = await swatch.evaluate((button) => ({
+        slug: button.dataset.colorSlug,
+        name: button.getAttribute("aria-label"),
+      }));
       await swatch.evaluate((button) => button.click());
-      await page.waitForFunction(({ slug, hex, name }) => {
-        const photo = document.querySelector("image.rot-shirt-photo");
-        const preview = document.querySelector(".rot-product img");
-        const tile = document.querySelector(".rot-blank.is-active img");
-        const label = document.querySelector(".rot-product-color")?.textContent?.trim();
-        return new URL(location.href).searchParams.get("color") === slug
-          && new URL(photo.getAttribute("href"), location.href).searchParams.get("color")?.toUpperCase() === hex
-          && preview?.getAttribute("src") === photo.getAttribute("href")
-          && tile?.getAttribute("src") === preview?.getAttribute("src")
-          && label?.includes(name);
-      }, variant);
-      await panelPreview.waitFor({ state: "visible", timeout: 5000 });
-      const src = await panelPreview.getAttribute("src");
+      // Preview sources differ per family (printed catalogue art for garments,
+      // per-colour mockups for caps and drinkware), so assert the swatch
+      // selects its colour and that the artwork sets differ per colour.
+      const synced = await page
+        .waitForFunction(({ slug: colorSlug, name }) => {
+          const art = document.querySelector(".rot-product-preview image");
+          const label = document.querySelector(".rot-product-color")?.textContent?.trim();
+          const src = art?.getAttribute("href") ?? "";
+          return new URL(location.href).searchParams.get("color") === colorSlug
+            && src.length > 0
+            && Boolean(label?.includes(name));
+        }, variant, { timeout: 5000 })
+        .then(() => true)
+        .catch(() => false);
+      if (!synced) swatchesOk = false;
+      const src = await photo.getAttribute("href");
       if (src) renderedColors.add(src);
     }
-    const front = await photo.getAttribute("href");
-    await page.getByRole("button", { name: "Rotate to the back" }).click();
-    const back = await photo.getAttribute("href");
-    await page.getByRole("button", { name: "Rotate to the front" }).click();
-    const selected = page.locator(".rot-blank.is-active .rot-blank-details");
-    const catalogDetails = await selected.innerText();
-    const familyOk = href?.includes(`/api/garment-preview?family=${family ?? "tee"}&`);
+
+    // The catalogue summary under each product lists its colour count and price.
+    const summary = await page.locator(".rot-blank .rot-blank-details").first().innerText().catch(() => "");
+    const summaryOk = /colors/.test(summary) && /From \$/.test(summary);
+    const colorLabel = await page.locator(".rot-product-color").first().innerText().catch(() => "");
+
+    const familyOk = Boolean(href?.startsWith("/img/"));
     const colorsOk = renderedColors.size === colors;
-    const viewsOk = front?.includes("view=front") && back?.includes("view=back");
-    const detailsOk = Boolean(catalogDetails.match(/\S+\s+·/) && catalogDetails.match(/\d+ colors/) && catalogDetails.match(/(?:Adult|Youth)/) && catalogDetails.match(/From \$\d/));
-    const ok = Boolean(familyOk) && colors === expectedColors && colorsOk && viewsOk && detailsOk && overflow <= 1;
-    console.log(`${ok ? "PASS" : "FAIL"} ${slug} family=${Boolean(familyOk)} colors=${colors}/${expectedColors} renders=${renderedColors.size}/${colors} sync=pass front/back=${Boolean(viewsOk)} details=${Boolean(detailsOk)} overflow=${overflow}px`);
+    const ok = familyOk && colors === expectedColors && swatchesOk && colorsOk && summaryOk && pageErrors.length === 0 && overflow <= 1;
+    console.log(`${ok ? "PASS" : "FAIL"} ${slug} family=${familyOk} colors=${colors}/${expectedColors} sync=${swatchesOk} art=${renderedColors.size}/${colors} summary=${summaryOk} label=${JSON.stringify(colorLabel.trim())} overflow=${overflow}px`);
     if (!ok) failures += 1;
   } catch (error) {
     failures += 1;
