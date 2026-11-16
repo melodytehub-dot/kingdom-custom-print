@@ -9,6 +9,7 @@ import ArrowRight from "@/components/icons/ArrowRight";
 import AdminRefund from "./AdminRefund";
 import QuotesPanel from "./QuotesPanel";
 import InventoryPanel from "./InventoryPanel";
+import PaymentSettings from "./PaymentSettings";
 import HomepageSections from "./HomepageSections";
 import AdminPages from "./AdminPages";
 import { HERO_IMAGES } from "@/lib/hero-slides";
@@ -154,7 +155,7 @@ export default function AdminDashboard({
       <div className="admin-content">
       {!data.paymentsLive ? (
         <p className="banner-note" role="status">
-          Card payments are unavailable. Contact your website administrator before accepting card orders.
+          Card payments are unavailable. Add your payment credentials in Settings before accepting card orders.
         </p>
       ) : null}
 
@@ -1843,6 +1844,8 @@ function SettingsPanel({
           {saving ? "Saving…" : "Save settings"}
         </button>
       </form>
+
+      <PaymentSettings />
 
       <div className="admin-subsection">
         <div className="admin-block-head">
