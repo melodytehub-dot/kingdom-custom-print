@@ -504,6 +504,9 @@ async function main() {
       db.exec(`DELETE FROM ${table}`);
     }
     db.exec("DELETE FROM sqlite_sequence WHERE name IN ('order_items','orders','customers','product_images','price_breaks','product_sizes','product_colors','products','categories')");
+    // Seed settings replace the storefront copy, homepage layout and custom
+    // pages so a forced reseed really returns the store to its seeded state.
+    db.exec("DELETE FROM site_settings");
 
     const catIds = new Map();
     for (const c of categories) {
