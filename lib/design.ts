@@ -633,7 +633,7 @@ const MIME_BY_FORMAT: Partial<Record<ImageFormat, string>> = {
  * attempt gets a fresh object URL and there are three attempts, so the
  * customer never sees that flake.
  */
-function readAsImage(file: File, maxEdge: number, format: ImageFormat): Promise<DecodedImage> {
+async function readAsImage(file: File, maxEdge: number, format: ImageFormat): Promise<DecodedImage> {
   // SVG is text: small artwork is stored as vector, not rasterised.
   if (format === "svg") return readAsVector(file, maxEdge);
   const type = MIME_BY_FORMAT[format];
@@ -646,12 +646,31 @@ function readAsImage(file: File, maxEdge: number, format: ImageFormat): Promise<
       return URL.createObjectURL(file);
     }
   };
-  return loadImage(makeUrl, 0).then(
-    (img) => rasterize(img, maxEdge),
-    () => {
+  let image: HTMLImageElement;
+  try {
+    image = await loadImage(makeUrl, 0);
+  } catch {
+    // Some mobile browsers cannot load object URLs from the photo picker even
+    // though they can decode the same file. Fall back only after the smaller,
+    // memory-friendlier object URL path has failed.
+    try {
+      const dataUrl = await readFileDataUrl(type && file.type !== type ? new Blob([file], { type }) : file);
+      image = await loadImage(() => dataUrl, DECODE_RETRIES);
+    } catch {
       throw decodeError(format);
     }
-  );
+  }
+  return rasterize(image, maxEdge);
+}
+
+function readFileDataUrl(file: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(reader.error ?? new Error("File read failed"));
+    reader.onabort = () => reject(new Error("File read cancelled"));
+    reader.onload = () => typeof reader.result === "string" ? resolve(reader.result) : reject(new Error("File read failed"));
+    reader.readAsDataURL(file);
+  });
 }
 
 const DECODE_RETRIES = 2;
@@ -663,7 +682,7 @@ function loadImage(makeUrl: () => string, attempt: number): Promise<HTMLImageEle
     const url = makeUrl();
     const img = new Image();
     img.onerror = () => {
-      URL.revokeObjectURL(url);
+      if (url.startsWith("blob:")) URL.revokeObjectURL(url);
       if (attempt >= DECODE_RETRIES) {
         reject(new Error("Image decode failed"));
         return;
@@ -673,7 +692,7 @@ function loadImage(makeUrl: () => string, attempt: number): Promise<HTMLImageEle
       }, DECODE_RETRY_DELAYS[attempt] ?? 900);
     };
     img.onload = () => {
-      URL.revokeObjectURL(url);
+      if (url.startsWith("blob:")) URL.revokeObjectURL(url);
       resolve(img);
     };
     img.src = url;

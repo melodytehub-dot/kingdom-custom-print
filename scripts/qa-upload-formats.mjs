@@ -66,6 +66,12 @@ function FLAKY_DECODE() {
   };
 }
 
+/** Simulates a browser that refuses every object-URL image decode. */
+function BLOCK_BLOB_DECODES() {
+  const real = URL.createObjectURL.bind(URL);
+  URL.createObjectURL = () => real(new Blob([new Uint8Array([0, 1, 2, 3])], { type: "image/jpeg" }));
+}
+
 async function runCase(page, payload, init) {
   await page.goto(BASE, { waitUntil: "commit" });
   await page.evaluate(() => localStorage.clear());
@@ -116,7 +122,7 @@ try {
   const page = await desktop.newPage();
   page.setDefaultTimeout(30000);
 
-  for (const [label, payload, expected, init] of DESKTOP_CASES) {
+  for (const [label, payload, expected, init] of process.env.QA_UPLOAD_FOCUS === "android" ? [] : DESKTOP_CASES) {
     const { layer, toast } = await runCase(page, payload, init);
     if (expected === "layer") {
       const detail = layer ? `${layer.type} ${layer.width}x${layer.height}` : `toast: ${toast ?? "none"}`;
@@ -167,9 +173,10 @@ try {
     // from the phone's picker without a usable type.
     ["phone jpg with no type", { name: "downloaded.jpg", mimeType: "application/octet-stream", buffer: jpgBytes }],
     ["phone large photo", { name: "IMG_20240101.jpg", mimeType: "application/octet-stream", buffer: largeBytes }],
+    ["phone jpg when object URLs fail", { name: "downloaded.jpg", mimeType: "application/octet-stream", buffer: jpgBytes }, BLOCK_BLOB_DECODES],
   ];
-  for (const [label, payload] of PHONE_CASES) {
-    const { layer, toast } = await runCase(phonePage, payload);
+  for (const [label, payload, init] of process.env.QA_UPLOAD_FOCUS === "android" ? [] : PHONE_CASES) {
+    const { layer, toast } = await runCase(phonePage, payload, init);
     check(
       `${label}: uploads and lands on the design`,
       Boolean(layer?.ok),
@@ -177,6 +184,20 @@ try {
     );
   }
   await iphone.close();
+
+  const android = await browser.newContext({
+    viewport: { width: 360, height: 800 },
+    hasTouch: true,
+    isMobile: true,
+    userAgent: "Mozilla/5.0 (Linux; Android 13; SM-G991B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Mobile Safari/537.36",
+  });
+  const androidPage = await android.newPage();
+  androidPage.setDefaultTimeout(30000);
+  for (const [label, init] of [["normal JPEG", undefined], ["JPEG when object URLs fail", BLOCK_BLOB_DECODES]]) {
+    const { layer, toast } = await runCase(androidPage, { name: "photo.jpg", mimeType: "image/jpeg", buffer: jpgBytes }, init);
+    check(`Android Chrome ${label}: uploads and lands on the design`, Boolean(layer?.ok), layer ? `${layer.width}x${layer.height}` : `toast: ${toast ?? "none"}`);
+  }
+  await android.close();
 } finally {
   await browser.close();
 }
