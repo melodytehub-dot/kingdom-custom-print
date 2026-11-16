@@ -658,6 +658,12 @@
   color: #14523a;
 }
 
+/* Webhook URLs are long unbroken tokens; let them wrap inside narrow cards
+   instead of pushing the page wider than the screen. */
+.admin-subsection .hint code {
+  overflow-wrap: anywhere;
+}
+
 .admin-empty {
   padding: 34px 20px;
   text-align: center;

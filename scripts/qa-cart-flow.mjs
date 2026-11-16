@@ -118,9 +118,9 @@ check("checkout form renders", hasForm > 0);
 check("checkout shows design notes", (await page.locator("main").innerText()).includes("Center the artwork above the chest pocket."));
 
 const email = page.locator('input[name="email"], input[type="email"]').first();
-const paymentUnavailable = await page.getByRole("button", { name: "Card checkout unavailable" }).count();
+const paymentUnavailable = await page.getByRole("button", { name: /Card checkout unavailable|Checkout unavailable/i }).count();
 if (paymentUnavailable) {
-  check("checkout is disabled until Stripe is configured", await page.getByRole("button", { name: "Card checkout unavailable" }).isDisabled());
+  check("checkout is disabled until Stripe is configured", await page.getByRole("button", { name: /Card checkout unavailable|Checkout unavailable/i }).isDisabled());
   const gate = await fetch(`${BASE}/api/checkout`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ items: [] }) });
   check("API rejects unconfigured payments", gate.status === 503);
   await page.goto(`${BASE}/cart`, { waitUntil: "networkidle" });
