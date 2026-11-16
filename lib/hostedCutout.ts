@@ -19,8 +19,12 @@
 import { encodeCanvasUnder } from "./design";
 import { imgixCutoutUrl } from "./imgixCutout";
 
-/** The bridge refuses photos over 4 MB; aim comfortably under. */
-const BRIDGE_ACCEPT_BYTES = 3_900_000;
+/**
+ * Photos are parked in the database, and D1 caps a row at 2 MB, so keep a
+ * comfortable margin below that.
+ */
+const BRIDGE_ACCEPT_BYTES = 1_800_000;
+const BRIDGE_TARGET_BYTES = 1_800_000;
 /** Total time the hosted render may take, first cold render included. */
 const RENDER_DEADLINE_MS = 120_000;
 /** Gap between "still processing" retries. */
@@ -118,11 +122,11 @@ export async function prepareCutoutUpload(src: string): Promise<Blob> {
 
     if (blob.type === "image/png") {
       const png = await toBlob(canvas, "image/png");
-      if (png.size <= 3_400_000) return png;
+      if (png.size <= BRIDGE_TARGET_BYTES) return png;
     }
     let quality = 0.92;
     let jpeg = await toBlob(canvas, "image/jpeg", quality);
-    while (jpeg.size > 3_400_000 && quality > 0.55) {
+    while (jpeg.size > BRIDGE_TARGET_BYTES && quality > 0.55) {
       quality -= 0.1;
       jpeg = await toBlob(canvas, "image/jpeg", quality);
     }
@@ -219,3 +223,4 @@ export async function hostedCutoutDataUrl(
   hooks.onPhase?.("cutting");
   return renderHostedCutout(domain, path, { onWaiting: () => hooks.onPhase?.("waiting") });
 }
+

@@ -1032,7 +1032,7 @@ function ProductColorPhotos({ color, onChange, onUploading }: { color: DraftProd
     if (!file) return;
     setError(""); setUploading(true); onUploading(1);
     try {
-      if (file.size > 4 * 1024 * 1024) throw new Error("Choose a photo under 4 MB.");
+      if (file.size > 1_900_000) throw new Error("Choose a photo under 2 MB.");
       const localUrl = URL.createObjectURL(file);
       try {
         await new Promise<void>((resolve, reject) => {
@@ -1073,7 +1073,7 @@ function ProductGallery({ photos, onChange, onUploading }: { photos: string[]; o
     const next = [...photos];
     try {
       for (const file of Array.from(files)) {
-        if (file.size > 4 * 1024 * 1024) throw new Error("Each photo must be under 4 MB.");
+        if (file.size > 1_900_000) throw new Error("Each photo must be under 2 MB.");
         const url = URL.createObjectURL(file);
         try { await new Promise<void>((resolve, reject) => { const image = new window.Image(); image.onload = () => image.naturalWidth && image.naturalHeight ? resolve() : reject(new Error("Choose a valid image.")); image.onerror = () => reject(new Error("Choose a valid JPG, PNG or WebP photo.")); image.src = url; }); }
         finally { URL.revokeObjectURL(url); }
@@ -1305,7 +1305,7 @@ function ProductForm({
 
       <fieldset className="fieldset">
         <legend className="label">{draft.saleMode === "ready-made" ? "Product options and photos" : "Colors"}</legend>
-        <p className="hint">{draft.saleMode === "ready-made" ? "Use Standard for an item with no color options, or add each color with its matching photos. Add at least one photo per option before publishing." : "Add each color, choose its swatch and upload matching photos."} Photos can be JPG, PNG or WebP, up to 4 MB each.</p>
+        <p className="hint">{draft.saleMode === "ready-made" ? "Use Standard for an item with no color options, or add each color with its matching photos. Add at least one photo per option before publishing." : "Add each color, choose its swatch and upload matching photos."} Photos can be JPG, PNG or WebP, up to 2 MB each.</p>
         {draft.saleMode === "customizable" ? <p className="hint">Upload both front and back photos to use them in the design studio.</p> : null}
         {draft.colors.length > 8 ? <label className="field">Find a color<input className="input" type="search" value={colorSearch} onChange={(e) => setColorSearch(e.target.value)} placeholder="Search colors" /></label> : null}
         <div className="repeat-list">

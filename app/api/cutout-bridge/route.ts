@@ -14,7 +14,8 @@ export const runtime = "nodejs";
  * served back by the sibling GET route; imgix fetches it from there. Rows are
  * swept after a day.
  */
-const MAX_BYTES = 4_000_000;
+// D1 caps a row at 2 MB, so a parked photo has to stay comfortably below it.
+const MAX_BYTES = 1_900_000;
 const CONTENT_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
 
 export async function POST(request: Request) {
@@ -26,7 +27,7 @@ export async function POST(request: Request) {
   try {
     form = await limitedFormData(request, MAX_BYTES + 65_536);
   } catch (error) {
-    if (error instanceof RangeError) return NextResponse.json({ error: "Keep the photo under 4 MB." }, { status: 413 });
+    if (error instanceof RangeError) return NextResponse.json({ error: "Keep the photo under 2 MB." }, { status: 413 });
     return NextResponse.json({ error: "Send the photo as form data." }, { status: 400 });
   }
 
@@ -39,7 +40,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Use a JPEG, PNG or WebP photo." }, { status: 415 });
   }
   if (file.size > MAX_BYTES) {
-    return NextResponse.json({ error: "Keep the photo under 4 MB." }, { status: 413 });
+    return NextResponse.json({ error: "Keep the photo under 2 MB." }, { status: 413 });
   }
 
   const bytes = new Uint8Array(await file.arrayBuffer());
@@ -50,5 +51,6 @@ export async function POST(request: Request) {
 
   return NextResponse.json({ id, path: `/api/cutout-bridge/${id}` });
 }
+
 
 
