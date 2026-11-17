@@ -7,7 +7,7 @@
 
 /** Slugs that would collide with an existing route or framework path. */
 export const RESERVED_PAGE_SLUGS = [
-  "about", "account", "admin", "api", "cart", "checkout", "contact", "customize",
+  "about", "account", "admin", "api", "builder-preview", "cart", "checkout", "contact", "customize",
   "faq", "homepage-preview", "invoice", "order", "privacy", "product", "qa-admin-preview",
   "qa-commerce-preview", "qa-design-admin", "qa-inventory-preview", "quote", "shipping",
   "shop", "skeleton-check-local", "terms", "track", "wishlist", "_next", "img", "brand",

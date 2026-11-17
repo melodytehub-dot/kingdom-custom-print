@@ -356,6 +356,20 @@ CREATE TABLE IF NOT EXISTS site_settings (
   updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
 );
 
+-- Pages built in the visual editor. The draft is what an owner is editing;
+-- the published snapshot is what visitors see. Scoped by slug.
+CREATE TABLE IF NOT EXISTS builder_pages (
+  slug           TEXT PRIMARY KEY,
+  title          TEXT NOT NULL,
+  description    TEXT NOT NULL DEFAULT '',
+  show_title     INTEGER NOT NULL DEFAULT 1,
+  layout_json    TEXT NOT NULL,
+  revision       INTEGER NOT NULL DEFAULT 1,
+  published_json TEXT,
+  published_at   TEXT,
+  updated_at     TEXT NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS admin_sessions (
   token      TEXT PRIMARY KEY,
   created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),

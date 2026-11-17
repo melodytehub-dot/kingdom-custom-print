@@ -19,6 +19,7 @@ const scripts = [
   "qa-support-conversation",
   "qa-cutout-expiry",
   "qa-media-gc",
+  "qa-builder-db",
   "qa-guest-order-access",
 ];
 

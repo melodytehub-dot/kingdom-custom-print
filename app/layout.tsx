@@ -13,6 +13,7 @@ import "./product/product.css";
 import "./customize/rot.css";
 import "./cart/cart.css";
 import "./admin/admin.css";
+import "./builder.css";
 import "./content.css";
 import "./minimog.css";
 import "./refinements.css";

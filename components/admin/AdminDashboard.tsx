@@ -12,6 +12,7 @@ import InventoryPanel from "./InventoryPanel";
 import PaymentSettings from "./PaymentSettings";
 import HomepageSections from "./HomepageSections";
 import AdminPages from "./AdminPages";
+import BuilderEditor from "./BuilderEditor";
 import { HERO_IMAGES } from "@/lib/hero-slides";
 import { homepageContentFromSettings } from "@/lib/homepage-builder";
 import { formatUSD } from "@/lib/pricing";
@@ -31,7 +32,7 @@ import type {
   SiteSettings,
 } from "@/lib/catalog-types";
 
-type Tab = "overview" | "orders" | "products" | "inventory" | "customers" | "quotes" | "homepage" | "pages" | "preview" | "settings";
+type Tab = "overview" | "orders" | "products" | "inventory" | "customers" | "quotes" | "builder" | "homepage" | "pages" | "preview" | "settings";
 
 const TABS: { id: Tab; label: string }[] = [
   { id: "overview", label: "Overview" },
@@ -40,6 +41,7 @@ const TABS: { id: Tab; label: string }[] = [
   { id: "inventory", label: "Inventory" },
   { id: "customers", label: "Customers" },
   { id: "quotes", label: "Quotes & invoices" },
+  { id: "builder", label: "Page builder" },
   { id: "homepage", label: "Homepage sections" },
   { id: "pages", label: "Pages" },
   { id: "preview", label: "Website preview" },
@@ -82,6 +84,7 @@ export default function AdminDashboard({
   const [tab, setTab] = useState<Tab>(initialTab);
   const [menuOpen, setMenuOpen] = useState(false);
   const [homepageDirty, setHomepageDirty] = useState(false);
+  const [builderDirty, setBuilderDirty] = useState(false);
   const menuToggleRef = useRef<HTMLButtonElement>(null);
   const router = useRouter();
   const [signedOut, setSignedOut] = useState(false);
@@ -93,6 +96,7 @@ export default function AdminDashboard({
 
   function selectTab(next: Tab) {
     if (tab === "homepage" && next !== "homepage" && homepageDirty && !window.confirm("You have unsaved homepage changes. Leave without saving?")) return;
+    if (tab === "builder" && next !== "builder" && builderDirty && !window.confirm("You have unsaved page changes. Leave without saving?")) return;
     setTab(next);
     setMenuOpen(false);
     if (menuOpen) menuToggleRef.current?.focus();
@@ -168,6 +172,7 @@ export default function AdminDashboard({
       {tab === "customers" ? <Customers data={data} /> : null}
       {tab === "quotes" ? <QuotesPanel /> : null}
       {tab === "homepage" ? <HomepageSections onDirtyChange={setHomepageDirty} products={data.products} /> : null}
+      {tab === "builder" ? <BuilderEditor onDirtyChange={setBuilderDirty} /> : null}
       {tab === "pages" ? <AdminPages /> : null}
       {tab === "preview" ? <WebsitePreview /> : null}
       {tab === "settings" ? <SettingsPanel settings={data.settings} categories={data.categories} /> : null}

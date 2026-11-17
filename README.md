@@ -86,6 +86,10 @@ valid for 12 hours, with repeated failed attempts throttled. From there you can
 review and update orders, manage products and variants, edit site settings
 (shipping rates, production time, contact details) and browse customers.
 
+Pages are built in two places: **Page builder** for new pages with sections,
+columns and styled blocks (see [`docs/page-builder.md`](docs/page-builder.md)),
+and **Pages** for the older block list.
+
 ## Customer accounts
 
 `/account` supports customer registration, password sign-in, and order history
