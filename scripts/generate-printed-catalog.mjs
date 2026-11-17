@@ -1,11 +1,16 @@
 import { mkdir, writeFile } from "node:fs/promises";
+import { existsSync } from "node:fs";
 import path from "node:path";
-import postgres from "postgres";
+import { DatabaseSync } from "node:sqlite";
 import sharp from "sharp";
 
-if (!process.env.DATABASE_URL) throw new Error("DATABASE_URL is required");
-
 const root = path.resolve(import.meta.dirname, "..");
+const databaseFile = process.env.LOCAL_DB_PATH ?? path.join(root, ".local-db", "store.sqlite");
+if (!existsSync(databaseFile)) {
+  console.error("No local database found. Run `npm run db:local` first.");
+  process.exit(1);
+}
+
 const outputRoot = path.join(root, "public", "img", "printed-catalog");
 const size = 768;
 const supportedFamilies = new Set(["tee", "vneck", "fitted", "youth", "pocket", "longsleeve", "hoodie", "crew", "polo", "cap", "tote", "mug"]);
@@ -50,13 +55,13 @@ function colorVariant(base, hex) {
   return result;
 }
 
-const sql = postgres(process.env.DATABASE_URL, { max: 1, ssl: "require" });
+const db = new DatabaseSync(databaseFile, { readOnly: true });
 try {
-  const rows = await sql`
+  const rows = db.prepare(`
     SELECT p.slug AS product_slug, p.kind, c.slug AS color_slug, c.hex
     FROM products p JOIN product_colors c ON c.product_id = p.id
-    WHERE p.active ORDER BY p.sort_order, p.id, c.sort_order, c.id
-  `;
+    WHERE p.active = 1 ORDER BY p.sort_order, p.id, c.sort_order, c.id
+  `).all();
   const families = new Map();
   const manifest = {};
   const variants = {};
@@ -85,5 +90,5 @@ try {
   await writeFile(path.join(root, "lib", "product-variant-manifest.json"), `${JSON.stringify(variants, null, 2)}\n`);
   console.log(`Generated front and back images for ${count} color variants across ${Object.keys(manifest).length} products.`);
 } finally {
-  await sql.end();
+  db.close();
 }

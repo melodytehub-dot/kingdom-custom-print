@@ -39,8 +39,9 @@ JSON columns are text parsed by the query layer.
 
 ## Catalog seed for D1
 
-`scripts/seed-sqlite.mjs` seeds the local database from `scripts/seed.mjs`
-catalog data. To publish the same catalog to production:
+`scripts/seed-sqlite.mjs` seeds the local database from the catalog data in
+`scripts/seed-sqlite.mjs`, `scripts/additional-catalog.mjs` and
+`scripts/rt2000-colors.mjs`. To publish the same catalog to production:
 
 ```powershell
 npm run db:seed:sql    # writes db/seed.sql from a throwaway seeded database

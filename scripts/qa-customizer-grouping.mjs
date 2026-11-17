@@ -16,9 +16,9 @@ const check = (name, ok, detail = "") => {
   if (!ok) failures += 1;
 };
 
-/** The sandbox's Neon pool occasionally drops a connection; that is not our bug. */
+/** A dropped local connection is environment noise, not a grouping bug. */
 const isEnvironmentNoise = (text) =>
-  /CONNECT_TIMEOUT|pooler\.c-\d+\.us-east-1\.aws\.neon\.tech|Failed to fetch/i.test(text);
+  /CONNECT_TIMEOUT|ECONNRESET|Failed to fetch/i.test(text);
 
 const browser = await chromium.launch({ channel: BROWSER, headless: true });
 

@@ -8,7 +8,8 @@ re-priced on the server at checkout.
 ## Stack
 
 - Next.js 16 (App Router) + React 19 + TypeScript
-- PostgreSQL via Neon (`postgres` driver), schema in [`db/schema.sql`](db/schema.sql)
+- Cloudflare Workers with D1 (SQLite) for data, schema in [`db/schema.sqlite.sql`](db/schema.sqlite.sql)
+- Cloudflare R2 for uploaded product photos and cutout bridge images
 - Stripe Checkout with a signature-verified webhook
 - Plain CSS design system (no UI framework)
 
@@ -17,8 +18,7 @@ re-priced on the server at checkout.
 ```bash
 npm install
 cp .env.example .env.local   # then fill in the values
-npm run db:migrate           # create the schema
-npm run db:seed              # load the starter catalogue
+npm run db:local             # create and seed the local SQLite database
 npm run dev
 ```
 
@@ -28,7 +28,6 @@ The site runs at http://localhost:3000 and the admin at `/admin`.
 
 | Variable | Required | Purpose |
 | --- | --- | --- |
-| `DATABASE_URL` | yes | PostgreSQL connection string |
 | `ADMIN_PASSWORD` | for `/admin` | Admin sign-in, 12 characters or more |
 | `STRIPE_SECRET_KEY` | for card payments | Server-side Stripe API key |
 | `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` | for card payments | Stripe.js key |
@@ -49,9 +48,11 @@ The customer cart stays saved and the API creates no unpaid manual-payment order
 | `npm run build` / `npm start` | Production build and server |
 | `npm run typecheck` | `tsc --noEmit` |
 | `npm run lint` | ESLint (flat config) |
-| `npm run db:migrate` | Apply `db/schema.sql` (idempotent) |
+| `npm run db:local` | Create and seed the local SQLite database |
+| `npm run db:local:reset` | Delete and rebuild the local database |
+| `npm run db:migrate` | Apply `db/schema.sqlite.sql` to the local database |
 | `npm run db:seed` | Load categories, products and site settings |
-| `npm run db:reset` | Drop, re-migrate and re-seed |
+| `npm run db:reset` | Re-apply the schema and reseed |
 
 ### QA scripts
 
@@ -88,32 +89,32 @@ review and update orders, manage products and variants, edit site settings
 ## Customer accounts
 
 `/account` supports customer registration, password sign-in, and order history
-for purchases made while signed in. Sessions are stored server-side in PostgreSQL;
-only a random session token is kept in an httpOnly cookie. Guest checkout still
-works, and older guest orders are not exposed to an account created later with
-the same email address. Apply `npm run db:migrate` before enabling the account
-routes on an existing database.
+for purchases made while signed in. Sessions are stored server-side in the
+database; only a random session token is kept in an httpOnly cookie. Guest
+checkout still works, and older guest orders are not exposed to an account
+created later with the same email address.
 
-The starter polo is added by `npm run db:seed-additional`. Confirm its final
-blank specification and pricing in the admin catalog before taking live orders.
+The starter polo is part of the seeded catalog. Confirm its final blank
+specification and pricing in the admin catalog before taking live orders.
 Automated password recovery and email verification require an email delivery
 service and are not configured yet.
 
 To enable Google sign-in, create a Google OAuth web client, authorize
-`https://kingdom-custom-print.vercel.app/api/account/google/callback` as a
-redirect URI, and set all three `GOOGLE_*` variables in the Vercel production
-environment. Apply `npm run db:migrate` to add the account link column before
-enabling it. The Google button stays hidden until client credentials are set.
+`https://kingdomcustomprint.com/api/account/google/callback` as a redirect URI,
+and set all three `GOOGLE_*` variables in the Worker environment. The Google
+button stays hidden until client credentials are set.
 The brand filters currently cover verified styles in the local catalog; the
 VictoryTee designer is a design reference, not a live supplier inventory feed.
 
 ## Deployment
 
-The project is linked to Vercel and reads `DATABASE_URL` from the Neon
-integration. Set `ADMIN_PASSWORD` and the Stripe variables in the Vercel project
-settings, then run `npm run db:migrate` against the production database before
-the first live order. **Do not run `db:reset` or `db:seed` on a database that
-contains customer or catalog data**; the seed task truncates tables. Seed only a
+The site runs on Cloudflare Workers with a D1 database and an R2 bucket for
+uploaded images. See [`docs/local-development-database.md`](docs/local-development-database.md)
+and [`docs/media-storage.md`](docs/media-storage.md) for the schema and bucket
+setup. Set `ADMIN_PASSWORD` and the Stripe variables as Worker secrets, then
+apply the schema with `npm run db:d1:schema` before the first live order.
+**Do not run `db:reset` or `db:d1:seed` on a database that contains customer or
+catalog data**; the seed task replaces catalog tables. Seed only a
 confirmed-empty database, or add catalog records through the admin workspace.
 
 Point a Stripe webhook at `https://<your-domain>/api/webhook` and subscribe it
@@ -125,7 +126,7 @@ full-refund event changes an order to refunded.
 Stripe test-mode checklist:
 
 1. Set test values for `STRIPE_SECRET_KEY` and `STRIPE_WEBHOOK_SECRET` in a
-   non-production deployment and run `npm run db:migrate`.
+   non-production deployment.
 2. Register the webhook events above and confirm Stripe reports successful 2xx
    delivery to `/api/webhook`.
 3. Place a test-card order and verify it stays pending until the signed paid

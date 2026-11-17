@@ -9,7 +9,7 @@
 ## Vercel Removed
 Vercel is no longer part of the deployment path. GitHub `main` pushes build and deploy through Cloudflare Workers Builds.
 
-The shared Hyperdrive connection uses query caching disabled. Authentication, payment, inventory and admin reads require current data; Hyperdrive does not invalidate cached query results on writes. Keep this setting disabled unless these reads are moved to a separate fresh-data connection.
+The Worker stores data in the D1 database `kingdom-custom-print` and uploaded images in the R2 bucket `kingdom-custom-print-media`. Both bindings are declared in `cloudflare.config.ts`; the database replaced the earlier Neon Postgres plus Hyperdrive connection.
 
 ## Check builds from the terminal
 

@@ -1,6 +1,6 @@
 -- Kingdom Custom Print — SQLite (Cloudflare D1) schema
 --
--- Mirrors db/schema.sql. Conventions:
+-- Mirrors the shape of the original Postgres schema. Conventions:
 --   * timestamps are ISO-8601 UTC text, so they sort lexicographically and
 --     parse with `new Date(value)` in the app
 --   * booleans are 0/1 integers

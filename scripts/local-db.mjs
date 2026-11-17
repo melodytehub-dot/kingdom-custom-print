@@ -3,8 +3,7 @@
  *
  * The app runs on one SQLite dialect everywhere: Cloudflare D1 in production
  * and Node's built-in SQLite on disk in development. This script resets that
- * local file and seeds the catalog, which is what `db:local` used to do through
- * a Postgres emulator.
+ * local file and seeds the catalog.
  *
  * Run: node scripts/local-db.mjs [--reset]
  */
