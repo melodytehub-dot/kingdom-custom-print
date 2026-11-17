@@ -127,3 +127,101 @@ export async function sweepExpiredCutout(): Promise<void> {
     cursor = listed.truncated ? listed.cursor : undefined;
   } while (cursor);
 }
+
+const PRODUCT_PREFIX = "product/";
+
+/** Unused product photos young enough that an editor may still put them back. */
+const ORPHAN_GRACE_MS = 14 * 24 * 60 * 60 * 1000;
+
+/**
+ * Upper bound on deletions per run. A backlog this large means the reference
+ * scan is probably wrong, so the sweep stops instead of clearing the bucket.
+ */
+const MAX_ORPHANS_PER_RUN = 25;
+
+const MEDIA_URL_ID = /\/api\/product-media\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/gi;
+
+/**
+ * Every product photo the database still points at.
+ *
+ * Uploads are only stored in three places: a colour's front/back image, the
+ * ready-made gallery rows, and the JSON values in `site_settings` (the homepage
+ * layout and custom pages live there). Add any new image column here as well.
+ */
+export async function referencedProductMedia(): Promise<Set<string>> {
+  const ids = new Set<string>();
+  const collect = (value: unknown) => {
+    if (typeof value !== "string") return;
+    for (const match of value.matchAll(MEDIA_URL_ID)) ids.add(match[1].toLowerCase());
+  };
+
+  const colors = await sql<{ front_image: string | null; back_image: string | null }[]>`
+    SELECT front_image, back_image FROM product_colors`;
+  for (const row of colors) {
+    collect(row.front_image);
+    collect(row.back_image);
+  }
+
+  const images = await sql<{ url: string | null }[]>`SELECT url FROM product_images`;
+  for (const row of images) collect(row.url);
+
+  const settings = await sql<{ value: string }[]>`SELECT value FROM site_settings`;
+  for (const row of settings) collect(row.value);
+
+  return ids;
+}
+
+export type ProductMediaSweep = {
+  /** Objects examined under `product/`. */
+  scanned: number;
+  /** Photo ids the database still references. */
+  referenced: number;
+  /** Keys removed from the bucket. */
+  deleted: string[];
+  /** Unreferenced keys left for a later run. */
+  kept: string[];
+};
+
+/**
+ * Removes product photos nothing points at any more.
+ *
+ * A photo is only deleted when it is unreferenced, older than the grace period
+ * and has a known upload time; anything unexpected is kept. Runs daily from the
+ * Worker's schedule, so a mistaken reference scan costs at most the cap below
+ * and not the whole bucket.
+ */
+export async function sweepOrphanProductMedia(now = Date.now()): Promise<ProductMediaSweep> {
+  const report: ProductMediaSweep = { scanned: 0, referenced: 0, deleted: [], kept: [] };
+  const bucket = mediaBucket();
+  if (!bucket) return report;
+
+  const objects: { key: string; uploaded?: Date }[] = [];
+  let cursor: string | undefined;
+  do {
+    const listed = await bucket.list({ prefix: PRODUCT_PREFIX, cursor });
+    objects.push(...listed.objects);
+    cursor = listed.truncated ? listed.cursor : undefined;
+  } while (cursor);
+
+  const referenced = await referencedProductMedia();
+  report.scanned = objects.length;
+  report.referenced = referenced.size;
+
+  const orphans = objects.filter((object) => {
+    const id = object.key.slice(PRODUCT_PREFIX.length).toLowerCase();
+    if (!id || referenced.has(id)) return false;
+    if (!object.uploaded) return false;
+    return now - object.uploaded.getTime() > ORPHAN_GRACE_MS;
+  });
+
+  if (orphans.length > MAX_ORPHANS_PER_RUN) {
+    report.kept = orphans.map((object) => object.key);
+    return report;
+  }
+
+  for (const object of orphans) {
+    await bucket.delete(object.key);
+    report.deleted.push(object.key);
+  }
+  return report;
+}

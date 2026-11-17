@@ -5,13 +5,24 @@ import {
   type DatabaseContext,
 } from "./lib/db-context";
 import type { DatabaseLike } from "./lib/sqlite";
-import { sweepExpiredCutout, type MediaBucket } from "./lib/media-storage";
+import {
+  sweepExpiredCutout,
+  sweepOrphanProductMedia,
+  type MediaBucket,
+} from "./lib/media-storage";
 
 type WorkerEnvironment = {
   DB: DatabaseLike;
   MEDIA?: MediaBucket;
   [key: string]: unknown;
 };
+
+type WorkerScheduledController = { scheduledTime?: number };
+
+/** The worker runs hourly; the photo sweep is the one job that runs once a day. */
+function isDailyPhotoSweep(scheduledTime: number | undefined): boolean {
+  return typeof scheduledTime === "number" && new Date(scheduledTime).getUTCHours() === 3;
+}
 
 type WorkerExecutionContext = {
   waitUntil(promise: Promise<unknown>): void;
@@ -25,12 +36,23 @@ type WorkerHandler = {
 const app = vinextWorker as WorkerHandler;
 
 export default {
-  async scheduled(_controller: unknown, env: WorkerEnvironment) {
+  async scheduled(controller: WorkerScheduledController, env: WorkerEnvironment) {
     globalThis.__kcpMediaBucket ??= env.MEDIA;
     const databaseContext: DatabaseContext = { db: env.DB };
     try {
       await runWithDatabaseContext(databaseContext, async () => {
         await sweepExpiredCutout();
+        if (isDailyPhotoSweep(controller?.scheduledTime)) {
+          const sweep = await sweepOrphanProductMedia();
+          if (sweep.deleted.length || sweep.kept.length) {
+            console.log("Product photo sweep", {
+              scanned: sweep.scanned,
+              referenced: sweep.referenced,
+              deleted: sweep.deleted.length,
+              kept: sweep.kept.length,
+            });
+          }
+        }
       });
     } finally {
       await closeDatabaseContext(databaseContext);

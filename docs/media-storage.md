@@ -34,8 +34,15 @@ npx cf deploy --prebuilt
 ```
 
 Cutout bridge objects are deleted after 24 hours by the hourly Worker schedule.
-Product photos are kept until the product or gallery entry is removed; deleting
-a product does not currently delete its R2 object.
+Product photos are removed once nothing references them: the daily run at 03:00
+UTC lists `product/`, compares it against the URLs stored in `product_colors`,
+`product_images` and `site_settings`, and deletes unreferenced photos that are
+older than 14 days. Anything with an unknown upload time is kept, and a run that
+finds more than 25 orphans deletes nothing so a broken reference scan cannot
+empty the bucket.
+
+The reference list lives in `referencedProductMedia()` in `lib/media-storage.ts`.
+If photos ever get stored somewhere else, add that source there first.
 
 ## Limits
 
