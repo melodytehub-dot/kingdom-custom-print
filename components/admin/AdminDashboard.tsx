@@ -10,7 +10,6 @@ import AdminRefund from "./AdminRefund";
 import QuotesPanel from "./QuotesPanel";
 import InventoryPanel from "./InventoryPanel";
 import PaymentSettings from "./PaymentSettings";
-import BuilderEditor from "./BuilderEditor";
 import { HERO_IMAGES } from "@/lib/hero-slides";
 import { homepageContentFromSettings } from "@/lib/homepage-builder";
 import { formatUSD } from "@/lib/pricing";
@@ -30,7 +29,7 @@ import type {
   SiteSettings,
 } from "@/lib/catalog-types";
 
-type Tab = "overview" | "orders" | "products" | "inventory" | "customers" | "quotes" | "pages" | "settings";
+type Tab = "overview" | "orders" | "products" | "inventory" | "customers" | "quotes" | "settings";
 
 /* SVG icon paths for sidebar nav items */
 const TAB_ICONS: Record<Tab, string> = {
@@ -40,7 +39,6 @@ const TAB_ICONS: Record<Tab, string> = {
   inventory: "M20 2H4c-1 0-2 .9-2 2v3.01c0 .72.43 1.34 1 1.69V20c0 .55.45 1 1 1h16c.55 0 1-.45 1-1V8.7c.57-.35 1-.97 1-1.69V4c0-1.1-1-2-2-2zm-5 12H9v-2h6v2zm5-7H4V4h16v3z",
   customers: "M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z",
   quotes: "M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z",
-  pages: "M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zm4 18H6V4h7v5h5v11z",
   settings: "M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.07.62-.07.94s.02.64.07.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z",
 };
 
@@ -49,7 +47,6 @@ type NavGroup = { label: string; tabs: Tab[] };
 const NAV_GROUPS: NavGroup[] = [
   { label: "", tabs: ["overview"] },
   { label: "Store", tabs: ["orders", "products", "inventory", "customers", "quotes"] },
-  { label: "Website", tabs: ["pages"] },
   { label: "Settings", tabs: ["settings"] },
 ];
 
@@ -60,7 +57,6 @@ const TAB_LABELS: Record<Tab, string> = {
   inventory: "Inventory",
   customers: "Customers",
   quotes: "Quotes & invoices",
-  pages: "Pages",
   settings: "Settings",
 };
 
@@ -99,8 +95,6 @@ export default function AdminDashboard({
 }) {
   const [tab, setTab] = useState<Tab>(initialTab);
   const [menuOpen, setMenuOpen] = useState(false);
-  const [builderDirty, setBuilderDirty] = useState(false);
-  const [studioMode, setStudioMode] = useState(false);
   const menuToggleRef = useRef<HTMLButtonElement>(null);
   const router = useRouter();
   const [signedOut, setSignedOut] = useState(false);
@@ -111,7 +105,6 @@ export default function AdminDashboard({
   }
 
   function selectTab(next: Tab) {
-    if (tab === "pages" && next !== "pages" && builderDirty && !window.confirm("You have unsaved page changes. Leave without saving?")) return;
     setTab(next);
     setMenuOpen(false);
     if (menuOpen) menuToggleRef.current?.focus();
@@ -138,7 +131,7 @@ export default function AdminDashboard({
   const pendingCount = data.orders.filter((o) => o.status === "pending").length;
 
   return (
-    <div className={`admin${studioMode ? " is-studio" : ""}`}>
+    <div className="admin">
       <div className={`admin-bar${menuOpen ? " is-open" : ""}`}>
         <div className="admin-sidebar-brand">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" fill="none" stroke="currentColor" strokeWidth="2"/></svg>
@@ -197,7 +190,6 @@ export default function AdminDashboard({
       {tab === "inventory" ? <InventoryPanel products={data.products} /> : null}
       {tab === "customers" ? <Customers data={data} /> : null}
       {tab === "quotes" ? <QuotesPanel /> : null}
-      {tab === "pages" ? <BuilderEditor onDirtyChange={setBuilderDirty} onStudioModeChange={setStudioMode} products={data.products} categories={data.categories} settings={data.settings} /> : null}
       {tab === "settings" ? <SettingsPanel settings={data.settings} categories={data.categories} /> : null}
       </div>
     </div>
