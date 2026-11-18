@@ -1,10 +1,14 @@
 import Image from "next/image";
 import Link from "next/link";
 import { DEFAULT_SETTINGS, getSettings } from "@/lib/catalog";
+import { defaultNavigationMenus, getNavigationMenus } from "@/lib/navigation-store";
 
 
 export default async function Footer() {
-  const settings = await getSettings().catch(() => DEFAULT_SETTINGS);
+  const [settings, menus] = await Promise.all([
+    getSettings().catch(() => DEFAULT_SETTINGS),
+    getNavigationMenus().catch(() => defaultNavigationMenus()),
+  ]);
   const year = new Date().getFullYear();
 
   return (
@@ -34,10 +38,9 @@ export default async function Footer() {
           <div className="mm-footer-col">
             <h2>Company</h2>
             <ul>
-              <li><Link href="/contact">Contact</Link></li>
-              <li><Link href="/shipping">Shipping & Return</Link></li>
-              <li><Link href="/faq">FAQ</Link></li>
-              <li><Link href="/privacy">Privacy Policy</Link></li>
+              {menus.footerCompany.map((item) => (
+                <li key={item.id}><Link href={item.href}>{item.label}</Link></li>
+              ))}
             </ul>
           </div>
 
@@ -56,12 +59,9 @@ export default async function Footer() {
           <div className="mm-footer-col mm-footer-information">
             <h2>Information</h2>
             <ul>
-              <li><Link href="/cart">My Cart</Link></li>
-              <li><Link href="/wishlist">Wishlist</Link></li>
-              <li><Link href="/checkout">Checkout</Link></li>
-              <li><Link href="/account">My Account</Link></li>
-              <li><Link href="/contact">Printing Enquiries</Link></li>
-              <li><Link href="/terms">Terms of Service</Link></li>
+              {menus.footerInfo.map((item) => (
+                <li key={item.id}><Link href={item.href}>{item.label}</Link></li>
+              ))}
             </ul>
           </div>
 

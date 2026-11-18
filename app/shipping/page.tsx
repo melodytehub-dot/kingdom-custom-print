@@ -1,16 +1,46 @@
 import Link from "next/link";
 import type { Metadata } from "next";
-import { getSettings, DEFAULT_SETTINGS } from "@/lib/catalog";
+import BuilderPageView from "@/components/builder/BuilderPageView";
+import { readPublishedBuilderPage } from "@/lib/builder/store";
+import { getProducts, getSettings, DEFAULT_SETTINGS } from "@/lib/catalog";
+import { emailConfigured } from "@/lib/email";
 import { formatUSD } from "@/lib/pricing";
 
-export const metadata: Metadata = {
+export const dynamic = "force-dynamic";
+
+const DEFAULT_META: Metadata = {
   title: "Shipping and returns",
   description:
     "Shipping timelines, costs and our policy on custom printed items.",
 };
 
+export async function generateMetadata(): Promise<Metadata> {
+  const custom = await readPublishedBuilderPage("shipping");
+  if (!custom) return DEFAULT_META;
+  return {
+    title: custom.title,
+    description: custom.description || DEFAULT_META.description,
+  };
+}
+
 export default async function ShippingPage() {
-  const settings = await getSettings().catch(() => DEFAULT_SETTINGS);
+  const [custom, settings] = await Promise.all([
+    readPublishedBuilderPage("shipping"),
+    getSettings().catch(() => DEFAULT_SETTINGS),
+  ]);
+
+  if (custom) {
+    const products = await getProducts().catch(() => []);
+    const contactEmail = process.env.SUPPORT_EMAIL?.trim() || settings.contactEmail;
+    return (
+      <BuilderPageView
+        page={custom}
+        products={products}
+        settings={{ ...settings, contactEmail }}
+        canSendEmail={emailConfigured() && Boolean(process.env.SUPPORT_EMAIL)}
+      />
+    );
+  }
 
   return (
     <>
