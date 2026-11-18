@@ -4,6 +4,8 @@ import CustomPageView from "@/components/CustomPageView";
 import BuilderPageView from "@/components/builder/BuilderPageView";
 import { publishedCustomPage } from "@/lib/custom-pages-store";
 import { readPublishedBuilderPage } from "@/lib/builder/store";
+import { DEFAULT_SETTINGS, getProducts, getSettings } from "@/lib/catalog";
+import { emailConfigured } from "@/lib/email";
 
 export const dynamic = "force-dynamic";
 
@@ -36,7 +38,21 @@ export default async function CustomPage({ params }: { params: Promise<{ slug: s
   const { slug } = await params;
 
   const builderPage = await readPublishedBuilderPage(slug);
-  if (builderPage) return <BuilderPageView page={builderPage} />;
+  if (builderPage) {
+    const [products, settings] = await Promise.all([
+      getProducts().catch(() => []),
+      getSettings().catch(() => DEFAULT_SETTINGS),
+    ]);
+    const contactEmail = process.env.SUPPORT_EMAIL?.trim() || settings.contactEmail;
+    return (
+      <BuilderPageView
+        page={builderPage}
+        products={products}
+        settings={{ ...settings, contactEmail }}
+        canSendEmail={emailConfigured() && Boolean(process.env.SUPPORT_EMAIL)}
+      />
+    );
+  }
 
   const page = await publishedCustomPage(slug);
   if (!page) notFound();

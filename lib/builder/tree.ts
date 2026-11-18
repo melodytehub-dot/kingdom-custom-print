@@ -7,8 +7,10 @@
 import {
   BUILDER_LIMITS,
   countNodes,
+  newColumn,
   newId,
   newWidget,
+  type Breakpoint,
   type BuilderLayout,
   type BuilderNode,
   type ColumnNode,
@@ -64,7 +66,7 @@ export function updateNode(
   };
 }
 
-/** Removes a widget or column. Sections are removed with `removeSection`. */
+/** Removes a widget, column or section. */
 export function removeNode(layout: BuilderLayout, id: string): BuilderLayout {
   return {
     ...layout,
@@ -79,7 +81,7 @@ export function removeNode(layout: BuilderLayout, id: string): BuilderLayout {
             widgets: column.widgets.filter((widget) => widget.id !== id),
           })),
       }))
-      .filter((section) => section.columns.length > 0)
+      .filter((section) => section.columns.length > 0),
   };
 }
 
@@ -91,13 +93,24 @@ export function insertSection(layout: BuilderLayout, section: SectionNode, index
   return countNodes(next) > BUILDER_LIMITS.nodes ? layout : next;
 }
 
+export function moveSection(layout: BuilderLayout, sectionId: string, targetIndex: number): BuilderLayout {
+  const currentIndex = layout.sections.findIndex((section) => section.id === sectionId);
+  if (currentIndex < 0) return layout;
+  let destination = Math.max(0, Math.min(targetIndex, layout.sections.length));
+  if (currentIndex < destination) destination -= 1;
+  if (destination === currentIndex) return layout;
+  const sections = [...layout.sections];
+  const [moved] = sections.splice(currentIndex, 1);
+  sections.splice(Math.max(0, Math.min(destination, sections.length)), 0, moved);
+  return { ...layout, sections };
+}
+
 export function insertColumn(layout: BuilderLayout, sectionId: string, column: ColumnNode): BuilderLayout {
   const section = layout.sections.find((entry) => entry.id === sectionId);
   if (!section || section.columns.length >= BUILDER_LIMITS.columns) return layout;
   return updateNode(layout, sectionId, (node) => {
     const target = node as SectionNode;
     const columns = [...target.columns, column];
-    // Share the row evenly; every column gets the same share of the row.
     const share = Math.round(100 / columns.length);
     return {
       ...target,
@@ -109,6 +122,110 @@ export function insertColumn(layout: BuilderLayout, sectionId: string, column: C
   });
 }
 
+/**
+ * Applies a column layout preset (e.g. [50, 50], [33, 67], [33, 33, 33]).
+ * If reducing the column count, widgets from trailing columns are appended
+ * into the last surviving column so nothing is lost.
+ */
+export function setSectionColumnsPreset(
+  layout: BuilderLayout,
+  sectionId: string,
+  widths: number[]
+): BuilderLayout {
+  if (widths.length < 1 || widths.length > BUILDER_LIMITS.columns) return layout;
+  const section = layout.sections.find((entry) => entry.id === sectionId);
+  if (!section) return layout;
+
+  const existing = section.columns;
+  const targetCount = widths.length;
+  const nextColumns: ColumnNode[] = [];
+
+  for (let i = 0; i < targetCount; i += 1) {
+    const colWidth = Math.min(100, Math.max(10, Math.round(widths[i])));
+    const source = existing[i];
+    if (source) {
+      nextColumns.push({
+        ...source,
+        style: {
+          ...source.style,
+          desktop: { ...source.style.desktop, columnWidth: colWidth },
+        },
+      });
+    } else {
+      nextColumns.push(newColumn(colWidth));
+    }
+  }
+
+  if (existing.length > targetCount) {
+    const trailingWidgets = existing.slice(targetCount).flatMap((col) => col.widgets);
+    if (trailingWidgets.length) {
+      const last = nextColumns[nextColumns.length - 1];
+      const merged = [...last.widgets, ...trailingWidgets].slice(0, BUILDER_LIMITS.widgets);
+      if (last.widgets.length + trailingWidgets.length > BUILDER_LIMITS.widgets) return layout;
+      nextColumns[nextColumns.length - 1] = { ...last, widgets: merged };
+    }
+  }
+
+  const next = updateNode(layout, sectionId, (node) => ({
+    ...(node as SectionNode),
+    columns: nextColumns,
+  }));
+  return countNodes(next) > BUILDER_LIMITS.nodes ? layout : next;
+}
+
+/**
+ * Resizes two adjacent columns inside a section while keeping their combined
+ * width constant.
+ */
+export function resizeColumns(
+  layout: BuilderLayout,
+  sectionId: string,
+  leftIndex: number,
+  nextLeftWidth: number,
+  breakpoint: Breakpoint = "desktop"
+): BuilderLayout {
+  const section = layout.sections.find((entry) => entry.id === sectionId);
+  if (!section || leftIndex < 0 || leftIndex + 1 >= section.columns.length) return layout;
+
+  const left = section.columns[leftIndex];
+  const right = section.columns[leftIndex + 1];
+  const readWidth = (col: ColumnNode) =>
+    (breakpoint === "desktop"
+      ? col.style.desktop.columnWidth
+      : breakpoint === "tablet"
+        ? col.style.tablet?.columnWidth ?? col.style.desktop.columnWidth
+        : col.style.mobile?.columnWidth ?? col.style.tablet?.columnWidth ?? col.style.desktop.columnWidth) ??
+    Math.round(100 / section.columns.length);
+
+  const leftCurr = readWidth(left);
+  const rightCurr = readWidth(right);
+  const combined = Math.min(100, Math.max(25, leftCurr + rightCurr));
+  const minWidth = 15;
+  const maxWidth = combined - minWidth;
+  if (maxWidth < minWidth) return layout;
+
+  const clampedLeft = Math.max(minWidth, Math.min(maxWidth, Math.round(nextLeftWidth)));
+  const clampedRight = Math.max(minWidth, Math.round(combined - clampedLeft));
+
+  const patchColumn = (col: ColumnNode, width: number): ColumnNode => {
+    const nextStyle = { ...col.style };
+    if (breakpoint === "desktop") {
+      nextStyle.desktop = { ...nextStyle.desktop, columnWidth: width };
+    } else {
+      nextStyle[breakpoint] = { ...(nextStyle[breakpoint] ?? {}), columnWidth: width };
+    }
+    return { ...col, style: nextStyle };
+  };
+
+  return updateNode(layout, sectionId, (node) => {
+    const target = node as SectionNode;
+    const columns = target.columns.map((col, idx) =>
+      idx === leftIndex ? patchColumn(col, clampedLeft) : idx === leftIndex + 1 ? patchColumn(col, clampedRight) : col
+    );
+    return { ...target, columns };
+  });
+}
+
 export function insertWidget(
   layout: BuilderLayout,
   columnId: string,
@@ -117,12 +234,13 @@ export function insertWidget(
 ): BuilderLayout {
   const column = layout.sections.flatMap((section) => section.columns).find((entry) => entry.id === columnId);
   if (!column || column.widgets.length >= BUILDER_LIMITS.widgets) return layout;
-  return updateNode(layout, columnId, (node) => {
+  const next = updateNode(layout, columnId, (node) => {
     const target = node as ColumnNode;
     const widgets = [...target.widgets];
     widgets.splice(index === undefined ? widgets.length : Math.max(0, Math.min(index, widgets.length)), 0, widget);
     return { ...target, widgets };
   });
+  return countNodes(next) > BUILDER_LIMITS.nodes ? layout : next;
 }
 
 /** Moves a widget to another column, or reorders it inside its own. */
@@ -144,12 +262,16 @@ export function moveWidget(
   let destination = index === undefined ? target.widgets.length : index;
   if (currentColumn.id === target.id && currentIndex < destination) destination -= 1;
 
-  if (currentColumn.id === target.id && (destination === currentIndex || destination < 0)) {
+  if (currentColumn.id === target.id) {
+    const bounded = Math.max(0, Math.min(destination, currentColumn.widgets.length - 1));
+    if (bounded === currentIndex) return layout;
     const widgets = [...currentColumn.widgets];
     widgets.splice(currentIndex, 1);
-    widgets.splice(Math.max(0, Math.min(destination, widgets.length)), 0, widget);
+    widgets.splice(bounded, 0, widget);
     return updateNode(layout, currentColumn.id, (node) => ({ ...(node as ColumnNode), widgets }));
   }
+
+  if (target.widgets.length >= BUILDER_LIMITS.widgets) return layout;
 
   const without = updateNode(layout, currentColumn.id, (node) => ({
     ...(node as ColumnNode),
@@ -230,20 +352,22 @@ export function duplicateNode(layout: BuilderLayout, id: string): BuilderLayout 
     const columnIndex = section.columns.findIndex((column) => column.id === id);
     if (columnIndex >= 0 && section.columns.length < BUILDER_LIMITS.columns) {
       const copy = cloneWithNewIds(section.columns[columnIndex]) as ColumnNode;
-      return updateNode(layout, section.id, (node) => {
+      const next = updateNode(layout, section.id, (node) => {
         const target = node as SectionNode;
         const columns = [...target.columns];
         columns.splice(columnIndex + 1, 0, copy);
         return { ...target, columns };
       });
+      return countNodes(next) > BUILDER_LIMITS.nodes ? layout : next;
     }
     for (const column of section.columns) {
       const widgetIndex = column.widgets.findIndex((widget) => widget.id === id);
-      if (widgetIndex >= 0) {
+      if (widgetIndex >= 0 && column.widgets.length < BUILDER_LIMITS.widgets) {
         const copy = cloneWithNewIds(column.widgets[widgetIndex]) as WidgetNode;
         const widgets = [...column.widgets];
         widgets.splice(widgetIndex + 1, 0, copy);
-        return updateNode(layout, column.id, (node) => ({ ...(node as ColumnNode), widgets }));
+        const next = updateNode(layout, column.id, (node) => ({ ...(node as ColumnNode), widgets }));
+        return countNodes(next) > BUILDER_LIMITS.nodes ? layout : next;
       }
     }
   }

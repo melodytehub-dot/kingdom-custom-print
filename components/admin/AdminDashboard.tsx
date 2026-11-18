@@ -13,6 +13,8 @@ import PaymentSettings from "./PaymentSettings";
 import HomepageSections from "./HomepageSections";
 import AdminPages from "./AdminPages";
 import BuilderEditor from "./BuilderEditor";
+import { MediaLibraryPanel } from "./MediaLibrary";
+import NavigationEditor from "./NavigationEditor";
 import { HERO_IMAGES } from "@/lib/hero-slides";
 import { homepageContentFromSettings } from "@/lib/homepage-builder";
 import { formatUSD } from "@/lib/pricing";
@@ -32,21 +34,54 @@ import type {
   SiteSettings,
 } from "@/lib/catalog-types";
 
-type Tab = "overview" | "orders" | "products" | "inventory" | "customers" | "quotes" | "builder" | "homepage" | "pages" | "preview" | "settings";
+type Tab = "overview" | "orders" | "products" | "inventory" | "customers" | "quotes" | "builder" | "homepage" | "media" | "menus" | "pages" | "preview" | "settings";
 
-const TABS: { id: Tab; label: string }[] = [
+const TABS: { id: Tab; label: string; group?: string }[] = [
   { id: "overview", label: "Overview" },
-  { id: "orders", label: "Orders" },
+  { id: "orders", label: "Orders", group: "Store" },
+  { id: "quotes", label: "Quotes & invoices" },
   { id: "products", label: "Products" },
   { id: "inventory", label: "Inventory" },
   { id: "customers", label: "Customers" },
-  { id: "quotes", label: "Quotes & invoices" },
-  { id: "builder", label: "Page builder" },
+  { id: "builder", label: "Page builder", group: "Website" },
   { id: "homepage", label: "Homepage sections" },
+  { id: "media", label: "Media library" },
+  { id: "menus", label: "Navigation" },
   { id: "pages", label: "Pages" },
   { id: "preview", label: "Website preview" },
-  { id: "settings", label: "Settings" },
+  { id: "settings", label: "Settings", group: "Configuration" },
 ];
+
+function TabIcon({ id }: { id: Tab }) {
+  switch (id) {
+    case "overview":
+      return <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1.5" /><rect x="14" y="3" width="7" height="7" rx="1.5" /><rect x="3" y="14" width="7" height="7" rx="1.5" /><rect x="14" y="14" width="7" height="7" rx="1.5" /></svg>;
+    case "orders":
+      return <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" aria-hidden="true"><path d="M6 7h12l-1 13H7L6 7Z" /><path d="M9 7V5a3 3 0 0 1 6 0v2" /></svg>;
+    case "quotes":
+      return <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" aria-hidden="true"><path d="M7 3h10l4 4v14H7V3Z" /><path d="M11 11h6M11 15h4" /></svg>;
+    case "products":
+      return <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" aria-hidden="true"><path d="M8 4l4 2 4-2 5 4-3 4v8H6v-8L3 8l5-4Z" /></svg>;
+    case "inventory":
+      return <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" aria-hidden="true"><path d="M4 7l8-4 8 4v10l-8 4-8-4V7Z" /><path d="M12 11l8-4M12 11v10M12 11L4 7" /></svg>;
+    case "customers":
+      return <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" aria-hidden="true"><circle cx="9" cy="8" r="3.5" /><path d="M3 19c0-3.2 2.7-5 6-5s6 1.8 6 5" /><path d="M17 11a3 3 0 1 0 0-6M21 19c0-2.5-1.7-4.2-4-4.7" /></svg>;
+    case "builder":
+      return <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2" /><path d="M9 4v16M9 11h12" /></svg>;
+    case "homepage":
+      return <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" aria-hidden="true"><path d="M3 10.5L12 3l9 7.5V20a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1v-9.5Z" /></svg>;
+    case "media":
+      return <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2" /><circle cx="8.5" cy="9.5" r="1.5" /><path d="m21 16-5-5-6 6-2-2-5 5" /></svg>;
+    case "menus":
+      return <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" aria-hidden="true"><path d="M4 7h16M4 12h12M4 17h16" /></svg>;
+    case "pages":
+      return <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" aria-hidden="true"><path d="M6 3h9l4 4v14H6V3Z" /><path d="M15 3v4h4" /></svg>;
+    case "preview":
+      return <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" aria-hidden="true"><path d="M2 12s4-6 10-6 10 6 10 6-4 6-10 6-10-6-10-6Z" /><circle cx="12" cy="12" r="2.5" /></svg>;
+    case "settings":
+      return <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" aria-hidden="true"><circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.9.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.9 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.9l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.9.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.9-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.9V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1Z" /></svg>;
+  }
+}
 
 const KIND_OPTIONS: { value: ProductKind; label: string }[] = [
   { value: "tee", label: "T-shirt" },
@@ -85,9 +120,11 @@ export default function AdminDashboard({
   const [menuOpen, setMenuOpen] = useState(false);
   const [homepageDirty, setHomepageDirty] = useState(false);
   const [builderDirty, setBuilderDirty] = useState(false);
+  const [studioOpen, setStudioOpen] = useState(false);
   const menuToggleRef = useRef<HTMLButtonElement>(null);
   const router = useRouter();
   const [signedOut, setSignedOut] = useState(false);
+  const pendingCount = useMemo(() => data.orders.filter((o) => o.status === "pending").length, [data.orders]);
 
   function closeMenu() {
     setMenuOpen(false);
@@ -97,6 +134,7 @@ export default function AdminDashboard({
   function selectTab(next: Tab) {
     if (tab === "homepage" && next !== "homepage" && homepageDirty && !window.confirm("You have unsaved homepage changes. Leave without saving?")) return;
     if (tab === "builder" && next !== "builder" && builderDirty && !window.confirm("You have unsaved page changes. Leave without saving?")) return;
+    if (next !== "builder") setStudioOpen(false);
     setTab(next);
     setMenuOpen(false);
     if (menuOpen) menuToggleRef.current?.focus();
@@ -120,9 +158,12 @@ export default function AdminDashboard({
     return <p className="muted" role="status">Signing you out…</p>;
   }
 
+  const inStudio = tab === "builder" && studioOpen;
+
   return (
-    <div className="admin">
-      <div className="admin-bar">
+    <div className={`admin${inStudio ? " is-studio" : ""}`}>
+      {!inStudio ? (
+      <div className="admin-bar wp-sidebar">
         <button ref={menuToggleRef} type="button" className="admin-menu-toggle" aria-expanded={menuOpen} aria-controls="admin-menu" onClick={() => setMenuOpen(true)}>
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><path d="M3 6h18M3 12h18M3 18h18" /></svg>
           Menu <span className="admin-menu-current">{TABS.find((item) => item.id === tab)?.label}</span>
@@ -132,15 +173,17 @@ export default function AdminDashboard({
           <div className="admin-menu-heading"><strong>Dashboard</strong><button type="button" onClick={closeMenu} aria-label="Close menu"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><path d="M5 5l14 14M19 5 5 19" /></svg></button></div>
           {TABS.map((t) => (
           <div className="admin-nav-item" key={t.id}>
-          {t.id === "orders" ? <p className="admin-nav-group">Store</p> : null}
-          {t.id === "homepage" ? <p className="admin-nav-group">Website</p> : null}
+          {t.group ? <p className="admin-nav-group">{t.group}</p> : null}
           <button
               type="button"
               className={`admin-tab${tab === t.id ? " is-active" : ""}`}
+              aria-label={t.label}
               aria-current={tab === t.id ? "page" : undefined}
               onClick={() => selectTab(t.id)}
             >
-              {t.label}
+              <TabIcon id={t.id} />
+              <span className="admin-tab-label">{t.label}</span>
+              {t.id === "orders" && pendingCount > 0 ? <span className="admin-nav-badge" aria-hidden="true">{pendingCount}</span> : null}
             </button>
           </div>
           ))}
@@ -155,6 +198,7 @@ export default function AdminDashboard({
           </button>
         </div>
       </div>
+      ) : null}
 
       <div className="admin-content">
       {!data.paymentsLive ? (
@@ -172,7 +216,18 @@ export default function AdminDashboard({
       {tab === "customers" ? <Customers data={data} /> : null}
       {tab === "quotes" ? <QuotesPanel /> : null}
       {tab === "homepage" ? <HomepageSections onDirtyChange={setHomepageDirty} products={data.products} /> : null}
-      {tab === "builder" ? <BuilderEditor onDirtyChange={setBuilderDirty} /> : null}
+      {tab === "builder" ? (
+        <BuilderEditor
+          onDirtyChange={setBuilderDirty}
+          onStudioModeChange={setStudioOpen}
+          onOpenHomepageEditor={() => selectTab("homepage")}
+          products={data.products}
+          categories={data.categories}
+          settings={data.settings}
+        />
+      ) : null}
+      {tab === "media" ? <MediaLibraryPanel /> : null}
+      {tab === "menus" ? <NavigationEditor /> : null}
       {tab === "pages" ? <AdminPages /> : null}
       {tab === "preview" ? <WebsitePreview /> : null}
       {tab === "settings" ? <SettingsPanel settings={data.settings} categories={data.categories} /> : null}
@@ -235,8 +290,8 @@ function Overview({
       <div className="admin-quick-actions" aria-label="Quick actions">
         <button type="button" onClick={() => onNavigate("orders")}><strong>Orders</strong><span>Review customer orders</span><ArrowRight /></button>
         <button type="button" onClick={() => onNavigate("products")}><strong>Products</strong><span>Add or edit products</span><ArrowRight /></button>
-        <button type="button" onClick={() => onNavigate("inventory")}><strong>Inventory</strong><span>Update stock quantities</span><ArrowRight /></button>
-        <button type="button" onClick={() => onNavigate("settings")}><strong>Website</strong><span>Edit website content</span><ArrowRight /></button>
+        <button type="button" onClick={() => onNavigate("builder")}><strong>Page builder</strong><span>Edit website pages visually</span><ArrowRight /></button>
+        <button type="button" onClick={() => onNavigate("media")}><strong>Media library</strong><span>Manage reusable photos</span><ArrowRight /></button>
       </div>
 
       {needsAction.length ? (

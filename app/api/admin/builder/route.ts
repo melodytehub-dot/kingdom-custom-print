@@ -2,9 +2,18 @@ import { NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
 import { requireAdmin } from "../_guard";
 import { limitedJson } from "@/lib/limited-form-data";
-import { isPageSlug } from "@/lib/custom-pages";
+import { getSettings } from "@/lib/catalog";
 import { readCustomPages } from "@/lib/custom-pages-store";
-import { BUILDER_LIMITS, parseBuilderLayout } from "@/lib/builder/schema";
+import {
+  BUILDER_LIMITS,
+  isBuilderSlug,
+  layoutHasContent,
+  parseBuilderLayout,
+} from "@/lib/builder/schema";
+import {
+  STORE_PAGE_CATALOG,
+  createBuiltinStarterPage,
+} from "@/lib/builder/builtin-pages";
 import {
   deleteBuilderPage,
   listBuilderPages,
@@ -36,9 +45,9 @@ function text(value: unknown, max: number, { empty = true } = {}): string | null
 /** Validates a save/publish payload. Returns a message instead of throwing. */
 async function readInput(body: Body): Promise<{ input: SaveInput } | { error: string; status: number }> {
   const slug = typeof body.slug === "string" ? body.slug : "";
-  if (!isPageSlug(slug)) {
+  if (!isBuilderSlug(slug)) {
     return {
-      error: "Page addresses use lowercase letters, numbers and dashes, and cannot reuse a store page.",
+      error: "Page addresses use lowercase letters, numbers and dashes, and cannot reuse a store route.",
       status: 422,
     };
   }
@@ -61,7 +70,7 @@ async function readInput(body: Body): Promise<{ input: SaveInput } | { error: st
   // A custom page and a builder page cannot share an address.
   const customPages = await readCustomPages();
   if (customPages.some((page) => page.slug === slug)) {
-    return { error: "A page created in the older page editor already uses that address.", status: 409 };
+    return { error: "A page created in the simple page editor already uses that address.", status: 409 };
   }
 
   return {
@@ -82,16 +91,52 @@ export async function GET(req: Request) {
 
   const url = new URL(req.url);
   const slug = url.searchParams.get("slug");
-  if (!slug) return NextResponse.json({ pages: await listBuilderPages() });
+  if (!slug) {
+    const allPages = await listBuilderPages();
+    const bySlug = new Map(allPages.map((p) => [p.slug, p]));
+    const storeSlugs = new Set<string>(STORE_PAGE_CATALOG.map((s) => s.slug));
+    const storePages = STORE_PAGE_CATALOG.map((entry) => {
+      const saved = bySlug.get(entry.slug);
+      return {
+        slug: entry.slug,
+        title: saved?.title || entry.title,
+        description: saved?.description || entry.description,
+        path: entry.path,
+        customized: Boolean(saved),
+        published: Boolean(saved?.published),
+        updatedAt: saved?.updatedAt ?? null,
+      };
+    });
+    return NextResponse.json({
+      pages: allPages.filter((p) => !storeSlugs.has(p.slug)),
+      storePages,
+    });
+  }
 
   const draft = await readBuilderDraft(slug);
-  if (!draft) return NextResponse.json({ error: "That page no longer exists." }, { status: 404 });
-  return NextResponse.json({
-    page: draft.page,
-    revision: draft.revision,
-    published: draft.published,
-    publishedAt: draft.publishedAt,
-  });
+  if (draft) {
+    return NextResponse.json({
+      page: draft.page,
+      revision: draft.revision,
+      published: draft.published,
+      publishedAt: draft.publishedAt,
+      isBuiltinDefault: false,
+    });
+  }
+
+  const builtin = STORE_PAGE_CATALOG.find((entry) => entry.slug === slug);
+  if (builtin) {
+    const settings = await getSettings();
+    return NextResponse.json({
+      page: createBuiltinStarterPage(builtin.slug, settings),
+      revision: 0,
+      published: false,
+      publishedAt: null,
+      isBuiltinDefault: true,
+    });
+  }
+
+  return NextResponse.json({ error: "That page no longer exists." }, { status: 404 });
 }
 
 export async function PUT(req: Request) {
@@ -148,7 +193,7 @@ export async function POST(req: Request) {
 
   if (body.action === "delete" || body.action === "unpublish") {
     const slug = typeof body.slug === "string" ? body.slug : "";
-    if (!isPageSlug(slug)) return NextResponse.json({ error: "Choose a page first." }, { status: 422 });
+    if (!isBuilderSlug(slug)) return NextResponse.json({ error: "Choose a page first." }, { status: 422 });
     const expectedRevision = Number(body.expectedRevision);
 
     if (body.action === "delete") {
@@ -181,16 +226,7 @@ export async function POST(req: Request) {
   const parsed = await readInput(body);
   if ("error" in parsed) return NextResponse.json({ error: parsed.error }, { status: parsed.status });
 
-  // Publishing an empty page would leave a blank address, so require content.
-  const hasContent = parsed.input.layout.sections.some((section) =>
-    section.columns.some((column) => column.widgets.some((widget) => {
-      if (widget.kind === "image") return widget.src !== "";
-      if (widget.kind === "faq") return widget.items.length > 0;
-      if (widget.kind === "spacer" || widget.kind === "divider") return true;
-      return widget.text.trim() !== "";
-    }))
-  );
-  if (!hasContent) {
+  if (!layoutHasContent(parsed.input.layout)) {
     return NextResponse.json({ error: "Add some content before publishing this page." }, { status: 422 });
   }
 
