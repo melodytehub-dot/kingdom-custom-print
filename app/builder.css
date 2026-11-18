@@ -812,17 +812,20 @@
 
 .builder-panel-tab {
   flex: 1;
-  padding: 10px 8px;
-  font-size: 12px;
+  padding: 10px 4px;
+  font-size: 11px;
   font-weight: 600;
   text-transform: uppercase;
-  letter-spacing: .06em;
+  letter-spacing: .04em;
   color: var(--el-panel-muted);
   background: none;
   border: 0;
   border-bottom: 2px solid transparent;
   cursor: pointer;
   text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .builder-panel-tab:hover { color: var(--el-panel-text); }
@@ -1179,7 +1182,7 @@
 }
 
 .builder-canvas-scaler {
-  transform-origin: top right;
+  transform-origin: top left;
 }
 
 /* Canvas selection and hover states (Elementor blue) */
@@ -1721,4 +1724,51 @@
 
 .builder-add-section-btn:hover {
   transform: scale(1.1);
+}
+
+/* ---- FAQ accordion reset inside builder canvas ---- */
+.builder-canvas .kcp-b-faq details summary {
+  transform: none !important;
+  writing-mode: horizontal-tb !important;
+  text-orientation: mixed !important;
+}
+.builder-canvas .kcp-b-faq details summary::marker,
+.builder-canvas .kcp-b-faq details summary::-webkit-details-marker {
+  display: none;
+}
+
+/* ---- Panel hint / label text fix (dark-on-dark) ---- */
+.builder-panel-left .hint,
+.builder-panel-right .hint,
+.builder-card .hint {
+  color: var(--el-panel-muted);
+}
+.builder-panel-left .label,
+.builder-panel-right .label {
+  color: var(--el-panel-muted);
+}
+
+/* ---- Admin media tabs (All / Published / Drafts filter) ---- */
+.admin-media-tabs {
+  display: flex;
+  gap: 0;
+  border: 1px solid var(--wp-border);
+  border-radius: 4px;
+  overflow: hidden;
+}
+.admin-media-tabs button {
+  padding: 7px 14px;
+  border: 0;
+  border-right: 1px solid var(--wp-border);
+  background: var(--wp-card-bg);
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--wp-text);
+  cursor: pointer;
+}
+.admin-media-tabs button:last-child { border-right: 0; }
+.admin-media-tabs button:hover { background: #f0f0f1; }
+.admin-media-tabs button.is-active {
+  background: var(--wp-primary);
+  color: #fff;
 }

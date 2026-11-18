@@ -57,12 +57,6 @@ export default async function AdminPage({
 
   return (
     <div className="wrap admin-page">
-      <header className="admin-head">
-        <div>
-          <h1 className="h2">Dashboard</h1>
-        </div>
-      </header>
-
       <AdminDashboard
         initialTab={tab}
         editingProduct={params.edit ?? ""}

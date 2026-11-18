@@ -1418,6 +1418,7 @@ export default function BuilderEditor({
             className="builder-canvas-wrap"
             onClick={() => setSelectedId(null)}
             onDragEnd={endDrag}
+            style={{ maxWidth: targetWidth * zoom, margin: '0 auto' }}
           >
             <div
               className={`builder-canvas${dragState ? " is-drop-target" : ""}`}
@@ -1430,7 +1431,7 @@ export default function BuilderEditor({
                   ref={scalerRef}
                   style={{
                     width: `${targetWidth}px`,
-                    transform: `translateX(${Math.max(0, Math.round((available - targetWidth * zoom) / 2))}px) scale(${zoom})`,
+                    transform: `scale(${zoom})`,
                   }}
                 >
                   <BuilderPageView
