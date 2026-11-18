@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent, type
 import Image from "next/image";
 import BuilderPageView, { type BuilderEditorCallbacks, type DropLocation } from "@/components/builder/BuilderPageView";
 import { MediaPickerModal } from "./MediaLibrary";
+import HomepageSections from "./HomepageSections";
 import type { SiteSettings } from "@/lib/catalog-types";
 import type { Product } from "@/lib/types";
 import { pageSlugFromTitle } from "@/lib/custom-pages";
@@ -273,14 +274,12 @@ function SelectField<T extends string>({
 export default function BuilderEditor({
   onDirtyChange,
   onStudioModeChange,
-  onOpenHomepageEditor,
   products = [],
   categories = [],
   settings,
 }: {
   onDirtyChange?: (dirty: boolean) => void;
   onStudioModeChange?: (open: boolean) => void;
-  onOpenHomepageEditor?: () => void;
   products?: Product[];
   categories?: { id: number; name: string; slug: string }[];
   settings?: SiteSettings;
@@ -310,6 +309,7 @@ export default function BuilderEditor({
   const [newSlug, setNewSlug] = useState("");
   const [newSlugEdited, setNewSlugEdited] = useState(false);
   const [starterId, setStarterId] = useState<string>(STARTER_PAGE_TEMPLATES[0].id);
+  const [homepageEditing, setHomepageEditing] = useState(false);
 
   // Media picker modal callback
   const [mediaTarget, setMediaTarget] = useState<((picked: { url: string; alt: string }) => void) | null>(null);
@@ -878,6 +878,24 @@ export default function BuilderEditor({
 
   if (loading) return <p className="hint">Loading pages…</p>;
 
+  /* Homepage inline editor — shown when user clicks "Edit homepage" from the page list */
+  if (!current && homepageEditing) {
+    return (
+      <div className="builder-start">
+        <div className="builder-start-head">
+          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            <button type="button" className="btn btn-light btn-sm" onClick={() => setHomepageEditing(false)}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z" /></svg>
+              All pages
+            </button>
+            <h2>Edit homepage</h2>
+          </div>
+        </div>
+        <HomepageSections onDirtyChange={onDirtyChange} products={products} />
+      </div>
+    );
+  }
+
   if (!current) {
     return (
       <div className="builder-start">
@@ -898,22 +916,20 @@ export default function BuilderEditor({
             <span className="small muted">Edit built-in pages visually or switch back to their default layout anytime.</span>
           </div>
           <div className="builder-store-grid">
-            {onOpenHomepageEditor ? (
-              <article className="builder-store-card">
-                <div>
-                  <div className="builder-store-card-top">
-                    <span className="builder-badge">Live</span>
-                    <span className="small muted">/</span>
-                  </div>
-                  <h4>Homepage</h4>
-                  <p className="small muted">Hero slideshow, sections, featured products, and homepage copy.</p>
+            <article className="builder-store-card">
+              <div>
+                <div className="builder-store-card-top">
+                  <span className="builder-badge">Live</span>
+                  <span className="small muted">/</span>
                 </div>
-                <div className="builder-store-card-actions">
-                  <button type="button" className="btn btn-sm" onClick={onOpenHomepageEditor}>Edit homepage</button>
-                  <a className="link" href="/" target="_blank" rel="noreferrer">View</a>
-                </div>
-              </article>
-            ) : null}
+                <h4>Homepage</h4>
+                <p className="small muted">Hero slideshow, sections, featured products, and homepage copy.</p>
+              </div>
+              <div className="builder-store-card-actions">
+                <button type="button" className="btn btn-sm" onClick={() => setHomepageEditing(true)}>Edit homepage</button>
+                <a className="link" href="/" target="_blank" rel="noreferrer">View</a>
+              </div>
+            </article>
 
             {storePages.map((entry) => (
               <article key={entry.slug} className="builder-store-card">
