@@ -144,9 +144,9 @@ const MEDIA_URL_ID = /\/api\/product-media\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}
 /**
  * Every product photo the database still points at.
  *
- * Uploads are stored across a colour's front/back image, the ready-made
- * gallery rows, the JSON values in `site_settings`, and visual builder pages
- * (`builder_pages`). Add any new image column here as well.
+ * Uploads are only stored in three places: a colour's front/back image, the
+ * ready-made gallery rows, and the JSON values in `site_settings` (the homepage
+ * layout and custom pages live there). Add any new image column here as well.
  */
 export async function referencedProductMedia(): Promise<Set<string>> {
   const ids = new Set<string>();
@@ -167,13 +167,6 @@ export async function referencedProductMedia(): Promise<Set<string>> {
 
   const settings = await sql<{ value: string }[]>`SELECT value FROM site_settings`;
   for (const row of settings) collect(row.value);
-
-  const builderPages = await sql<{ layout_json: string; published_json: string | null }[]>`
-    SELECT layout_json, published_json FROM builder_pages`;
-  for (const row of builderPages) {
-    collect(row.layout_json);
-    collect(row.published_json);
-  }
 
   return ids;
 }

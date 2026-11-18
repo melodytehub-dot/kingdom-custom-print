@@ -5,8 +5,6 @@ import BuilderPageView from "@/components/builder/BuilderPageView";
 import { ADMIN_COOKIE, adminConfigured, validateSession } from "@/lib/admin-auth";
 import { readBuilderDraft } from "@/lib/builder/store";
 import { isBuilderSlug } from "@/lib/builder/schema";
-import { DEFAULT_SETTINGS, getProducts, getSettings } from "@/lib/catalog";
-import { emailConfigured } from "@/lib/email";
 
 export const dynamic = "force-dynamic";
 
@@ -27,18 +25,5 @@ export default async function BuilderPreview({ searchParams }: { searchParams: P
   const draft = await readBuilderDraft(slug);
   if (!draft) notFound();
 
-  const [products, settings] = await Promise.all([
-    getProducts().catch(() => []),
-    getSettings().catch(() => DEFAULT_SETTINGS),
-  ]);
-  const contactEmail = process.env.SUPPORT_EMAIL?.trim() || settings.contactEmail;
-
-  return (
-    <BuilderPageView
-      page={draft.page}
-      products={products}
-      settings={{ ...settings, contactEmail }}
-      canSendEmail={emailConfigured() && Boolean(process.env.SUPPORT_EMAIL)}
-    />
-  );
+  return <BuilderPageView page={draft.page} />;
 }

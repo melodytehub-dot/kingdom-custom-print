@@ -94,18 +94,10 @@ try {
   const unusedOld = id(4);
   const unusedFresh = id(5);
   const unusedUnknownAge = id(6);
-  const onBuilder = id(7);
 
   run("UPDATE product_colors SET front_image = ? WHERE id = (SELECT MIN(id) FROM product_colors)", `/api/product-media/${onColor}`);
   run("INSERT INTO product_images (product_id, url, alt, sort_order) VALUES ((SELECT MIN(id) FROM products), ?, '__color_gallery__:white', 0)", `/api/product-media/${onGallery}`);
   run("INSERT INTO site_settings (key, value) VALUES ('homepage_content_v1', ?)", JSON.stringify({ heroImage1: `/api/product-media/${onHomepage}` }));
-  run(
-    "INSERT INTO builder_pages (slug, title, description, show_title, layout_json, revision, published_json, published_at, updated_at) VALUES (?, ?, '', 1, ?, 1, NULL, NULL, ?)",
-    "qa-media-page",
-    "QA Media Page",
-    JSON.stringify({ version: 1, sections: [{ id: id(90), kind: "section", boxed: true, style: { desktop: {} }, columns: [{ id: id(91), kind: "column", style: { desktop: { columnWidth: 100 } }, widgets: [{ id: id(92), kind: "image", src: `/api/product-media/${onBuilder}`, alt: "Builder photo", href: "", style: { desktop: {} } }] }] }] }),
-    new Date(now).toISOString()
-  );
 
   const bucket = fakeBucket([
     { key: `product/${onColor}`, uploaded: old },
@@ -114,7 +106,6 @@ try {
     { key: `product/${unusedOld}`, uploaded: old },
     { key: `product/${unusedFresh}`, uploaded: fresh },
     { key: `product/${unusedUnknownAge}`, uploaded: undefined },
-    { key: `product/${onBuilder}`, uploaded: old },
     { key: `cutout/${"c".repeat(32)}`, uploaded: old },
   ]);
   globalThis.__kcpMediaBucket = bucket;
@@ -123,17 +114,15 @@ try {
   check("front images are treated as references", referenced.has(onColor));
   check("gallery rows are treated as references", referenced.has(onGallery));
   check("homepage settings are treated as references", referenced.has(onHomepage));
-  check("builder pages are treated as references", referenced.has(onBuilder));
 
   const report = await sweepOrphanProductMedia(now);
   const remaining = [...bucket.objects.keys()].sort();
 
-  check("the sweep only looks at product photos", report.scanned === 7);
+  check("the sweep only looks at product photos", report.scanned === 6);
   check("an old unused photo is deleted", !remaining.includes(`product/${unusedOld}`));
   check("a photo used by a colour survives", remaining.includes(`product/${onColor}`));
   check("a photo used by the gallery survives", remaining.includes(`product/${onGallery}`));
   check("a photo used by the homepage survives", remaining.includes(`product/${onHomepage}`));
-  check("a photo used by a builder page survives", remaining.includes(`product/${onBuilder}`));
   check("a recent upload survives the grace period", remaining.includes(`product/${unusedFresh}`));
   check("a photo with no upload time is kept", remaining.includes(`product/${unusedUnknownAge}`));
   check("cutout images are outside this sweep", remaining.includes(`cutout/${"c".repeat(32)}`));

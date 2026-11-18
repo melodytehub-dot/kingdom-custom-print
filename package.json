@@ -46,7 +46,6 @@
     "qa-checkout-idempotency": "node scripts/qa-checkout-idempotency.mjs",
     "qa-order-transitions": "node scripts/qa-order-transitions.mjs",
     "qa-homepage-history": "node scripts/qa-homepage-history.mjs",
-    "qa-builder-ui": "node scripts/qa-elementor-builder.mjs",
     "qa-custom-pages": "node scripts/qa-custom-pages.mjs",
     "qa-admin-pages": "node scripts/qa-admin-pages.mjs",
     "qa-admin-settings": "node scripts/qa-admin-settings.mjs",

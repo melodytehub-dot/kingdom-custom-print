@@ -154,23 +154,11 @@ export async function saveBuilderDraft(input: SaveInput): Promise<SaveResult> {
 
 /**
  * Publishes the draft and bumps the revision in one statement, so visitors can
- * never see a half-updated page. `expectedRevision` of 0 creates and publishes
- * the page in a single step.
+ * never see a half-updated page.
  */
 export async function publishBuilderPage(input: SaveInput): Promise<SaveResult> {
   const now = new Date().toISOString();
   const layout = JSON.stringify(input.layout);
-
-  if (input.expectedRevision === 0) {
-    const [{ n }] = await sql<{ n: number }[]>`SELECT count(*) AS n FROM builder_pages`;
-    if (Number(n) >= PAGE_LIMIT) return { ok: false, reason: "limit" };
-    const inserted = await sql`
-      INSERT INTO builder_pages (slug, title, description, show_title, layout_json, revision, published_json, published_at, updated_at)
-      VALUES (${input.slug}, ${input.title}, ${input.description}, ${input.showTitle ? 1 : 0}, ${layout}, 1, ${layout}, ${now}, ${now})
-      ON CONFLICT (slug) DO NOTHING`;
-    return inserted.count === 1 ? { ok: true, revision: 1 } : { ok: false, reason: "conflict" };
-  }
-
   const updated = await sql`
     UPDATE builder_pages
     SET title = ${input.title},

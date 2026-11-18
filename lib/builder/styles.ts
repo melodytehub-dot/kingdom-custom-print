@@ -41,17 +41,6 @@ function oneOf<T extends string>(value: unknown, allowed: readonly T[]): T | nul
 const TEXT_ALIGN = ["left", "center", "right"] as const;
 const VERTICAL_ALIGN = { start: "flex-start", center: "center", end: "flex-end" } as const;
 const OBJECT_FIT = ["cover", "contain"] as const;
-const BOX_SHADOW = {
-  none: "none",
-  sm: "0 2px 8px rgba(17,17,16,.06)",
-  md: "0 8px 24px rgba(17,17,16,.1)",
-  lg: "0 18px 42px rgba(17,17,16,.14)",
-} as const;
-const FONT_FAMILY = {
-  body: "var(--font-body)",
-  display: "var(--font-display)",
-} as const;
-const TEXT_TRANSFORM = ["none", "uppercase"] as const;
 
 function declarations(node: BuilderNode, style: ElementStyle): string[] {
   const out: string[] = [];
@@ -70,9 +59,6 @@ function declarations(node: BuilderNode, style: ElementStyle): string[] {
 
   add("font-size", px(style.fontSize));
   add("font-weight", unitless(style.fontWeight));
-  const family = oneOf(style.fontFamily, ["body", "display"] as const);
-  if (family) add("font-family", FONT_FAMILY[family]);
-  add("text-transform", oneOf(style.textTransform, TEXT_TRANSFORM));
   add("line-height", unitless(style.lineHeight));
   add("letter-spacing", px(style.letterSpacing));
   add("text-align", oneOf(style.textAlign, TEXT_ALIGN));
@@ -91,17 +77,12 @@ function declarations(node: BuilderNode, style: ElementStyle): string[] {
     add("margin-left", "auto");
     add("margin-right", "auto");
   }
-  if (typeof style.minHeight === "number" && style.minHeight > 0) {
-    add("min-height", px(style.minHeight));
-  }
 
   if (typeof style.borderWidth === "number" && style.borderWidth > 0) {
     const borderColour = colour(style.borderColor) ?? "#e5e2dd";
     add("border", `${Math.round(style.borderWidth)}px solid ${borderColour}`);
   }
   add("border-radius", px(style.borderRadius));
-  const shadow = oneOf(style.boxShadow, ["none", "sm", "md", "lg"] as const);
-  if (shadow) add("box-shadow", BOX_SHADOW[shadow]);
 
   // A section is a block with a flex row inside, so its gap belongs on the row.
   if (node.kind !== "section") add("gap", px(style.gap));

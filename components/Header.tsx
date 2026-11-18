@@ -1,11 +1,21 @@
 import Image from "next/image";
 import Link from "next/link";
 import type { Category } from "@/lib/types";
-import { defaultNavigationMenus, getNavigationMenus } from "@/lib/navigation-store";
 import WishlistLink from "./WishlistLink";
 import CartButton from "./CartButton";
 import MobileNav from "./MobileNav";
 import Search from "./icons/Search";
+
+const MAIN_NAV_LINKS = [
+  { href: "/", label: "Home" },
+  { href: "/shop", label: "Shop All" },
+  { href: "/shop?kind=tee", label: "T-Shirts" },
+  { href: "/shop?kind=polo", label: "Polo Shirts" },
+  { href: "/shop?kind=longsleeve", label: "Long Sleeves" },
+  { href: "/shop?kind=hoodie", label: "Hoodies" },
+  { href: "/customize", label: "Design Studio", highlight: true },
+  { href: "/contact", label: "Contact" },
+];
 
 export default async function Header({
   categories,
@@ -16,8 +26,6 @@ export default async function Header({
   announcement: string;
   announcementLink?: string;
 }) {
-  const menus = await getNavigationMenus().catch(() => defaultNavigationMenus());
-  const mainNavLinks = menus.header;
 
   return (
     <header className="mm-header-wrapper">
@@ -92,8 +100,8 @@ export default async function Header({
         {/* 3. DESKTOP NAVIGATION BAR */}
         <nav className="mm-nav-bar" aria-label="Main navigation">
           <ul className="mm-nav-list">
-            {mainNavLinks.map((link) => (
-              <li key={link.id} className="mm-nav-item">
+            {MAIN_NAV_LINKS.map((link) => (
+              <li key={link.href} className="mm-nav-item">
                 <Link
                   href={link.href}
                   className={`mm-nav-link ${link.highlight ? "highlight" : ""}`}
