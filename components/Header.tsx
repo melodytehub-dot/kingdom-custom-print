@@ -11,10 +11,12 @@ export default async function Header({
   categories,
   announcement,
   announcementLink = "",
+  logo,
 }: {
   categories: Category[];
   announcement: string;
   announcementLink?: string;
+  logo: string;
 }) {
   const menus = await getNavigationMenus().catch(() => defaultNavigationMenus());
   const mainNavLinks = menus.header;
@@ -42,12 +44,13 @@ export default async function Header({
       <div className="mm-header">
         <div className="minimog-container mm-header-main">
           {/* Mobile hamburger */}
-          <MobileNav categories={categories} />
+          <MobileNav categories={categories} logo={logo} />
 
           {/* Real Brand Logo */}
           <Link href="/" className="mm-logo" aria-label="Kingdom Custom Print — Home">
             <Image
-              src="/brand/kingdom-logo.png"
+              src={logo}
+              unoptimized={logo.startsWith("/api/product-media/")}
               alt="Kingdom Custom Print"
               width={180}
               height={55}

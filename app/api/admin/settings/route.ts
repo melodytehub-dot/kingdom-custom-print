@@ -3,6 +3,7 @@ import { revalidatePath } from "next/cache";
 import { requireAdmin } from "../_guard";
 import { getSettings, HomepageContentConflict, saveSettings, type SiteSettings } from "@/lib/catalog";
 import { isHomepageImage, isSafeHomepageLink, parseHomepageContent } from "@/lib/homepage-builder";
+import { mediaExists } from "@/lib/media-storage";
 
 export const dynamic = "force-dynamic";
 
@@ -24,6 +25,18 @@ export async function PUT(req: Request) {
   }
 
   const current = await getSettings();
+  const logo = body.siteLogo ?? current.siteLogo;
+  const logoMatch = typeof logo === "string" ? /^\/api\/product-media\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/i.exec(logo) : null;
+  if (logo !== "/brand/kingdom-logo.png" && (!logoMatch || !(await mediaExists("product", logoMatch[1])))) {
+    return NextResponse.json({ error: "Choose a valid logo image and try again." }, { status: 422 });
+  }
+  for (const key of ["heroImage1", "heroImage2", "heroImage3"] as const) {
+    const value = body[key] ?? current[key];
+    const uploaded = typeof value === "string" ? /^\/api\/product-media\/([0-9a-f-]+)$/i.exec(value) : null;
+    if (typeof value !== "string" || !isHomepageImage(value) || (uploaded && !(await mediaExists("product", uploaded[1])))) {
+      return NextResponse.json({ error: "Choose a valid slideshow image and try again." }, { status: 422 });
+    }
+  }
   const image = (value: unknown, fallback: string) => typeof value === "string" && isHomepageImage(value) ? value : fallback;
   const str = (v: unknown, max = 500) => String(v ?? "").slice(0, max);
   const numField = (v: unknown, fallback: number, max = 100000) => {
@@ -35,6 +48,7 @@ export async function PUT(req: Request) {
   const expectedHomepage = body.expectedHomepageContent === undefined ? undefined : parseHomepageContent(body.expectedHomepageContent);
   if (expectedHomepage === null) return NextResponse.json({ error: "The homepage settings could not be verified. Reload and try again." }, { status: 422 });
   try { await saveSettings({
+    siteLogo: logo as string,
     heroLabel: str(body.heroLabel ?? current.heroLabel, 80),
     heroHeadlineTop: str(body.heroHeadlineTop ?? current.heroHeadlineTop, 100),
     heroHeadlineBottom: str(body.heroHeadlineBottom ?? current.heroHeadlineBottom, 100),

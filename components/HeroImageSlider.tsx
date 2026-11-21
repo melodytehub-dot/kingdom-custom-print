@@ -96,7 +96,7 @@ export default function HeroImageSlider({ slides: SLIDES }: { slides: readonly {
               fill
               sizes="(max-width: 768px) 100vw, 50vw"
               preload={index === 0}
-              unoptimized={slide.src.endsWith(".webp")}
+              unoptimized={slide.src.endsWith(".webp") || slide.src.startsWith("/api/product-media/")}
               style={{ objectFit: "cover", objectPosition: slide.position }}
             />
           </div>

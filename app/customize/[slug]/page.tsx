@@ -59,6 +59,7 @@ export default async function CustomizePage({ params, searchParams }: Params) {
         initialColor={color ?? ""}
         initialLines={parseSizes(sizes, product)}
         contactPhone={settings?.contactPhone ?? ""}
+        siteLogo={settings?.siteLogo}
       />
     </div>
   );

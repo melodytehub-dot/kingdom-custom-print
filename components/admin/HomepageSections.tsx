@@ -16,7 +16,7 @@ function formatVersionDate(value: string) {
   return `${iso.slice(0, 10)} at ${iso.slice(11, 16)} UTC`;
 }
 
-export default function HomepageSections({ onDirtyChange, products }: { onDirtyChange: (dirty: boolean) => void; products: Product[] }) {  const [layout, setLayout] = useState<HomepageLayout | null>(null);
+export default function HomepageSections({ onDirtyChange, products }: { onDirtyChange?: (dirty: boolean) => void; products: Product[] }) {  const [layout, setLayout] = useState<HomepageLayout | null>(null);
   const [loading, setLoading] = useState(true);
   const [dragging, setDragging] = useState<HomepageSectionId | null>(null);
   const [dropTarget, setDropTarget] = useState<HomepageSectionId | null>(null);
@@ -129,7 +129,7 @@ export default function HomepageSections({ onDirtyChange, products }: { onDirtyC
 
   const dirty = Boolean(layout && initial && JSON.stringify(layout) !== (saved ?? initial));
   useEffect(() => {
-    onDirtyChange(dirty || inlineEditing);
+    onDirtyChange?.(dirty || inlineEditing);
     if (!dirty && !inlineEditing) return;
     const warn = (event: BeforeUnloadEvent) => { event.preventDefault(); event.returnValue = ""; };
     window.addEventListener("beforeunload", warn);

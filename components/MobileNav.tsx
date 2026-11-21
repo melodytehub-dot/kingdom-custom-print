@@ -17,7 +17,7 @@ const LINKS = [
   { href: "/contact", label: "Contact" },
 ];
 
-export default function MobileNav({ categories }: { categories: Category[] }) {
+export default function MobileNav({ categories, logo }: { categories: Category[]; logo: string }) {
   const [open, setOpen] = useState(false);
   const pathname = usePathname();
   const panelRef = useRef<HTMLDivElement>(null);
@@ -102,7 +102,8 @@ export default function MobileNav({ categories }: { categories: Category[] }) {
                 <div className="mobile-panel-head">
                   <Link href="/" className="mm-logo" onClick={() => setOpen(false)} aria-label="Kingdom Custom Print">
                     <Image
-                      src="/brand/kingdom-logo.png"
+                      src={logo}
+                      unoptimized={logo.startsWith("/api/product-media/")}
                       alt="Kingdom Custom Print"
                       width={160}
                       height={46}

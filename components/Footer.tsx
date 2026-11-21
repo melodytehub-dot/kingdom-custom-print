@@ -20,7 +20,8 @@ export default async function Footer() {
           <div className="mm-footer-col mm-footer-brand-info">
             <Link href="/" className="mm-footer-logo" aria-label="Kingdom Custom Print">
               <Image
-                src="/brand/kingdom-logo.png"
+                src={settings.siteLogo}
+                unoptimized={settings.siteLogo.startsWith("/api/product-media/")}
                 alt="Kingdom Custom Print"
                 width={170}
                 height={50}

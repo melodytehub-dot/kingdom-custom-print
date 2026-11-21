@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import Garment from "@/components/Garment";
 import DesignPreviewImage from "@/components/DesignPreviewImage";
@@ -1610,9 +1611,31 @@ function SettingsPanel({
   const [categorySaving, setCategorySaving] = useState(false);
   const [saving, setSaving] = useState(false);
   const [state, setState] = useState<{ tone: "ok" | "error"; text: string } | null>(null);
+  const router = useRouter();
+
+  const [uploadingBrandImage, setUploadingBrandImage] = useState(false);
+  async function uploadBrandImage(key: "siteLogo" | "heroImage1" | "heroImage2" | "heroImage3", file: File | undefined) {
+    if (!file || uploadingBrandImage || saving) return;
+    setUploadingBrandImage(true);
+    setState(null);
+    try {
+      const data = new FormData();
+      data.append("image", file);
+      const response = await fetch("/api/admin/product-media", { method: "POST", body: data });
+      const result = await response.json() as { url?: string; error?: string };
+      if (!response.ok || !result.url) throw new Error(result.error || "The image could not be uploaded.");
+      setForm(current => ({ ...current, [key]: result.url! }));
+      setState({ tone: "ok", text: "Image ready. Select Save settings to publish your changes." });
+    } catch (error) {
+      setState({ tone: "error", text: error instanceof Error ? error.message : "The image could not be uploaded. Try again." });
+    } finally {
+      setUploadingBrandImage(false);
+    }
+  }
 
   async function save(e: React.FormEvent) {
     e.preventDefault();
+    if (saving || uploadingBrandImage) return;
     setSaving(true);
     setState(null);
     try {
@@ -1633,6 +1656,7 @@ function SettingsPanel({
       }
       setHomepageBaseline(homepageContentFromSettings(form));
       setState({ tone: "ok", text: "Settings saved. They apply across the storefront." });
+      router.refresh();
     } catch {
       setState({ tone: "error", text: "Network error. Try again." });
     } finally {
@@ -1663,6 +1687,15 @@ function SettingsPanel({
 
       <form className="settings-form" onSubmit={save}>
         <fieldset className="fieldset">
+          <legend className="label">Website logo</legend>
+          <p className="hint">This logo appears in the site header, mobile menu, footer and design studio. A transparent PNG works well.</p>
+          <div className="admin-brand-logo-preview"><Image src={form.siteLogo} alt="Current logo preview" width={220} height={100} unoptimized /></div>
+          <label className="label" htmlFor="s-site-logo">Replace logo</label>
+          <input id="s-site-logo" className="admin-image-upload" type="file" accept="image/jpeg,image/png,image/webp" disabled={saving || uploadingBrandImage} onChange={(event) => { void uploadBrandImage("siteLogo", event.currentTarget.files?.[0]); event.currentTarget.value = ""; }} />
+          <span className="hint">JPG, PNG or WebP, up to 15 MB. Save settings to publish.</span>
+          {form.siteLogo !== "/brand/kingdom-logo.png" ? <button type="button" className="btn btn-light" disabled={saving || uploadingBrandImage} onClick={() => setForm(current => ({ ...current, siteLogo: "/brand/kingdom-logo.png" }))}>Restore original logo</button> : null}
+        </fieldset>
+        <fieldset className="fieldset">
           <legend className="label">Homepage introduction</legend>
           <p className="hint">Edit the text shown over the homepage slideshow.</p>
           <div className="admin-home-preview" style={{ backgroundImage: `linear-gradient(90deg, rgba(0,0,0,.78), rgba(0,0,0,.35)), url("${form.heroImage1}")` }}>
@@ -1682,6 +1715,10 @@ function SettingsPanel({
           {(["heroImage1", "heroImage2", "heroImage3"] as const).map((key, index) => <div className="field" key={key}>
             <label className="label" htmlFor={`s-${key}`}>Slideshow image {index + 1}</label>
             <select id={`s-${key}`} className="select" value={form[key]} onChange={(e) => setForm({ ...form, [key]: e.target.value })}>{HERO_IMAGES.map((image) => <option key={image.src} value={image.src}>{image.name}</option>)}{!HERO_IMAGES.some(image => image.src === form[key]) ? <option value={form[key]}>Uploaded photo</option> : null}</select>
+            <div className="admin-slide-preview"><Image src={form[key]} alt={`Slideshow image ${index + 1} preview`} width={480} height={240} unoptimized /></div>
+            <label className="label" htmlFor={`s-upload-${key}`}>Upload a new image</label>
+            <input id={`s-upload-${key}`} className="admin-image-upload" type="file" accept="image/jpeg,image/png,image/webp" disabled={saving || uploadingBrandImage} onChange={(event) => { void uploadBrandImage(key, event.currentTarget.files?.[0]); event.currentTarget.value = ""; }} />
+            <span className="hint">JPG, PNG or WebP, up to 15 MB.</span>
           </div>)}
         </fieldset>
         <fieldset className="fieldset">
@@ -1833,7 +1870,9 @@ function SettingsPanel({
           </div>
         </fieldset>
 
-        <button type="submit" className="btn" disabled={saving}>
+        {uploadingBrandImage ? <p role="status">Uploading image…</p> : null}
+        {state ? <p className={`banner-note${state.tone === "error" ? " is-error" : " is-ok"}`}>{state.text}</p> : null}
+        <button type="submit" className="btn" disabled={saving || uploadingBrandImage}>
           {saving ? "Saving…" : "Save settings"}
         </button>
       </form>

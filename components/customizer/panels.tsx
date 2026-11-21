@@ -39,6 +39,7 @@ export function ProductsPanel({
   onColor,
   onSwitchProduct,
   onClose,
+  siteLogo = "/brand/kingdom-logo.png",
 }: {
   product: Product;
   products: Product[];
@@ -47,6 +48,7 @@ export function ProductsPanel({
   onColor: (code: string) => void;
   onSwitchProduct: (product: Product) => boolean;
   onClose: () => void;
+  siteLogo?: string;
 }) {
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState("all");
@@ -150,7 +152,7 @@ export function ProductsPanel({
               // eslint-disable-next-line @next/next/no-img-element
               <img src={p.images[0].url} alt="" />
             ) : (
-              <Image src="/brand/kingdom-logo.png" alt="" width={40} height={24} />
+              <Image src={siteLogo} alt="" width={40} height={24} unoptimized={siteLogo.startsWith("/api/product-media/")} />
             )}
             <span className="rot-blank-details">
               <strong>{p.name}</strong>

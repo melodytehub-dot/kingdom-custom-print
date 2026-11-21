@@ -110,7 +110,7 @@ export default async function RootLayout({
         <ToastProvider>
           <CartProvider>
             <WishlistProvider>
-            <StorefrontChrome><Header categories={categories} announcement={settings.announcement} announcementLink={settings.announcementLink} /></StorefrontChrome>
+            <StorefrontChrome><Header categories={categories} announcement={settings.announcement} announcementLink={settings.announcementLink} logo={settings.siteLogo} /></StorefrontChrome>
             <main id="main"><PageTransition>{children}</PageTransition></main>
             <StorefrontChrome><Footer /></StorefrontChrome>
             <MobileTabBar />

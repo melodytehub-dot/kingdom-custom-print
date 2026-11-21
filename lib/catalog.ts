@@ -432,6 +432,7 @@ export async function deleteProduct(id: number): Promise<boolean> {
    ------------------------------------------------------------------------- */
 
 export interface SiteSettings {
+  siteLogo: string;
   heroLabel: string;
   heroHeadlineTop: string;
   heroHeadlineBottom: string;
@@ -455,6 +456,7 @@ export interface SiteSettings {
 }
 
 export const DEFAULT_SETTINGS: SiteSettings = {
+  siteLogo: "/brand/kingdom-logo.png",
   heroLabel: "PRINT ON DEMAND STUDIO",
   heroHeadlineTop: "YOUR IDEAS.",
   heroHeadlineBottom: "MADE TO WEAR.",
@@ -492,6 +494,7 @@ export async function getSettings(): Promise<SiteSettings> {
     SELECT key, value FROM site_settings`;
   const map = new Map(rows.map((r) => [r.key, parseSettingValue(r.value)]));
   return {
+    siteLogo: String(map.get("site_logo") ?? DEFAULT_SETTINGS.siteLogo),
     heroLabel: String(map.get("hero_label") ?? DEFAULT_SETTINGS.heroLabel),
     heroHeadlineTop: String(map.get("hero_headline_top") ?? DEFAULT_SETTINGS.heroHeadlineTop),
     heroHeadlineBottom: String(map.get("hero_headline_bottom") ?? DEFAULT_SETTINGS.heroHeadlineBottom),
@@ -529,6 +532,7 @@ export async function saveSettings(settings: SiteSettings, expectedHomepage?: Ho
   }
 
   const entries: [string, unknown][] = [
+    ["site_logo", settings.siteLogo],
     ["hero_label", settings.heroLabel],
     ["hero_headline_top", settings.heroHeadlineTop],
     ["hero_headline_bottom", settings.heroHeadlineBottom],

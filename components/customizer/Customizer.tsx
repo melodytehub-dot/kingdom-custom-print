@@ -233,12 +233,14 @@ export default function Customizer({
   initialColor,
   initialLines,
   contactPhone,
+  siteLogo = "/brand/kingdom-logo.png",
 }: {
   product: Product;
   products: Product[];
   initialColor: string;
   initialLines: Record<string, number>;
   contactPhone: string;
+  siteLogo?: string;
 }) {
   const { addItem, replaceItem, items } = useCart();
   const router = useRouter();
@@ -1619,6 +1621,7 @@ export default function Customizer({
             onColor={changeColor}
             onSwitchProduct={handoffToProduct}
             onClose={closePanel}
+            siteLogo={siteLogo}
           />
         );
       case "switch-confirm":
@@ -1763,7 +1766,7 @@ export default function Customizer({
         );
       default:
         return (
-          <ProductsPanel product={product} products={products} mockup={mockup} mockups={productMockups} onColor={changeColor} onSwitchProduct={handoffToProduct} onClose={closePanel} />
+          <ProductsPanel product={product} products={products} mockup={mockup} mockups={productMockups} onColor={changeColor} onSwitchProduct={handoffToProduct} onClose={closePanel} siteLogo={siteLogo} />
         );
     }
   }
@@ -1928,7 +1931,8 @@ export default function Customizer({
       <header className="rot-bar">
         <Link href="/" className="rot-logo" aria-label="Kingdom Custom Print — home">
           <Image
-            src="/brand/kingdom-logo.png"
+            src={siteLogo}
+            unoptimized={siteLogo.startsWith("/api/product-media/")}
             alt="Kingdom Custom Print"
             width={1400}
             height={843}

@@ -2,6 +2,7 @@ import type { OrderStatus, ProductKind, RosterEntry } from "./types";
 import type { Product } from "./types";
 
 export interface SiteSettings {
+  siteLogo: string;
   heroLabel: string;
   heroHeadlineTop: string;
   heroHeadlineBottom: string;
