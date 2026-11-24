@@ -65,18 +65,19 @@ const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || (process.env.NODE_ENV === "p
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
   title: {
-    default: "Kingdom Custom Print — Custom Printed Apparel",
+    default: "Custom T-Shirts, Hoodies & Apparel | Kingdom Custom Print",
     template: "%s | Kingdom Custom Print",
   },
   description:
-    "Design custom printed t-shirts. Upload your artwork or build a design online — add text, graphics and names & numbers — then we print it to order.",
+    "Create custom t-shirts, hoodies, polos and team apparel online. Upload your artwork or use our design studio to personalize garments, then order with Kingdom Custom Print.",
+  alternates: { canonical: "/" },
   openGraph: {
     type: "website",
     siteName: "Kingdom Custom Print",
     url: siteUrl,
-    title: "Kingdom Custom Print — Custom Printed Apparel",
+    title: "Custom T-Shirts, Hoodies & Apparel | Kingdom Custom Print",
     description:
-      "Upload your artwork or design online. Custom printed t-shirts, made to order.",
+      "Create custom t-shirts, hoodies, polos and team apparel online with the Kingdom Custom Print design studio.",
   },
   twitter: {
     card: "summary_large_image",

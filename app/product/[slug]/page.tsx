@@ -19,10 +19,13 @@ export async function generateMetadata({ params }: Params): Promise<Metadata> {
   if (!product) return { title: "Product not found" };
   return {
     title: product.saleMode === "ready-made" ? product.name : `${product.name} — custom printed`,
-    description: product.blurb,
+    description: product.blurb || product.description || `Shop ${product.name} from Kingdom Custom Print. Choose a color and personalize your order online.`,
+    alternates: { canonical: `/product/${product.slug}` },
     openGraph: {
       title: `${product.name} | Kingdom Custom Print`,
-      description: product.blurb,
+      description: product.blurb || product.description || `Shop ${product.name} from Kingdom Custom Print.`,
+      type: "website",
+      images: product.colors?.[0]?.frontImage ? [product.colors[0].frontImage] : undefined,
     },
   };
 }
